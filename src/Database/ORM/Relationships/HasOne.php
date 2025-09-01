@@ -38,27 +38,18 @@ class HasOne
         $result = $this->connection->fetchOne($query, [$this->localKey]);
 
         if ($result !== false && is_array($result)) {
-            // Kalla bara på createModelInstance om resultatet är en array
+            // Returnera en ny modellinstans om data hittas
             return $this->createModelInstance($result);
         }
 
-        // Returnera null om inget hittades eller om datatyp inte är en array
+        // Returnera null om inget hittades
         return null;
     }
 
     public function first(): ?Model
     {
-        $result = $this->get();
-
-        // Direkt returnera resultatet om det redan är en modell
-        if ($result instanceof Model) {
-            return $result;
-        }
-
-        // Annars skapa en modellinstans
-        return $result ? $this->createModelInstance($result) : null;
+        return $this->get();
     }
-
 
     private function createModelInstance(array $data): Model
     {
