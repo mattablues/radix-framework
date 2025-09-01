@@ -1,0 +1,577 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Radix\Viewer;
+
+class RadixTemplateViewer implements TemplateViewerInterface
+{
+    private array $globals = [];
+    private string $cachePath;
+    private string $viewsDirectory;
+    private bool $debug = false;
+    private array $filters = [];
+
+    public function __construct(string $viewsDirectory = null)
+    {
+        $this->viewsDirectory = $viewsDirectory ?? dirname(__DIR__, 3) . '/views/';
+        $this->cachePath = ROOT_PATH . getenv('CACHE_PATH') ?: __DIR__ . '/../cache/views/';
+    }
+
+    /**
+     * Render a template with given data.
+     */
+    public function render(string $template, array $data = [], string $version = ''): string
+    {
+        $this->debug("[DEBUG] Attempting to render template: $template");
+        $data = $this->mergeData($data);
+
+        // Rensa gamla cachefiler
+        $this->clearOldCacheFiles(3600);
+
+        $templatePath = $this->resolveTemplatePath($template);
+        $this->debug("Template resolved to: $templatePath");
+
+        $data = $this->applyFilters($data);
+
+        // Generera unik cache-nyckel baserat på data och version
+        $cacheKey = $this->generateCacheKey($templatePath, $data, $version);
+        $cachedFile = $this->getCachedTemplate($cacheKey);
+
+        if ($cachedFile !== null) {
+            $this->debug("[DEBUG] Using cached template: $cachedFile");
+            extract($data, EXTR_SKIP);
+
+            ob_start();
+            include $cachedFile;
+            $output = ob_get_clean();
+            $this->debug("[DEBUG] Output from cached file: " . substr($output, 0, 100));
+            return $output;
+        }
+
+        $filePath = $this->viewsDirectory . $templatePath;
+        if (!file_exists($filePath)) {
+            throw new \RuntimeException("Template file not found: $filePath");
+        }
+
+        $code = $this->loadTemplate($filePath);
+        $code = $this->processExtends($code, $this->viewsDirectory);
+        $code = $this->loadIncludes($this->viewsDirectory, $code);
+        $code = $this->replacePlaceholders($code);
+
+        $this->cacheTemplate($cacheKey, $code);
+        $this->debug("Compiled template cached under key: $cacheKey");
+
+        return $this->evaluateTemplate($code, $data);
+    }
+
+    /**
+     * Aktivera eller inaktivera debug-läge.
+     */
+    public function enableDebugMode(bool $debug): void
+    {
+        $this->debug = $debug;
+    }
+
+    public function registerFilter(string $name, callable $callback, string $type = 'string'): void
+    {
+        $this->filters[$name] = [
+            'callback' => $callback, // Behåller callback för att kunna exekvera den
+            'type' => $type,
+            'identifier' => spl_object_hash((object)$callback) // Identifiering utan serialization
+        ];
+    }
+
+    public function invalidateCache(string $template, array $data = [], string $version = ''): void
+    {
+        $templatePath = $this->resolveTemplatePath($template);
+        $cacheKey = $this->generateCacheKey($templatePath, $data, $version);
+        $cacheFile = $this->cachePath . $cacheKey . '.php';
+
+        if (file_exists($cacheFile)) {
+            unlink($cacheFile); // Ta bort filen
+            $this->debug("Cache invalidated for key: $cacheKey");
+        }
+    }
+
+    /**
+     * Define a global shared variable.
+     */
+    public function shared(string $name, mixed $value): void
+    {
+        $this->globals[$name] = $value;
+        $this->debug("[DEBUG] Registrerad global variabel: $name => " . print_r($value, true));
+    }
+
+    /**
+     * Create a new instance and render the template statically.
+     */
+    public static function view(string $template, array $data = []): string
+    {
+        $view = new self();
+
+        return $view->render($template, $data);
+    }
+
+    /**
+     * Resolve a template path from a dot-separated string.
+     */
+    private function resolveTemplatePath(string $template): string
+    {
+        if (str_contains($template, '.')) {
+            // Byt ut punkter mot snedstreck för att spegla mappstrukturen
+            $path = str_replace('.', '/', $template);
+            return $path . '.ratio.php';
+        }
+
+        return $template . '.ratio.php';
+    }
+
+    /**
+     * Load a template file, enforcing it exists.
+     */
+    private function loadTemplate(string $filePath): string
+    {
+        if (!file_exists($filePath)) {
+            // Debug-log för sökvägar
+            throw new \RuntimeException("Template file not found: $filePath. Check if the directory and file exist.");
+        }
+
+        return file_get_contents($filePath);
+    }
+
+    /**
+     * Process any `{% extends %}` directives for parent templates.
+     */
+    private function processExtends(string $code, string $viewsDirectory): string
+    {
+        while (preg_match('#^{% extends "(?<view>.*?)" %}#', $code, $matches)) {
+            $parentTemplate = $this->loadTemplate($viewsDirectory . $matches['view']);
+            $blocks = $this->getBlocks($code);
+            $code = $this->replaceYields($parentTemplate, $blocks);
+        }
+
+        return $code;
+    }
+
+    /**
+     * Load and include templates referenced in `{% include %}` directives.
+     */
+    private function loadIncludes(string $viewsDirectory, string $code): string
+    {
+        preg_match_all('#{% include "(?<view>.*?)" %}#', $code, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $templateFilePath = $viewsDirectory . $match['view'];
+            $includedContent = $this->loadTemplate($templateFilePath);
+            $code = preg_replace("#{% include \"{$match['view']}\" %}#", $includedContent, $code);
+        }
+
+        return $code;
+    }
+
+    /**
+     * Convert placeholders like `{% %}` and `{{ }}` to PHP code.
+     */
+    private function parseAttributes(string $attributeString): array
+    {
+        $attributes = [];
+        preg_match_all('/([\w\-:]+)="([^"]*)"/', $attributeString, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $key = $match[1];
+            $value = preg_replace_callback(
+                "#{{\s*(.+?)\s*}}#", // Matcha speciella placeholders i attribut
+                function ($matches) {
+                    return '<?php echo ' . $matches[1] . '; ?>';
+                },
+                $match[2]
+            );
+
+            $attributes[$key] = trim($value);
+        }
+
+        return $attributes;
+    }
+
+    private function replacePlaceholders(string $code): string
+    {
+        $this->debug("[DEBUG] Original kod före placeholder-bearbetning:\n" . htmlspecialchars($code));
+
+        // 1. Hantera komponentinstanser (<x-komponent>)
+        $code = preg_replace_callback(
+            '#<x-([\w\.\-]+)([^>]*)>(.*?)<\/x-\1>#s',
+            function (array $matches) {
+                $componentName = str_replace('.', '/', $matches[1]);
+                $attributes = $this->parseAttributes(trim($matches[2] ?? ''));
+                $content = trim($matches[3] ?? '');
+
+                return $this->renderComponent($componentName, $attributes, $this->replacePlaceholders($content));
+            },
+            $code
+        );
+
+        // 2. Specifik hantering av globala variabler (t.ex., {{ $globalVar }})
+        $code = preg_replace_callback(
+            "#{{\s*\\$(global\w+)\s*}}#", // Matchar globala variabler med `$`-prefix
+            function ($matches) {
+                return '<?php echo $' . $matches[1] . '; ?>';
+            },
+            $code
+        );
+
+        // 3. Bearbeta PHP-direktiv `{% ... %}`
+        $code = $this->replacePHPDirectives($code);
+
+        // 4. Bearbeta variabler och uttryck (gäller generiska placeholders som `{{ variabel }}`)
+        $code = $this->replaceVariableOutput($code);
+
+        $this->debug("[DEBUG] Kod efter placeholder-bearbetning:\n" . htmlspecialchars($code));
+        return $code;
+    }
+
+    private function renderComponent(string $componentPath, array $attributes, string $slotContent): string
+    {
+        $this->debug("[DEBUG] Renderar komponent från path: $componentPath");
+        $this->debug("[DEBUG] Attribut: " . print_r($attributes, true));
+        $this->debug("[DEBUG] SlotInnehåll: " . htmlspecialchars($slotContent));
+
+        $componentFilePath = "{$this->viewsDirectory}components/$componentPath.ratio.php";
+
+        if (!file_exists($componentFilePath)) {
+            throw new \RuntimeException("Komponent fil saknas: $componentFilePath");
+        }
+
+        $componentCode = $this->loadTemplate($componentFilePath);
+        $slots = $this->extractNamedSlots($slotContent);
+
+        // Justera attribut med att lägga till slots
+        $attributes = array_map(
+            fn($value) => trim($this->replaceVariableOutput($value)),
+            $attributes
+        );
+
+        // Kombinera data (inklusive tom slot) som skickas till komponenten
+        $data = array_merge(['slot' => trim($slotContent)], $slots, $attributes);
+        $processedCode = trim($this->replacePlaceholders($componentCode));
+
+        $result = trim($this->evaluateTemplate($processedCode, $this->mergeData($data)));
+        $this->debug("[DEBUG] Renderad komponent ut data:\n" . htmlspecialchars($result));
+
+        return $result;
+    }
+
+    /**
+     * Extracts named slots from the given slotContent.
+     * Supports syntax like `<x-slot:name>content</x-slot:name>`.
+     */
+    private function extractNamedSlots(string &$slotContent): array
+    {
+        $this->debug("[DEBUG] Extraherar slots från innehåll:\n" . htmlspecialchars($slotContent));
+
+        $slots = [];
+        preg_match_all('#<x-slot:([\w\-]+)>(.*?)</x-slot:\1>#s', $slotContent, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $slotName = $match[1];
+            // Hantera tomma slots genom att sätta ett standardvärde som tom sträng
+            $slotValue = isset($match[2]) ? trim($this->replacePlaceholders($match[2])) : '';
+            $slots[$slotName] = $slotValue;
+
+            $this->debug("[DEBUG] Extraherad slot: $slotName, Innehåll:\n" . htmlspecialchars($slotValue));
+
+            // Ta bort matchade <x-slot> från originalinnehållet
+            $slotContent = str_replace($match[0], '', $slotContent);
+        }
+
+        $this->debug("[DEBUG] Extraherade slots:\n" . print_r($slots, true));
+        return $slots;
+    }
+
+    /**
+     * Convert `{% directive %}` to PHP code.
+     */
+    private function replacePHPDirectives(string $code): string
+    {
+        return preg_replace("#{%\s*(.+?)\s*%}#", "<?php $1 ?>", $code);
+    }
+
+    /**
+     * Bearbeta och escapa variabelbaserade placeholders.
+     */
+    private function replaceVariableOutput(string $code): string
+    {
+       // 1. Placeholder för slot
+       $code = preg_replace_callback(
+           "#{{\s*slot\s*}}#",
+           function () {
+               return '<?php echo trim($slot); ?>';
+           },
+           $code
+       );
+
+       // 2. Bearbeta uttryck med "|raw" för att undvika HTML-escaping
+       $code = preg_replace_callback(
+           "#{{\s*(.+?)\|raw\s*}}#",
+           function ($matches) {
+               return '<?php echo secure_output('. $matches[1] . ', true); ?>'; // Tillåt rå data
+           },
+           $code
+       );
+
+       // 3. Alla andra placeholders (inklusive variabler och funktioner)
+       $code = preg_replace_callback(
+           "#{{\s*(.+?)\s*}}#",
+           function ($matches) {
+               return '<?php echo secure_output('. $matches[1] . '); ?>'; // Escapar HTML-output via secureOutput
+           },
+           $code
+       );
+
+       return $code;
+    }
+
+    /**
+     * Extract blocks from a given template string.
+     */
+    private function getBlocks(string $code): array
+    {
+        preg_match_all("#{% block (?<name>\w+) %}(?<content>.*?){% endblock %}#s", $code, $matches, PREG_SET_ORDER);
+        $blocks = [];
+
+        foreach ($matches as $match) {
+            $blocks[$match["name"]] = $match["content"];
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Replace `{% yield %}` directives with corresponding block content.
+     */
+    private function replaceYields(string $code, array $blocks): string
+    {
+        preg_match_all("#{% yield (?<name>\w+) %}#", $code, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $yieldName = $match['name'];
+            $replacement = $blocks[$yieldName] ?? '';
+            $code = str_replace($match[0], $replacement, $code);
+        }
+
+        return $code;
+    }
+
+    /**
+     * Safely evaluate the processed template code with extracted data.
+     */
+    private function evaluateTemplate(string $code, array $data): string
+    {
+        extract($data, EXTR_SKIP);
+
+        ob_start();
+        eval('?>' . $code);
+        $output = ob_get_clean();
+
+        // Behåll outputen som den är utan normalisering
+        $this->debug("[DEBUG] Evaluations resultat:\n" . htmlspecialchars($output));
+
+        return $output;
+    }
+
+    /**
+     * Merge globals and provided template data.
+     */
+    private function mergeData(array $data): array
+    {
+        $this->debug("[DEBUG] Globala variabler:\n" . print_r($this->globals, true));
+        $this->debug("[DEBUG] Lokala data:\n" . print_r($data, true));
+
+        // Kombinera globala variabler och lokala data
+        return array_merge($this->globals, $data);
+    }
+
+    private function cacheTemplate(string $key, string $compiledCode): void
+    {
+        $cacheFile = $this->cachePath . $key . '.php';
+
+        if (!is_dir($this->cachePath)) {
+            $this->debug("[DEBUG] Cache directory not found. Creating: $this->cachePath");
+            mkdir($this->cachePath, 0755, true);
+        }
+
+        // Kontrollera miljön från APP_ENV: Minifiera endast i production
+        $appEnv = getenv('APP_ENV') ?: 'production';
+        $codeToWrite = $appEnv === 'production' ? $this->minifyPHP($compiledCode) : $compiledCode;
+
+        $this->debug("[DEBUG] Writing cache file to: $cacheFile (Minify: " . ($appEnv === 'production' ? 'YES' : 'NO') . ")");
+
+        // Skriv ut koden till fil
+        if (file_put_contents($cacheFile, $codeToWrite) === false) {
+            $this->debug("[DEBUG] Failed to write cache file to: $cacheFile");
+        } else {
+            $this->debug("[DEBUG] Cache file successfully written to: $cacheFile");
+        }
+    }
+
+    private function minifyPHP(string $code): string
+    {
+        // 1. Matcha och skydda PHP-taggar och innehåll
+        $preservedPHP = [];
+
+        $code = preg_replace_callback(
+            '/(<\?php.*?\?>)/s', // Matcha PHP-block
+            function ($matches) use (&$preservedPHP) {
+                $key = '###PHP' . count($preservedPHP) . '###'; // Generera unikt nyckelord
+                $preservedPHP[$key] = $matches[0]; // Behåll PHP-originalkoden
+                return $key; // Ersätt PHP med nyckeln
+            },
+            $code
+        );
+
+        // 2. Utför lätt minifiering för HTML utanför PHP-block
+        // Ta bort onödiga radbrytningar och blanksteg i HTML
+        $code = preg_replace('/^\h*\R+/m', '', $code); // Ta bort tomma rader
+        $code = preg_replace('/>\s+</', ">\n<", $code); // Behåll radbrytningar mellan HTML-taggar
+        $code = preg_replace('/\s+/', ' ', $code); // Komprimera mellanslag till ett enda
+
+        // 3. Återställ skyddad PHP tillbaka till koden
+        foreach ($preservedPHP as $key => $originalPHP) {
+            $code = str_replace($key, $originalPHP, $code);
+        }
+
+        // 4. Trimma kod (ta bort whitespace i början och slutet)
+        return trim($code);
+    }
+
+    private function generateCacheKey(string $templatePath, array $data, string $version = ''): string
+    {
+        // Skapa en liten representation av relevanta delar
+        $relevantParts = [
+            'template' => $templatePath,
+            'pagination' => $this->getPaginationKey($data),
+            'search' => $this->getSearchKey($data), // Inkludera sök-data
+            'filters' => $this->getFilterKey(),
+            'version' => $version ?: 'default_version',
+        ];
+
+        // Lägg till ändringstider från CSS och JS
+        $cssPath = ROOT_PATH . '/public/css/app.css';
+        $jsPath = ROOT_PATH . '/public/js/app.js';
+        $additionalHashes = [
+            'css' => file_exists($cssPath) ? (string)filemtime($cssPath) : 'no-css',
+            'js' => file_exists($jsPath) ? (string)filemtime($jsPath) : 'no-js',
+        ];
+
+        // Kombinera allt till en cache-nyckel
+        return md5(serialize($relevantParts) . serialize($additionalHashes));
+    }
+
+    private function getSearchKey(array $data): array
+    {
+        // Isolera söktermer och relevant data från "search"
+        if (isset($data['search']) && is_array($data['search'])) {
+            return [
+                'term' => $data['search']['term'] ?? '', // Sökterm som viktiga nyckel
+                'current_page' => $data['search']['current_page'] ?? 1, // För paginerad sökning
+            ];
+        }
+
+        return [];
+    }
+
+    private function getPaginationKey(array $data): array
+    {
+        // Isolera endast pagineringen
+        return isset($data['pagination']) && is_array($data['pagination'])
+            ? ['page' => $data['pagination']['page'] ?? 1]
+            : [];
+    }
+
+    private function getFilterKey(): string
+    {
+        // Skapa en representation av filtren (namn och typer)
+        $filterNames = array_keys($this->filters);
+        $filterTypes = array_map(fn($filter) => $filter['type'], $this->filters);
+
+        // Skapa hash för aktiva filter
+        return md5(serialize($filterNames) . serialize($filterTypes));
+    }
+
+    /**
+     * Debug-loggning (kan anpassas att logga i filer eller visa på skärmen).
+     */
+    private function debug(string $message): void
+    {
+        if ($this->debug) {
+            echo "[DEBUG] $message" . PHP_EOL;
+        }
+    }
+
+    private function applyFilters(array $data): array
+    {
+        foreach ($data as $key => $value) {
+            foreach ($this->filters as $filter) {
+                $expectedType = $filter['type'];
+
+                // Applicera filtret endast om typen matchar
+                if ($expectedType === 'string' && is_string($value)) {
+                    $value = $filter['callback']($value); // Uppdatera värdet
+                } elseif ($expectedType === 'array' && is_array($value)) {
+                    $value = $filter['callback']($value);
+                } elseif ($expectedType === 'object' && is_object($value)) {
+                    $value = $filter['callback']($value);
+                }
+            }
+            $data[$key] = $value; // Sätt det transformerade värdet
+        }
+
+        return $data;
+    }
+
+    private function getCachedTemplate(string $key): ?string
+    {
+        $cacheFile = $this->cachePath . $key . '.php';
+
+        if (file_exists($cacheFile)) {
+            return $cacheFile;
+        }
+
+        return null;
+    }
+
+    /**
+     * Removes older cache files based on their last modification time.
+     *
+     * @param int $maxAgeInSeconds The maximum age (in seconds) a cache file is allowed to have.
+     */
+    private function clearOldCacheFiles(int $maxAgeInSeconds = 86400): void // 1 day by default
+    {
+        // Kontrollera om cache-katalogen finns innan du rensar
+        if (!is_dir($this->cachePath)) {
+            return;
+        }
+    
+        $now = time();
+    
+        // Loopa igenom alla filer i cachekatalogen
+        foreach (scandir($this->cachePath) as $file) {
+            $filePath = "$this->cachePath/$file";
+    
+            // Hoppa över "." och ".."
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+    
+            // Kontrollera om det är en giltig fil
+            if (is_file($filePath)) {
+                $fileAge = $now - filemtime($filePath);
+    
+                // Ta bort filen om den är äldre än tillåten ålder
+                if ($fileAge > $maxAgeInSeconds) {
+                    unlink($filePath);
+                }
+            }
+        }
+    }
+}
