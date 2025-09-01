@@ -12,9 +12,9 @@ class HasOne
     private Connection $connection;
     private string $modelClass;
     private string $foreignKey;
-    private $localKey;
+    private int|string $localKey;
 
-    public function __construct(Connection $connection, string $modelClass, string $foreignKey, $localKey)
+    public function __construct(Connection $connection, string $modelClass, string $foreignKey, int|string $localKey)
     {
         // Försök att tolka den fullständiga modellen
         $resolvedClass = $this->resolveModelClass($modelClass);
