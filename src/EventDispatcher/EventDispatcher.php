@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\EventDispatcher;
 
-use Psr\EventDispatcher\EventDispatcherInterface;;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\EventDispatcher\StoppableEventInterface;
 
 class EventDispatcher implements EventDispatcherInterface

@@ -40,7 +40,7 @@ class CallableArgument extends LiteralArgument
      * @param mixed ...$args Argument som skickas till callable.
      * @return mixed Resultatet av anropet.
      */
-    public function invoke(...$args)
+    public function invoke(...$args): mixed
     {
         return call_user_func($this->getValue(), ...$args);
     }

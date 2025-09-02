@@ -62,7 +62,7 @@ class RadixErrorHandler
             ];
 
             // För utvecklingsläge - inkludera stack trace
-            if ($_ENV['APP_ENV'] === 'development') {
+            if (getenv('APP_ENV') === 'development') {
                 $body['debug'] = [
                     "exception_class" => get_class($exception),
                     "stack_trace" => $exception->getTraceAsString(),
@@ -80,7 +80,7 @@ class RadixErrorHandler
         }
 
         // Hantering för vanliga rutter (icke-API)
-        if ($_ENV['APP_ENV'] === 'development') {
+        if (getenv('APP_ENV') === 'development') {
             ini_set('display_errors', '1');   // Visa detaljerat felmeddelande
             echo '<pre>' . htmlspecialchars($logMessage, ENT_QUOTES, 'UTF-8') . '</pre>';
         } else {

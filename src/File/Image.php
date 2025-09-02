@@ -167,7 +167,7 @@ class Image
         $directory = pathinfo($path, PATHINFO_DIRNAME);
         $filename = pathinfo($path, PATHINFO_FILENAME);
         $ext = pathinfo($path, PATHINFO_EXTENSION);
-        $thumbPath = "{$directory}/{$filename}.thumb.{$ext}";
+        $thumbPath = "$directory/$filename.thumb.$ext";
 
         $this->saveImage($thumbPath, $quality);
     }

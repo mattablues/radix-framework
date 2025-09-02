@@ -23,7 +23,7 @@ class RadixDateTime
         $this->datetimeConfig = $this->config->get('datetime', []); // Cacha datetime-konfigurationen
 
         // Hämta tidszonen från appkonfigurationen
-        $timezone = $this->config->get('app.app_timezone', 'UTC'); // Standardvärde 'UTC'
+        $timezone = $this->config->get('app.timezone', 'UTC'); // Standardvärde 'UTC'
         $this->timezone = new DateTimeZone($timezone); // Skapa en tidszonsinstans
     }
 

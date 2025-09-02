@@ -24,7 +24,7 @@ abstract class AbstractQueryBuilder
     /**
      * Kör SQL-frågan.
      */
-    public function execute(): mixed
+    public function execute(): \PDOStatement
     {
         if ($this->connection === null) {
             throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
@@ -53,7 +53,7 @@ abstract class AbstractQueryBuilder
 
                 foreach ($this->eagerLoadRelations as $relation) {
                     if (!method_exists($modelInstance, $relation)) {
-                        throw new \InvalidArgumentException("Relation '{$relation}' is not defined in the model '{$this->modelClass}'.");
+                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
                     }
 
                     $relationData = $modelInstance->$relation()->get();

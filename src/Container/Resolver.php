@@ -13,7 +13,7 @@ use Radix\Container\Exception\ContainerDependencyInjectionException;
 class Resolver
 {
     private array $resolvedDependenciesCache = [];
-    public function __construct(private Container $container)
+    public function __construct(private readonly Container $container)
     {
     }
 

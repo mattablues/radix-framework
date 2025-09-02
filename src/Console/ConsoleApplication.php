@@ -62,30 +62,6 @@ class ConsoleApplication
             echo "Unknown command: '$command'.\n\n";
             $this->displayHelp();
         }
-
-//        if (isset($this->commands[$command])) {
-//            $args = array_slice($argv, 2);
-//
-//            // Om hjälpflaggan används utan vidare argument, visa global hjälp
-//            if (in_array('--help', $args, true)) {
-//                echo "Usage: php radix [command] [arguments]\n";
-//                echo "Available commands:\n";
-//                foreach ($this->commands as $name => $command) {
-//                    echo "  - $name\n";
-//                }
-//                echo "\nTip: Use '[command] --help' for more information about a specific command.\n";
-//                return;
-//            }
-//
-//            try {
-//                call_user_func($this->commands[$command], $args);
-//            } catch (\Exception $e) {
-//                echo "Error: " . $e->getMessage() . "\n";
-//            }
-//        } else {
-//            echo "Unknown command: '$command'.\n\n";
-//            $this->displayHelp();
-//        }
     }
 
     /**

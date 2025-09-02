@@ -36,7 +36,7 @@ final class Parameter extends Data
 
     public function setParameter(string $name, mixed $value): void
     {
-        if (!is_string($name) || empty($name)) {
+        if (empty($name)) {
             throw new \InvalidArgumentException('Parameter name must be a non-empty string.');
         }
 

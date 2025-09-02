@@ -158,7 +158,7 @@ class Migrator
             fn($migration) => stripos($migration, $partialName) !== false
         );
 
-        // Omindexera arrayen för att säkerställa att nycklarna är numeriska
+        // Om indexera arrayen för att säkerställa att nycklarna är numeriska
         return array_values($filteredMigrations);
     }
 

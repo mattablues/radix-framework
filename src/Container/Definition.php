@@ -137,7 +137,7 @@ class Definition
 
     public function addMethodCall(string $method, array|string $arguments): Definition
     {
-        if (!is_string($method) || empty($method)) {
+        if (empty($method)) {
             throw new \InvalidArgumentException('Method name must be a non-empty string.');
         }
 

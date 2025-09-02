@@ -28,15 +28,15 @@ class ArrayArgument extends LiteralArgument
     /**
      * Validerar arrayen.
      *
-     * @param array $value
-     * @throws ContainerInvalidArgumentException Om arrayen inte uppfyller förväntade krav.
+     * @param  array  $value
+     * @throws ContainerInvalidArgumentException
      */
     private function validateArray(array $value): void
     {
         // Exempel: Lägg till valideringslogik här om nödvändigt.
-        // if (empty($value)) {
-        //     throw new ContainerInvalidArgumentException('Array cannot be empty.');
-        // }
+         if (empty($value)) {
+             throw new ContainerInvalidArgumentException('Array cannot be empty.');
+         }
     }
 
     /**
@@ -45,7 +45,7 @@ class ArrayArgument extends LiteralArgument
      * @param mixed $value
      * @return array
      */
-    public function addValue($value): array
+    public function addValue(mixed $value): array
     {
         $array = $this->getValue();
         $array[] = $value;
@@ -58,7 +58,7 @@ class ArrayArgument extends LiteralArgument
      * @param mixed $value
      * @return array
      */
-    public function removeValue($value): array
+    public function removeValue(mixed $value): array
     {
         $array = $this->getValue();
         $index = array_search($value, $array, true);

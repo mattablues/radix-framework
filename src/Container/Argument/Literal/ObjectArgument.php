@@ -29,11 +29,15 @@ class ObjectArgument extends LiteralArgument
      */
     private function validateObject(object $value): void
     {
-        // Lägg till valideringar som är unika för objekt, exempel:
-        // if (get_class($value) !== 'ExpectedClass') {
-        //     throw new ContainerInvalidArgumentException('Object is not an instance of ExpectedClass.');
-        // }
+        // Om ingen specifik validering behövs, lämna denna metod tom.
+        // Alternativt anpassa valideringslogiken utifrån dina behov.
+
+        // En kontroll kan t.ex. bara säkerställa att objektet inte är null:
+        if (!$value) {
+            throw new ContainerInvalidArgumentException('Object cannot be null.');
+        }
     }
+
 
     /**
      * Kontrollerar om objektet är en instans av en viss klass.
