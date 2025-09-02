@@ -70,7 +70,9 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder execute() Kör den genererade SQL-frågan.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapColumn(string $column) Testar att wrappa en kolumn.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapAlias(string $alias) Testar att wrappa ett alias.
+ * @method static self forceFill(array $attributes) Tvinga fyllning av attribut oavsett skydd.
  */
+
 abstract class Model implements JsonSerializable
 {
     protected string $primaryKey = 'id'; // Standard primärnyckel
@@ -236,26 +238,6 @@ abstract class Model implements JsonSerializable
     public function setFillable(array $fields): void
     {
         $this->fillable = $fields;
-    }
-
-    public static function unguardQuery(callable $callback): mixed
-    {
-        $originalGuarded = (new static())->guarded; // Spara den nuvarande "guarded"-arrayen
-        $unguardedModel = new static();
-        $unguardedModel->setGuarded([]); // Temporärt tillåt alla fält
-
-        try {
-            $result = $callback(); // Kör callbacken för att exekvera frågan
-
-            // Om resultatet är en modell eller en samling av modeller, inkludera skyddade attribut
-            if ($result instanceof self) {
-                $result->setGuarded($originalGuarded); // Återställ `guarded` till sitt originalvärde
-            }
-
-            return $result;
-        } finally {
-            $unguardedModel->setGuarded($originalGuarded); // Återställ modellen
-        }
     }
 
     public function forceFill(array $attributes): self
@@ -603,7 +585,7 @@ abstract class Model implements JsonSerializable
 
         // Verifiera att localKey finns i attributen
         if (!array_key_exists($localKey, $this->attributes)) {
-            throw new \Exception("Attribute '{$localKey}' not found in model attributes.");
+            throw new \Exception("Attribute '$localKey' not found in model attributes.");
         }
 
         return new HasMany(
