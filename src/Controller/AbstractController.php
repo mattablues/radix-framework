@@ -80,7 +80,6 @@ abstract class AbstractController
     {
         $formToken = $this->request->getCsrfToken();
         $sessionToken = $this->request->session()->get('csrf_token');
-        $csrfTime = $this->request->session()->get('csrf_time');
 
         if (!$sessionToken) {
             $this->request->session()->setCsrfToken(); // Generera en ny token om ingen existerar

@@ -159,7 +159,6 @@ class Session implements SessionInterface
         ]);
     }
 
-
     public function flashMessage(): ?array
     {
         $flash = $this->get('flash_notification');
