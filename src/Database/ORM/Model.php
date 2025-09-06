@@ -42,6 +42,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder limit(int $limit) Ange antalet poster att hämta.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder offset(int $offset) Hoppa över ett visst antal poster.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder paginate(int $perPage = 10, int $currentPage = 1) Returnera paginerade resultat.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1) Returnera search resultat.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder count(string $column = '*', string $alias = 'count') Lägg till COUNT i SELECT.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder avg(string $column, string $alias = 'average') Lägg till AVG i SELECT.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder sum(string $column, string $alias = 'sum') Lägg till SUM i SELECT.
