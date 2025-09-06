@@ -79,35 +79,42 @@ class Validator
             $parameter = null;
         }
 
-        // Om fältet är nullable och värdet är null
-        if ($rule === 'nullable' && (is_null($value) || (is_array($value) && $value['error'] === UPLOAD_ERR_NO_FILE))) {
+        // Hämta värdet med dot-notation
+        $value = $this->getValueForDotNotation($field);
+
+        // Om fältet är nullable och värdet är null eller saknas
+        if ($rule === 'nullable' && (is_null($value) || $value === '' || (is_array($value) && $value['error'] === UPLOAD_ERR_NO_FILE))) {
             return; // Ignorera helt
         }
 
-        // Om regeln är 'sometimes', kontrollera om fältet finns innan validering
+        // Om regeln är 'sometimes', ignorera fältet om det saknas
         if ($rule === 'sometimes') {
             if (!array_key_exists($field, $this->data)) {
-                return; // Ignorera om fältet inte finns
+                return; // Ignorera
             }
         }
 
+        // Dynamiskt valideringsmetodnamn
         $method = 'validate' . str_replace(' ', '', ucwords(str_replace('_', ' ', strtolower($rule))));
 
+        // Kontrollera att metoden finns
         if (!method_exists($this, $method)) {
             throw new InvalidArgumentException("Valideringsregeln '$rule' stöds inte.");
         }
 
-        // För regeln 'confirmed'
+        // Hantering för regeln 'confirmed'
         if ($rule === 'confirmed') {
-            $parameter = rtrim($field, '_confirmation'); // Ta bort "_confirmation" för att få huvudfältet
+            $parameter = rtrim($field, '_confirmation'); // Hitta huvudfältet som konfirmeras
         }
 
+        // Extra logik för filbaserade valideringar
         if (in_array($rule, ['file_type', 'file_size']) && is_array($this->data) && isset($this->data[$field])) {
             $value = $this->data[$field];
         }
 
+        // Applicera valideringen och hantera fel
         if (!$this->$method($value, $parameter)) {
-            $this->errors[$field][] = $this->getErrorMessage($field, $rule, $parameter);
+            $this->addError($field, $this->getErrorMessage($field, $rule, $parameter));
         }
     }
 
@@ -141,6 +148,7 @@ class Validator
             'min' => "Fältet $translatedField måste vara minst $parameter tecken långt.",
             'max' => "Fältet $translatedField får inte vara längre än $parameter tecken.",
             'numeric' => "Fältet $translatedField måste vara numeriskt.",
+            'integer' => "Fältet $translatedField måste vara ett giltigt heltal.", // Nytt meddelande
             'alphanumeric' => "Fältet $translatedField får endast innehålla bokstäver och siffror.",
             'match' => "Fältet $translatedField måste matcha fältet $translatedParameter.",
             'honeypot' => "Spam.",
@@ -172,6 +180,12 @@ class Validator
         }
 
         return $message;
+    }
+
+    protected function validateInteger(mixed $value, ?string $parameter = null): bool
+    {
+        // Kontrollera om värdet är ett giltigt heltal eller en sträng som kan konverteras till ett heltal
+        return is_int($value) || (is_string($value) && ctype_digit($value));
     }
 
     protected function validateSometimes(mixed $value, ?string $parameter = null): bool
@@ -237,13 +251,30 @@ class Validator
 
     protected function validateMin(mixed $value, ?string $parameter = null): bool
     {
+        // Säkerställ att parametern är numerisk
+        if (!is_numeric($parameter)) {
+            throw new InvalidArgumentException("Valideringsregeln 'min' kräver en numerisk parameter.");
+        }
+
+        $minValue = (float)$parameter;
+
         // Om värdet är null (nullable) eller en tom sträng, returnera alltid true
         if (is_null($value) || $value === '') {
             return true;
         }
 
-        // Kontrollera längden för värdet om det inte är tomt
-        return is_string($value) && strlen($value) >= (int) $parameter;
+        // Kontrollera numeriska värden
+        if (is_numeric($value)) {
+            return (float)$value >= $minValue;
+        }
+
+        // Kontrollera längden för strängvärden
+        if (is_string($value)) {
+            return mb_strlen($value) >= (int)$minValue;
+        }
+
+        // Om det inte är numeriskt eller en sträng, valideringen misslyckas
+        return false;
     }
 
     protected function validateUrl(mixed $value, ?string $parameter = null): bool
@@ -253,11 +284,30 @@ class Validator
 
     protected function validateMax(mixed $value, ?string $parameter = null): bool
     {
+        // Säkerställ att parametern är numerisk
+        if (!is_numeric($parameter)) {
+            throw new InvalidArgumentException("Valideringsregeln 'max' kräver en numerisk parameter.");
+        }
+
+        $maxValue = (float)$parameter;
+
+        // Om värdet är null (nullable) eller en tom sträng, returnera alltid true
         if (is_null($value) || $value === '') {
             return true;
         }
 
-        return is_string($value) && strlen($value) <= (int) $parameter;
+        // Kontrollera numeriska värden
+        if (is_numeric($value)) {
+            return (float)$value <= $maxValue;
+        }
+
+        // Kontrollera längden för strängvärden
+        if (is_string($value)) {
+            return mb_strlen($value) <= (int)$maxValue;
+        }
+
+        // Om det inte är numeriskt eller en sträng, valideringen misslyckas
+        return false;
     }
 
     protected function validateNumeric(mixed $value, ?string $parameter = null): bool
@@ -509,6 +559,28 @@ class Validator
 
         // Kontrollera om filens storlek ligger inom det tillåtna intervallet
         return $value['size'] <= $maxBytes;
+    }
+
+    protected function getValueForDotNotation(string $field)
+    {
+        // Om fältet inte innehåller en punkt (.), returnera direkt från `$this->data`
+        if (!str_contains($field, '.')) {
+            return $this->data[$field] ?? null;
+        }
+
+        // Dela upp fältet baserat på punkter
+        $keys = explode('.', $field);
+        $value = $this->data;
+
+        foreach ($keys as $key) {
+            // Kontrollera om nyckeln existerar i den aktuella nivån
+            if (!is_array($value) || !array_key_exists($key, $value)) {
+                return null; // Om någon del saknas, returnera null
+            }
+            $value = $value[$key]; // Navigera ner till nästa nivå
+        }
+
+        return $value;
     }
 
     // Konvertera bytes till MB

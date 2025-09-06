@@ -506,6 +506,7 @@ class QueryBuilder extends AbstractQueryBuilder
                 'per_page' => $perPage,
                 'current_page' => $currentPage,
                 'last_page' => $lastPage,
+                'first_page' => 1,
             ],
         ];
     }
