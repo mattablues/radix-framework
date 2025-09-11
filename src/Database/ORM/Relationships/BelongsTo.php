@@ -66,23 +66,28 @@ class BelongsTo
         throw new \Exception("Unable to access the foreign key attribute '$attribute' on the parent model.");
     }
 
-
     private function resolveModelClass(string $classOrTable): string
     {
+        // Om klassnamnet redan är ett FQCN
         if (class_exists($classOrTable)) {
-            return $classOrTable; // Om det redan är ett giltigt klassnamn
+            return $classOrTable;
         }
 
-        // Kontrollera om klassnamnet verkar vara en tabell och försök singularisera det
-        $resolvedClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's'));
+        // Försök singularisera och tolka modellen
+        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Exempel: 'tokens' → 'Token'
+        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Exempel: 'status'
 
-        if (class_exists($resolvedClass)) {
-            return $resolvedClass; // Returnera det singulariserade klassnamnet
+        if (class_exists($singularClass)) {
+            return $singularClass;
         }
 
-        throw new \Exception("Model class '$resolvedClass' not found.");
+        if (class_exists($pluralClass)) {
+            return $pluralClass;
+        }
+
+        // Om ingen klass hittas, kasta ett undantag
+        throw new \Exception("Model class '$classOrTable' not found.");
     }
-
 
     private function createModelInstance(array $data, string $classOrTable): Model
     {

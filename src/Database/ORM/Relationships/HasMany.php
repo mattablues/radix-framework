@@ -50,6 +50,29 @@ class HasMany
         return reset($results); // Returnera den första instansen
     }
 
+    private function resolveModelClass(string $classOrTable): string
+    {
+        // Om klassnamnet redan är fullt kvalificerat
+        if (class_exists($classOrTable)) {
+            return $classOrTable; // Returnera direkt om klassen redan finns
+        }
+
+        // Försök interpretiera som singular modell
+        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Plural 'tokens' → 'Token'
+        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Utan trim = plural
+
+        if (class_exists($singularClass)) {
+            return $singularClass;
+        }
+
+        if (class_exists($pluralClass)) {
+            return $pluralClass;
+        }
+
+        // Kasta fel om modellen inte hittas
+        throw new \Exception("Model class '$classOrTable' not found.");
+    }
+
 
     private function createModelInstance(array $data, string $classOrTable): Model
     {
@@ -59,22 +82,5 @@ class HasMany
         $model->markAsExisting();
 
         return $model;
-    }
-
-    private function resolveModelClass(string $classOrTable): string
-    {
-        // Om ett fullständigt kvalificerat klassnamn redan anges, använd direkt
-        if (class_exists($classOrTable)) {
-            return $classOrTable;
-        }
-
-        // Annars tolkas detta från `App\Models`
-        $resolvedClass = 'App\\Models\\' . ucfirst($classOrTable);
-
-        if (class_exists($resolvedClass)) {
-            return $resolvedClass;
-        }
-
-        throw new \Exception("Model class '$resolvedClass' not found.");
     }
 }

@@ -65,19 +65,25 @@ class HasOne
      */
     private function resolveModelClass(string $classOrTable): string
     {
-        // Om klassnamn redan är fullständigt kvalificerat
+        // Om klassnamnet redan är fullt kvalificerat
         if (class_exists($classOrTable)) {
-            return $classOrTable;
+            return $classOrTable; // Returnera som det är
         }
 
-        // Tolka som modell i `App\Models`
-        $resolvedClass = 'App\\Models\\' . ucfirst($classOrTable);
+        // Försök tolka som en modell från 'App\Models'
+        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Singular: ex tokens → Token
+        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Plural: ex status → Status
 
-        if (class_exists($resolvedClass)) {
-            return $resolvedClass;
+        // Kontrollera om antingen singular eller plural modell existerar
+        if (class_exists($singularClass)) {
+            return $singularClass;
         }
 
-        // Om modellen inte hittas, returnera som det är
-        return $classOrTable;
+        if (class_exists($pluralClass)) {
+            return $pluralClass;
+        }
+
+        // Kasta fel om modellen inte hittas
+        throw new \Exception("Model class '$classOrTable' not found.");
     }
 }

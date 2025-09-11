@@ -62,17 +62,25 @@ class BelongsToMany
 
     private function resolveModelClass(string $classOrTable): string
     {
+        // Om klassnamnet redan är fullt kvalificerat
         if (class_exists($classOrTable)) {
-            return $classOrTable;
+            return $classOrTable; // Returnera direkt om det är en giltig klass
         }
 
-        $resolvedClass = 'App\\Models\\' . ucfirst($classOrTable);
+        // Försök tolka klassnamn
+        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Plural → Singular
+        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Ingen trim = plural
 
-        if (class_exists($resolvedClass)) {
-            return $resolvedClass;
+        if (class_exists($singularClass)) {
+            return $singularClass;
         }
 
-        throw new \Exception("Model class '$resolvedClass' not found.");
+        if (class_exists($pluralClass)) {
+            return $pluralClass;
+        }
+
+        // Kasta undantag om ingen modell hittas
+        throw new \Exception("Model class '$classOrTable' not found.");
     }
 
     private function createModelInstance(array $data, string $classOrTable): Model
