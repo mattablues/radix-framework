@@ -586,6 +586,6 @@ class Validator
     // Konvertera bytes till MB
     protected function convertSizeToMB(int $sizeInBytes): float
     {
-        return round($sizeInBytes / (1024 * 1024), 2);
+        return round((float)$sizeInBytes / (1024 * 1024), 2, PHP_ROUND_HALF_UP);
     }
 }
