@@ -593,7 +593,7 @@ abstract class Model implements JsonSerializable
             $this->getConnection(),
             $relatedModel,
             $foreignKey,
-            $this->attributes[$localKey] // Nu säkerställt
+            (string)$this->attributes[$localKey] // Nu säkerställt
         );
     }
 
