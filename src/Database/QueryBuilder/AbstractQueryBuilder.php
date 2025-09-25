@@ -36,37 +36,39 @@ abstract class AbstractQueryBuilder
 
     public function get(): array
     {
-        // Kontrollera att anslutningen är inställd
-        if ($this->connection === null) {
-            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
+        // Kontrollera att modelClass är inställd
+        if (is_null($this->modelClass)) {
+            throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
         }
 
-        // Generera SQL-frågan
+        // Hämta resultaten direkt från frågan - Observera att du bör ha en implementering av `toSql()`
         $sql = $this->toSql();
         $results = $this->connection->fetchAll($sql, $this->bindings);
 
-        // Om det finns relationer att förladda, bearbeta dessa
+        // Om det finns relationer att förladda
         if (!empty($this->eagerLoadRelations)) {
             foreach ($results as &$result) {
+                // Skapa en instans av den aktuella modellen
                 $modelInstance = new $this->modelClass();
                 $modelInstance->fill($result);
 
                 foreach ($this->eagerLoadRelations as $relation) {
                     if (!method_exists($modelInstance, $relation)) {
-                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
+                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '{$this->modelClass}'.");
                     }
 
+                    // Ladda relationen
                     $relationData = $modelInstance->$relation()->get();
 
-                    // Se till att endast modellinstanser associeras
-                    if ($relationData instanceof Model) {
+                    // Hantera HasMany specifikt och säkerställ array-hantering
+                    if (is_array($relationData)) {
                         $modelInstance->setRelation($relation, $relationData);
                     } else {
-                        $modelInstance->setRelation($relation, null); // Sätt null om relationen inte hittades
+                        $modelInstance->setRelation($relation, $relationData ?? null); // Hantera null för tomma relationer
                     }
                 }
 
-                $result = $modelInstance;
+                $result = $modelInstance; // Uppdatera resultatet med en korrekt laddad modell
             }
             unset($result);
         }
