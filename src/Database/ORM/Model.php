@@ -667,7 +667,7 @@ abstract class Model implements JsonSerializable
             $pivotTable,
             $foreignPivotKey,
             $relatedPivotKey,
-            $this->attributes[$parentKey]
+            (string)$this->attributes[$parentKey]
         );
     }
 
