@@ -108,7 +108,7 @@ class RadixDateTime
         $endDateTime = $this->dateTimeImmutable($end);
         $interval = $endDateTime->getTimestamp() - $startDateTime->getTimestamp();
 
-        return round($interval / 3600, 1); // Konvertera sekunder till timmar
+        return round($interval / 3600, 1, PHP_ROUND_HALF_UP); // Konvertera sekunder till timmar
     }
 
     // Hjälpfunktion för att kontrollera giltiga datum
