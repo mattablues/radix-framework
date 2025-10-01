@@ -6,6 +6,7 @@ namespace Radix\Database\ORM\Relationships;
 
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Support\StringHelper;
 
 class BelongsTo
 {
@@ -68,25 +69,18 @@ class BelongsTo
 
     private function resolveModelClass(string $classOrTable): string
     {
-        // Om klassnamnet redan är ett FQCN
         if (class_exists($classOrTable)) {
-            return $classOrTable;
+            return $classOrTable; // Returnera direkt
         }
 
-        // Försök singularisera och tolka modellen
-        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Exempel: 'tokens' → 'Token'
-        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Exempel: 'status'
+        // Använd den delade singulariseringen
+        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
 
         if (class_exists($singularClass)) {
             return $singularClass;
         }
 
-        if (class_exists($pluralClass)) {
-            return $pluralClass;
-        }
-
-        // Om ingen klass hittas, kasta ett undantag
-        throw new \Exception("Model class '$classOrTable' not found.");
+        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
     private function createModelInstance(array $data, string $classOrTable): Model

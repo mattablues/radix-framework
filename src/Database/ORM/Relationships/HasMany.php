@@ -6,6 +6,7 @@ namespace Radix\Database\ORM\Relationships;
 
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Support\StringHelper;
 
 class HasMany
 {
@@ -54,23 +55,18 @@ class HasMany
     {
         // Om klassnamnet redan är fullt kvalificerat
         if (class_exists($classOrTable)) {
-            return $classOrTable; // Returnera direkt om klassen redan finns
+            return $classOrTable; // Returnera direkt
         }
 
-        // Försök interpretiera som singular modell
-        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Plural 'tokens' → 'Token'
-        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Utan trim = plural
+        // Använd den delade singulariseringen
+        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
 
         if (class_exists($singularClass)) {
             return $singularClass;
         }
 
-        if (class_exists($pluralClass)) {
-            return $pluralClass;
-        }
-
-        // Kasta fel om modellen inte hittas
-        throw new \Exception("Model class '$classOrTable' not found.");
+        // Om klassen inte hittas, kasta fel
+        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
 

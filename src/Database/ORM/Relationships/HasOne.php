@@ -6,6 +6,7 @@ namespace Radix\Database\ORM\Relationships;
 
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Support\StringHelper;
 
 class HasOne
 {
@@ -65,25 +66,17 @@ class HasOne
      */
     private function resolveModelClass(string $classOrTable): string
     {
-        // Om klassnamnet redan är fullt kvalificerat
         if (class_exists($classOrTable)) {
-            return $classOrTable; // Returnera som det är
+            return $classOrTable; // Returnera direkt
         }
 
-        // Försök tolka som en modell från 'App\Models'
-        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Singular: ex tokens → Token
-        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Plural: ex status → Status
+        // Använd den delade singulariseringsmetoden
+        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
 
-        // Kontrollera om antingen singular eller plural modell existerar
         if (class_exists($singularClass)) {
             return $singularClass;
         }
 
-        if (class_exists($pluralClass)) {
-            return $pluralClass;
-        }
-
-        // Kasta fel om modellen inte hittas
-        throw new \Exception("Model class '$classOrTable' not found.");
+        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 }

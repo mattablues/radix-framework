@@ -6,6 +6,7 @@ namespace Radix\Database\ORM\Relationships;
 
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Support\StringHelper;
 
 class BelongsToMany
 {
@@ -62,25 +63,18 @@ class BelongsToMany
 
     private function resolveModelClass(string $classOrTable): string
     {
-        // Om klassnamnet redan är fullt kvalificerat
         if (class_exists($classOrTable)) {
-            return $classOrTable; // Returnera direkt om det är en giltig klass
+            return $classOrTable; // Returnera direkt
         }
 
-        // Försök tolka klassnamn
-        $singularClass = 'App\\Models\\' . ucfirst(rtrim($classOrTable, 's')); // Plural → Singular
-        $pluralClass = 'App\\Models\\' . ucfirst($classOrTable); // Ingen trim = plural
+        // Använd den delade singulariseringen
+        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
 
         if (class_exists($singularClass)) {
             return $singularClass;
         }
 
-        if (class_exists($pluralClass)) {
-            return $pluralClass;
-        }
-
-        // Kasta undantag om ingen modell hittas
-        throw new \Exception("Model class '$classOrTable' not found.");
+        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
     private function createModelInstance(array $data, string $classOrTable): Model
