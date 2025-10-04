@@ -72,6 +72,14 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapColumn(string $column) Testar att wrappa en kolumn.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapAlias(string $alias) Testar att wrappa ett alias.
  * @method static self forceFill(array $attributes) Tvinga fyllning av attribut oavsett skydd.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|string[] $relations) Räknar relationer och exponerar {
+* relation
+* }_count.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withSum(string|string[] $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withAvg(string|string[] $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withMin(string|string[] $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withMax(string|string[] $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withAggregate(string|string[] $relation, string $column, string $fn, ?string $alias = null)
  */
 
 abstract class Model implements JsonSerializable
@@ -575,26 +583,29 @@ abstract class Model implements JsonSerializable
     /**
      * Definiera en "hasMany"-relation.
      */
+// ... existing code ...
     public function hasMany(string $relatedModel, string $foreignKey, ?string $localKey = null): HasMany
     {
         $localKey = $localKey ?? $this->primaryKey;
 
-        // Säkerställ att modellen existerar och skapa en instans för att hämta tabellnamnet
         if (!class_exists($relatedModel)) {
             throw new \Exception("Relation model class '$relatedModel' not found.");
         }
 
-        // Verifiera att localKey finns i attributen
-        if (!array_key_exists($localKey, $this->attributes)) {
-            throw new \Exception("Attribute '$localKey' not found in model attributes.");
-        }
-
-        return new HasMany(
+        // Skapa relationen med key-namnet, och koppla parent efteråt
+        $relation = new HasMany(
             $this->getConnection(),
             $relatedModel,
             $foreignKey,
-            (string)$this->attributes[$localKey] // Nu säkerställt
+            $localKey
         );
+
+        // Koppla parent så att relationen kan läsa värdet vid get()
+        if (method_exists($relation, 'setParent')) {
+            $relation->setParent($this);
+        }
+
+        return $relation;
     }
 
     /**
@@ -604,19 +615,50 @@ abstract class Model implements JsonSerializable
     {
         $localKey = $localKey ?? $this->primaryKey;
 
-        // Säkerställ att modellen existerar och hämta tabellnamn via getTable()
         if (!class_exists($relatedModel)) {
             throw new \Exception("Relation model class '$relatedModel' not found.");
         }
 
-        $relatedInstance = new $relatedModel();
-
-        return new HasOne(
+        $relation = new HasOne(
             $this->getConnection(),
-            $relatedInstance->getTable(), // Använd getTable()
+            $relatedModel,
             $foreignKey,
-            $this->attributes[$localKey]
+            $localKey // skicka key-namn
         );
+
+        if (method_exists($relation, 'setParent')) {
+            $relation->setParent($this);
+        }
+
+        return $relation;
+    }
+    public function belongsToMany(
+        string $relatedModel,
+        string $pivotTable,
+        string $foreignPivotKey,
+        string $relatedPivotKey,
+        ?string $parentKey = null
+    ): BelongsToMany {
+        $parentKey = $parentKey ?? $this->primaryKey;
+
+        if (!class_exists($relatedModel)) {
+            throw new \Exception("Relation model class '$relatedModel' not found.");
+        }
+
+        $relation = new BelongsToMany(
+            $this->getConnection(),
+            $relatedModel,     // skicka modellklass
+            $pivotTable,
+            $foreignPivotKey,
+            $relatedPivotKey,
+            $parentKey         // skicka key-namn
+        );
+
+        if (method_exists($relation, 'setParent')) {
+            $relation->setParent($this);
+        }
+
+        return $relation;
     }
 
     /**
@@ -642,34 +684,7 @@ abstract class Model implements JsonSerializable
         );
     }
 
-    /**
-     * Definiera en "belongsToMany"-relation.
-     */
-    public function belongsToMany(
-        string $relatedModel,
-        string $pivotTable,
-        string $foreignPivotKey,
-        string $relatedPivotKey,
-        ?string $parentKey = null
-    ): BelongsToMany {
-        $parentKey = $parentKey ?? $this->primaryKey;
 
-        // Säkerställ att modellen existerar och hämta tabellnamn via getTable()
-        if (!class_exists($relatedModel)) {
-            throw new \Exception("Relation model class '$relatedModel' not found.");
-        }
-
-        $relatedInstance = new $relatedModel();
-
-        return new BelongsToMany(
-            $this->getConnection(),
-            $relatedInstance->getTable(), // Använd getTable()
-            $pivotTable,
-            $foreignPivotKey,
-            $relatedPivotKey,
-            (string)$this->attributes[$parentKey]
-        );
-    }
 
     public function toArray(): array
     {

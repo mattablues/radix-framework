@@ -11,65 +11,100 @@ use Radix\Support\StringHelper;
 class BelongsToMany
 {
     private Connection $connection;
-    private string $relatedTable;
+    private string $relatedModelClass; // ändrat: spara klassnamn
     private string $pivotTable;
     private string $foreignPivotKey;
     private string $relatedPivotKey;
-    private string $parentKey;
+    private string $parentKeyName;
+    private ?Model $parent = null;
 
     public function __construct(
         Connection $connection,
-        string $relatedTable,
+        string $relatedModel,
         string $pivotTable,
         string $foreignPivotKey,
         string $relatedPivotKey,
-        string $parentKey
+        string $parentKeyName
     ) {
         $this->connection = $connection;
-        $this->relatedTable = $relatedTable;
+        $this->relatedModelClass = $this->resolveModelClass($relatedModel);
         $this->pivotTable = $pivotTable;
         $this->foreignPivotKey = $foreignPivotKey;
         $this->relatedPivotKey = $relatedPivotKey;
-        $this->parentKey = $parentKey;
+        $this->parentKeyName = $parentKeyName;
+    }
+
+    public function setParent(Model $parent): self
+    {
+        $this->parent = $parent;
+        return $this;
     }
 
     public function get(): array
     {
+        // Parent-flöde
+        if ($this->parent !== null) {
+            $parentValue = $this->parent->getAttribute($this->parentKeyName);
+            if ($parentValue === null) {
+                return [];
+            }
+        } else {
+            // Backwards compatibility: anta att parentKeyName redan är ett värde
+            $parentValue = $this->parentKeyName;
+        }
+
+        /** @var Model $relatedInstance */
+        $relatedInstance = new $this->relatedModelClass();
+        $relatedTable = $relatedInstance->getTable();
+
         $query = "
             SELECT related.*
-            FROM `$this->relatedTable` AS related
+            FROM `$relatedTable` AS related
             INNER JOIN `$this->pivotTable` AS pivot
-            ON related.id = pivot.`$this->relatedPivotKey`
+              ON related.id = pivot.`$this->relatedPivotKey`
             WHERE pivot.`$this->foreignPivotKey` = ?";
 
-        $results = $this->connection->fetchAll($query, [$this->parentKey]);
+        $results = $this->connection->fetchAll($query, [$parentValue]);
 
-        return array_map(fn($data) => $this->createModelInstance($data, $this->relatedTable), $results);
+        return array_map(fn($data) => $this->createModelInstance($data, $this->relatedModelClass), $results);
     }
 
     public function first(): ?Model
     {
-        // Hämta alla relaterade poster genom befintlig `get()`-metod
         $results = $this->get();
-
-        // Kontrollera om resultaten är tomma
         if (empty($results)) {
             return null;
         }
-
-        // Returnera den första modellen i listan
         return reset($results);
+    }
+
+    public function getPivotTable(): string
+    {
+        return $this->pivotTable;
+    }
+
+    public function getForeignPivotKey(): string
+    {
+        return $this->foreignPivotKey;
+    }
+
+    public function getRelatedModelClass(): string
+    {
+        return $this->relatedModelClass;
+    }
+
+    public function getParentKeyName(): string
+    {
+        return $this->parentKeyName;
     }
 
     private function resolveModelClass(string $classOrTable): string
     {
         if (class_exists($classOrTable)) {
-            return $classOrTable; // Returnera direkt
+            return $classOrTable;
         }
 
-        // Använd den delade singulariseringen
         $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-
         if (class_exists($singularClass)) {
             return $singularClass;
         }

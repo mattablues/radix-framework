@@ -26,6 +26,8 @@ class QueryBuilder extends AbstractQueryBuilder
     protected ?string $modelClass = null;
     protected array $eagerLoadRelations = []; // Förladdade relationer
     protected bool $withSoftDeletes = false;
+    protected array $withCountRelations = [];
+    protected array $withAggregateExpressions = []; // <-- lägg till för aggregat
 
     /**
      * Ställ in vilka kolumner som ska väljas vid SELECT.
@@ -66,6 +68,236 @@ class QueryBuilder extends AbstractQueryBuilder
         }, (array) $columns);
 
         return $this;
+    }
+
+    public function withCount(string|array $relations): self
+    {
+        if ($this->modelClass === null) {
+            throw new \LogicException("Model class is not set. Use setModelClass() before calling withCount().");
+        }
+
+        $relations = (array) $relations;
+        foreach ($relations as $relation) {
+            $this->withCountRelations[] = $relation;
+            $this->addRelationCountSelect($relation);
+        }
+
+        return $this;
+    }
+
+    public function withSum(string $relation, string $column, ?string $alias = null): self
+    {
+        return $this->withAggregate($relation, $column, 'SUM', $alias);
+    }
+
+    public function withAvg(string $relation, string $column, ?string $alias = null): self
+    {
+        return $this->withAggregate($relation, $column, 'AVG', $alias);
+    }
+
+    public function withMin(string $relation, string $column, ?string $alias = null): self
+    {
+        return $this->withAggregate($relation, $column, 'MIN', $alias);
+    }
+
+    public function withMax(string $relation, string $column, ?string $alias = null): self
+    {
+        return $this->withAggregate($relation, $column, 'MAX', $alias);
+    }
+
+    public function withAggregate(string $relation, string $column, string $fn, ?string $alias = null): self
+    {
+        if ($this->modelClass === null) {
+            throw new \LogicException("Model class is not set. Use setModelClass() before calling withAggregate().");
+        }
+
+        $fn = strtoupper($fn);
+        if (!in_array($fn, ['SUM', 'AVG', 'MIN', 'MAX'], true)) {
+            throw new \InvalidArgumentException("Unsupported aggregate function: {$fn}");
+        }
+
+        $computedAlias = $alias ?: "{$relation}_" . strtolower($fn);
+
+        $this->addRelationAggregateSelect($relation, $column, $fn, $alias);
+
+        // Spara aliaset för hydrering till relations
+        $this->withAggregateExpressions[] = $computedAlias;
+
+        return $this;
+    }
+
+    protected function addRelationAggregateSelect(string $relation, string $column, string $fn, ?string $alias = null): void
+    {
+        /** @var \Radix\Database\ORM\Model $parent */
+        $parent = new $this->modelClass();
+        $parentTable = trim($this->table, '`');
+        $parentPk = $parent::getPrimaryKey();
+
+        if (!method_exists($parent, $relation)) {
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+        }
+
+        $rel = $parent->$relation();
+        $aggAlias = $alias ?: "{$relation}_" . strtolower($fn);
+
+        // HasMany
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
+            // Försök få relaterad tabell
+            $relatedModelClass = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $relatedModelClass->setAccessible(true);
+            $relatedClass = $relatedModelClass->getValue($rel);
+            $relatedInstance = class_exists($relatedClass) ? new $relatedClass() : null;
+            $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            return;
+        }
+
+        // HasOne
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            // Hämta relaterad tabell via modellklass i HasOne
+            $mcProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $mcProp->setAccessible(true);
+            $modelClass = $mcProp->getValue($rel);
+            $relatedInstance = new $modelClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            return;
+        }
+
+        // BelongsTo
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
+            $ownerKeyProp = (new \ReflectionClass($rel))->getProperty('ownerKey');
+            $ownerKeyProp->setAccessible(true);
+            $ownerKey = $ownerKeyProp->getValue($rel);
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $parentForeignKey = $fkProp->getValue($rel);
+
+            $tableProp = (new \ReflectionClass($rel))->getProperty('relatedTable');
+            $tableProp->setAccessible(true);
+            $relatedTable = $tableProp->getValue($rel);
+
+            // related.ownerKey = parent.foreignKey
+            $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}`) AS `{$aggAlias}`";
+            return;
+        }
+
+        // BelongsToMany
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
+            // Hämta metadata från relationen
+            $pivotTable = $rel->getPivotTable();
+            $foreignPivotKey = $rel->getForeignPivotKey();
+
+            // Relaterad tabell från relaterad modellklass
+            $relatedClass = $rel->getRelatedModelClass();
+            /** @var \Radix\Database\ORM\Model $relatedInstance */
+            $relatedInstance = new $relatedClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
+            $relatedPivotKeyProp->setAccessible(true);
+            $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
+
+            // JOIN pivot -> related, filter pivot.foreignPivotKey = parent.pk
+            $this->columns[] = "(SELECT {$fn}(`related`.`{$column}`) 
+                                 FROM `{$relatedTable}` AS related
+                                 INNER JOIN `{$pivotTable}` AS pivot
+                                   ON related.`id` = pivot.`{$relatedPivotKey}`
+                                 WHERE pivot.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            return;
+        }
+
+        throw new \InvalidArgumentException("withAggregate() does not support relation type for '$relation'.");
+    }
+
+    protected function addRelationCountSelect(string $relation): void
+    {
+        /** @var \Radix\Database\ORM\Model $parent */
+        $parent = new $this->modelClass();
+        $parentTable = trim($this->table, '`'); // unwrap table-name if wrapped
+        $parentPk = $parent::getPrimaryKey();
+
+        if (!method_exists($parent, $relation)) {
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+        }
+
+        $rel = $parent->$relation();
+        $parentSingular = \Radix\Support\StringHelper::singularize($parentTable);
+        $fkGuess = $parentSingular . '_id';
+        $relatedTableGuess = $relation;
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
+            try {
+                $relatedModelClass = 'App\\Models\\' . ucfirst(\Radix\Support\StringHelper::singularize($relation));
+                if (class_exists($relatedModelClass)) {
+                    $relatedInstance = new $relatedModelClass();
+                    $relatedTable = $relatedInstance->getTable();
+                } else {
+                    $relatedTable = $relatedTableGuess;
+                }
+            } catch (\Throwable) {
+                $relatedTable = $relatedTableGuess;
+            }
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+            return;
+        }
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
+            $pivotTable = $rel->getPivotTable();
+            $foreignPivotKey = $rel->getForeignPivotKey();
+            $this->columns[] = "(SELECT COUNT(*) FROM `{$pivotTable}` WHERE `{$pivotTable}`.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+            return;
+        }
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            $mcProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $mcProp->setAccessible(true);
+            $modelClass = $mcProp->getValue($rel);
+            $relatedInstance = new $modelClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+            return;
+        }
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
+            $ownerKeyProp = (new \ReflectionClass($rel))->getProperty('ownerKey');
+            $ownerKeyProp->setAccessible(true);
+            $ownerKey = $ownerKeyProp->getValue($rel);
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $parentForeignKey = $fkProp->getValue($rel);
+
+            $tableProp = (new \ReflectionClass($rel))->getProperty('relatedTable');
+            $tableProp->setAccessible(true);
+            $relatedTable = $tableProp->getValue($rel);
+
+            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}`) AS `{$relation}_count`";
+            return;
+        }
+
+        throw new \InvalidArgumentException("withCount() does not support relation type for '$relation'.");
     }
 
     public function setModelClass(string $modelClass): self
@@ -113,12 +345,21 @@ class QueryBuilder extends AbstractQueryBuilder
 
         $results = parent::get();
 
-        // Omvandla arrays till modellinstanser
+        // Konvertera arrays -> modeller
         foreach ($results as &$result) {
             if (!$result instanceof $this->modelClass) {
                 $modelInstance = new $this->modelClass();
                 $modelInstance->fill($result);
                 $modelInstance->markAsExisting();
+
+                // plocka upp *_count-fält från SELECT och sätt som relation
+                foreach ($this->withCountRelations as $rel) {
+                    $k = $rel . '_count';
+                    if (is_array($result) && array_key_exists($k, $result)) {
+                        $modelInstance->setRelation($k, (int)$result[$k]);
+                    }
+                }
+
                 $result = $modelInstance;
             }
         }

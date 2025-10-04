@@ -36,41 +36,54 @@ abstract class AbstractQueryBuilder
 
     public function get(): array
     {
-        // Kontrollera att modelClass är inställd
         if (is_null($this->modelClass)) {
             throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
         }
 
-        // Hämta resultaten direkt från frågan - Observera att du bör ha en implementering av `toSql()`
         $sql = $this->toSql();
-        $results = $this->connection->fetchAll($sql, $this->bindings);
+        $rows = $this->connection->fetchAll($sql, $this->bindings);
 
-        // Om det finns relationer att förladda
-        if (!empty($this->eagerLoadRelations)) {
-            foreach ($results as &$result) {
-                // Skapa en instans av den aktuella modellen
-                $modelInstance = new $this->modelClass();
-                $modelInstance->fill($result);
+        $results = [];
+        foreach ($rows as $row) {
+            $model = new $this->modelClass();
+            $model->fill($row);
+            $model->markAsExisting();
 
-                foreach ($this->eagerLoadRelations as $relation) {
-                    if (!method_exists($modelInstance, $relation)) {
-                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '{$this->modelClass}'.");
-                    }
-
-                    // Ladda relationen
-                    $relationData = $modelInstance->$relation()->get();
-
-                    // Hantera HasMany specifikt och säkerställ array-hantering
-                    if (is_array($relationData)) {
-                        $modelInstance->setRelation($relation, $relationData);
-                    } else {
-                        $modelInstance->setRelation($relation, $relationData ?? null); // Hantera null för tomma relationer
+            // Sätt *_count som relationer
+            if (!empty($this->withCountRelations)) {
+                foreach ($this->withCountRelations as $rel) {
+                    $k = $rel . '_count';
+                    if (array_key_exists($k, $row)) {
+                        $model->setRelation($k, (int)$row[$k]);
                     }
                 }
-
-                $result = $modelInstance; // Uppdatera resultatet med en korrekt laddad modell
             }
-            unset($result);
+
+            // Sätt aggregat (t.ex. total_votes) som relationer
+            if (!empty($this->withAggregateExpressions)) {
+                foreach ($this->withAggregateExpressions as $aggAlias) {
+                    if (array_key_exists($aggAlias, $row)) {
+                        $model->setRelation($aggAlias, $row[$aggAlias]);
+                    }
+                }
+            }
+
+            // Eager load
+            if (!empty($this->eagerLoadRelations)) {
+                foreach ($this->eagerLoadRelations as $relation) {
+                    if (!method_exists($model, $relation)) {
+                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '{$this->modelClass}'.");
+                    }
+                    $relObj = $model->$relation();
+                    if (method_exists($relObj, 'setParent')) {
+                        $relObj->setParent($model);
+                    }
+                    $relationData = $relObj->get();
+                    $model->setRelation($relation, is_array($relationData) ? $relationData : ($relationData ?? null));
+                }
+            }
+
+            $results[] = $model;
         }
 
         return $results;

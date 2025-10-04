@@ -13,9 +13,10 @@ class HasMany
     private Connection $connection;
     private string $modelClass;
     private string $foreignKey;
-    private string $localKey;
+    private string $localKeyName;
+    private ?Model $parent = null;
 
-    public function __construct(Connection $connection, string $modelClass, string $foreignKey, $localKey)
+    public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
     {
         $this->connection = $connection;
 
@@ -25,17 +26,32 @@ class HasMany
 
         $this->modelClass = $modelClass;
         $this->foreignKey = $foreignKey;
-        $this->localKey = $localKey;
+        $this->localKeyName = $localKeyName;
+    }
+
+    public function setParent(Model $parent): self
+    {
+        $this->parent = $parent;
+        return $this;
     }
 
     public function get(): array
     {
-        $modelClass = $this->resolveModelClass($this->modelClass); // Säkerställ rätt klassnamn
+        $modelClass = $this->resolveModelClass($this->modelClass);
         $modelInstance = new $modelClass();
         $table = $modelInstance->getTable();
 
+        if ($this->parent === null) {
+            throw new \LogicException("HasMany parent model is not set. Ensure the parent model is hydrated before loading relation.");
+        }
+
+        $localValue = $this->parent->getAttribute($this->localKeyName);
+        if ($localValue === null) {
+            return [];
+        }
+
         $query = "SELECT * FROM `$table` WHERE `$this->foreignKey` = ?";
-        $results = $this->connection->fetchAll($query, [$this->localKey]);
+        $results = $this->connection->fetchAll($query, [$localValue]);
 
         return array_map(fn($data) => $this->createModelInstance($data, $modelClass), $results);
     }
@@ -43,32 +59,25 @@ class HasMany
     public function first(): ?Model
     {
         $results = $this->get();
-
         if (empty($results)) {
             return null;
         }
-
-        return reset($results); // Returnera den första instansen
+        return reset($results);
     }
 
     private function resolveModelClass(string $classOrTable): string
     {
-        // Om klassnamnet redan är fullt kvalificerat
         if (class_exists($classOrTable)) {
-            return $classOrTable; // Returnera direkt
+            return $classOrTable;
         }
 
-        // Använd den delade singulariseringen
         $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-
         if (class_exists($singularClass)) {
             return $singularClass;
         }
 
-        // Om klassen inte hittas, kasta fel
         throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
-
 
     private function createModelInstance(array $data, string $classOrTable): Model
     {
@@ -76,7 +85,6 @@ class HasMany
         $model = new $modelClass();
         $model->fill($data);
         $model->markAsExisting();
-
         return $model;
     }
 }

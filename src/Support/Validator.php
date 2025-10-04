@@ -21,6 +21,8 @@ class Validator
         'password' => 'lösenord',
         'password_confirmation' => 'repetera lösenord',
         'honeypot' => 'honeypot',
+        'category' => 'kategori',
+        'description' => 'beskrivning',
     ];
 
     public function __construct(array $data, array $rules)
