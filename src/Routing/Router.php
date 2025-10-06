@@ -195,9 +195,13 @@ class Router
             throw new InvalidArgumentException("Method '$method' is not allowed");
         }
 
+        // Beräkna det fullständiga pathet med gruppens prefix (samma som i add())
+        $fullPath = $this->path ? rtrim($this->path, '/') . '/' . ltrim($path, '/') : $path;
+        $fullPath = preg_replace('#/+#', '/', $fullPath);
+
         foreach ($this->routes as $route) {
-            if ($route['path'] === $path && $route['params']['method'] === $method) {
-                throw new InvalidArgumentException("Route path '$path' with method '$method' already exists");
+            if ($route['path'] === $fullPath && $route['params']['method'] === $method) {
+                throw new InvalidArgumentException("Route path '$fullPath' with method '$method' already exists");
             }
         }
 
@@ -209,12 +213,11 @@ class Router
 
         $handler['method'] = $method;
 
-        // Använd din befintliga add-metod för att registera rutten
+        // Registrera rutten via add(), men skicka in original-$path så add() bygger samma $fullPath
         $this->add($path, $handler);
 
         return $this;
     }
-
 
     private static function extractRoute(string $url, array $data): string
     {
