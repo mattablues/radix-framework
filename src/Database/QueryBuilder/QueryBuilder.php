@@ -683,62 +683,41 @@ class QueryBuilder extends AbstractQueryBuilder
      */
     public function search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1): array
     {
-        // Se till att currentPage är ett positivt heltal
         $currentPage = ($currentPage > 0) ? $currentPage : 1;
 
-        // Säkerställ att soft-delete logiken alltid ingår
-        // Se till att soft-delete-villkoret alltid används om inte uttryckligen inaktiverat
-        if (!$this->getWithSoftDeletes()) {
-            $this->whereNull('deleted_at');
-        }
-
-        // Lägg till sökvillkoren
+        // Lägg INTE på deleted_at här (Model::query() gör det). Vi grupperar istället sökvillkoren.
         if (!empty($searchColumns)) {
-            $isFirstCondition = true;
-
-            foreach ($searchColumns as $column) {
-                if ($isFirstCondition) {
-                    // Första villkoret läggs till med WHERE
-                    $this->where($column, 'LIKE', "%$term%");
-                    $isFirstCondition = false;
-                } else {
-                    // Efterföljande villkor läggs till med OR
-                    $this->orWhere($column, 'LIKE', "%$term%");
+            $this->where(function (self $q) use ($term, $searchColumns) {
+                $first = true;
+                foreach ($searchColumns as $column) {
+                    if ($first) {
+                        $q->where($column, 'LIKE', "%$term%");
+                        $first = false;
+                    } else {
+                        $q->orWhere($column, 'LIKE', "%$term%");
+                    }
                 }
-            }
+            });
         }
 
-        // Klona QueryBuilder för att skapa en separat räknefråga
         $countQuery = clone $this;
-
-        // Rensa specifika delar för att räkna totalen utan LIMIT, OFFSET, ORDER BY
         $countQuery->columns = [];
         $countQuery->orderBy = [];
         $countQuery->limit = null;
         $countQuery->offset = null;
-
-        // Ställ in COUNT-frågan
         $countQuery->selectRaw('COUNT(*) as total');
 
-        // Hämta totalantalet resultat
         $countResult = $this->connection->fetchOne($countQuery->toSql(), $countQuery->getBindings());
         $totalRecords = $countResult['total'] ?? 0;
 
-        // Beräkna totalt antal sidor
         $lastPage = (int) ceil($totalRecords / $perPage);
-
-        // Om den begärda sidan är större än sista sidan, sätt till sista sidan
         if ($currentPage > $lastPage && $lastPage > 0) {
             $currentPage = $lastPage;
         }
 
-        // Begränsa resultaten för den aktuella sidan
         $this->limit($perPage)->offset(($currentPage - 1) * $perPage);
-
-        // Hämta resultaten
         $data = $this->get();
 
-        // Returnera data och sök-/pagineringsmetadata
         return [
             'data' => $data,
             'search' => [
