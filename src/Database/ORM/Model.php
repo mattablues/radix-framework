@@ -72,9 +72,8 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapColumn(string $column) Testar att wrappa en kolumn.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapAlias(string $alias) Testar att wrappa ett alias.
  * @method static self forceFill(array $attributes) Tvinga fyllning av attribut oavsett skydd.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|string[] $relations) Räknar relationer och exponerar {
-* relation
-* }_count.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|string[] $relations) Räknar relationer och exponerar {relation}_count.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withSum(string|string[] $relation, string $column, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withAvg(string|string[] $relation, string $column, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withMin(string|string[] $relation, string $column, ?string $alias = null)
