@@ -62,10 +62,16 @@ class QueryBuilder extends AbstractQueryBuilder
         $rel = $parent->$relation();
         $aggAlias = $alias ?: "{$relation}_count_{$value}";
 
+        // Normalisera jämförelsevärde (literal i SQL)
+        $valSql = is_int($value) || is_float($value)
+            ? (string)$value
+            : ("'".addslashes((string)$value)."'");
+
+        // HasMany
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
-            $relatedModelClass = (new \ReflectionClass($rel))->getProperty('modelClass');
-            $relatedModelClass->setAccessible(true);
-            $relatedClass = $relatedModelClass->getValue($rel);
+            $relatedModelClassProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $relatedModelClassProp->setAccessible(true);
+            $relatedClass = $relatedModelClassProp->getValue($rel);
             $relatedInstance = class_exists($relatedClass) ? new $relatedClass() : null;
             $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
 
@@ -73,17 +79,85 @@ class QueryBuilder extends AbstractQueryBuilder
             $fkProp->setAccessible(true);
             $foreignKey = $fkProp->getValue($rel);
 
-            // Bindat värde via literal (tinyint)
-            $val = is_int($value) ? (string) $value : ("'".addslashes((string) $value)."'");
+            $this->columns[] =
+                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
+                "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
+                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` AND `{$relatedTable}`.`{$column}` = {$val}) AS `{$aggAlias}`";
-
-            // registrera alias för hydrering som relation
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
 
-        throw new \InvalidArgumentException("withCountWhere() supports only HasMany here.");
+        // HasOne
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            $mcProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $mcProp->setAccessible(true);
+            $modelClass = $mcProp->getValue($rel);
+            $relatedInstance = new $modelClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $this->columns[] =
+                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
+                "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
+                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        // BelongsTo
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
+            $ownerKeyProp = (new \ReflectionClass($rel))->getProperty('ownerKey');
+            $ownerKeyProp->setAccessible(true);
+            $ownerKey = $ownerKeyProp->getValue($rel);
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $parentForeignKey = $fkProp->getValue($rel);
+
+            $tableProp = (new \ReflectionClass($rel))->getProperty('relatedTable');
+            $tableProp->setAccessible(true);
+            $relatedTable = $tableProp->getValue($rel);
+
+            $this->columns[] =
+                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
+                "WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}` " .
+                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        // BelongsToMany
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
+            $pivotTable = $rel->getPivotTable();
+            $foreignPivotKey = $rel->getForeignPivotKey();
+
+            $relatedClass = $rel->getRelatedModelClass();
+            /** @var \Radix\Database\ORM\Model $relatedInstance */
+            $relatedInstance = new $relatedClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
+            $relatedPivotKeyProp->setAccessible(true);
+            $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
+
+            $this->columns[] =
+                "(SELECT COUNT(*) " .
+                "FROM `{$pivotTable}` AS pivot " .
+                "INNER JOIN `{$relatedTable}` AS related ON related.`id` = pivot.`{$relatedPivotKey}` " .
+                "WHERE pivot.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}` " .
+                "AND related.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        throw new \InvalidArgumentException("withCountWhere() does not support relation type for '$relation'.");
     }
 
     public function withSum(string $relation, string $column, ?string $alias = null): self
