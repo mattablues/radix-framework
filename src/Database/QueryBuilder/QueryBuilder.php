@@ -29,47 +29,6 @@ class QueryBuilder extends AbstractQueryBuilder
     protected array $withCountRelations = [];
     protected array $withAggregateExpressions = []; // <-- lägg till för aggregat
 
-    /**
-     * Ställ in vilka kolumner som ska väljas vid SELECT.
-     */
-    public function select(array|string $columns = ['*']): self
-    {
-        $this->type = 'SELECT';
-
-        // Ta bort defaultkolumnen '*'
-        if ($this->columns === ['*']) {
-            $this->columns = [];
-        }
-
-        $this->columns = array_map(function ($column) {
-            // Hantera kolumn med alias (t.ex. u.id AS user_id)
-            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
-                $columnPart = $this->wrapColumn(trim($matches[1])); // Wrappa kolumnen (u.id)
-                $aliasPart = $this->wrapAlias(trim($matches[2]));   // Wrappa aliaset (user_id)
-
-                return "{$columnPart} AS {$aliasPart}";
-            }
-
-            // Hantera funktioner med alias (t.ex. COUNT(*) AS total_employees)
-            if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
-                $function = $matches[1]; // Funktion, t.ex. COUNT
-                $parameters = $matches[2]; // Parametrar, t.ex. *
-                $alias = $matches[3]; // Alias, t.ex. total_employees
-
-                $wrappedParameters = implode(', ',
-                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters))));
-                $wrappedAlias = $this->wrapAlias($alias);
-
-                return strtoupper($function)."($wrappedParameters) AS $wrappedAlias";
-            }
-
-            // Hantera andra typer på vanligt sätt
-            return $this->wrapColumn($column);
-        }, (array) $columns);
-
-        return $this;
-    }
-
     public function withCount(string|array $relations): self
     {
         if ($this->modelClass === null) {
@@ -83,6 +42,48 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         return $this;
+    }
+
+    public function withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null): self
+    {
+        if ($this->modelClass === null) {
+            throw new \LogicException("Model class is not set. Use setModelClass() before calling withCountWhere().");
+        }
+
+        /** @var \Radix\Database\ORM\Model $parent */
+        $parent = new $this->modelClass();
+        $parentTable = trim($this->table, '`');
+        $parentPk = $parent::getPrimaryKey();
+
+        if (!method_exists($parent, $relation)) {
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+        }
+
+        $rel = $parent->$relation();
+        $aggAlias = $alias ?: "{$relation}_count_{$value}";
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
+            $relatedModelClass = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $relatedModelClass->setAccessible(true);
+            $relatedClass = $relatedModelClass->getValue($rel);
+            $relatedInstance = class_exists($relatedClass) ? new $relatedClass() : null;
+            $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            // Bindat värde via literal (tinyint)
+            $val = is_int($value) ? (string) $value : ("'".addslashes((string) $value)."'");
+
+            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` AND `{$relatedTable}`.`{$column}` = {$val}) AS `{$aggAlias}`";
+
+            // registrera alias för hydrering som relation
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        throw new \InvalidArgumentException("withCountWhere() supports only HasMany here.");
     }
 
     public function withSum(string $relation, string $column, ?string $alias = null): self
@@ -307,6 +308,47 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         $this->modelClass = $modelClass;
+        return $this;
+    }
+
+    /**
+     * Ställ in vilka kolumner som ska väljas vid SELECT.
+     */
+    public function select(array|string $columns = ['*']): self
+    {
+        $this->type = 'SELECT';
+
+        // Ta bort defaultkolumnen '*'
+        if ($this->columns === ['*']) {
+            $this->columns = [];
+        }
+
+        $this->columns = array_map(function ($column) {
+            // Hantera kolumn med alias (t.ex. u.id AS user_id)
+            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
+                $columnPart = $this->wrapColumn(trim($matches[1])); // Wrappa kolumnen (u.id)
+                $aliasPart = $this->wrapAlias(trim($matches[2]));   // Wrappa aliaset (user_id)
+
+                return "{$columnPart} AS {$aliasPart}";
+            }
+
+            // Hantera funktioner med alias (t.ex. COUNT(*) AS total_employees)
+            if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
+                $function = $matches[1]; // Funktion, t.ex. COUNT
+                $parameters = $matches[2]; // Parametrar, t.ex. *
+                $alias = $matches[3]; // Alias, t.ex. total_employees
+
+                $wrappedParameters = implode(', ',
+                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters))));
+                $wrappedAlias = $this->wrapAlias($alias);
+
+                return strtoupper($function)."($wrappedParameters) AS $wrappedAlias";
+            }
+
+            // Hantera andra typer på vanligt sätt
+            return $this->wrapColumn($column);
+        }, (array) $columns);
+
         return $this;
     }
 
