@@ -534,7 +534,7 @@ if (!function_exists('paginate_links')) {
 
         // Mobil: litet intervall + horisontell scroll + mindre text
         $mobile = '<div class="overflow-x-auto max-w-full md:hidden px-2 pb-2">'
-                . '<div class="inline-flex items-center gap-1.5 min-w-max text-sm">'
+                . '<div class="w-full inline-flex items-center justify-center gap-1.5 min-w-max text-sm">'
                 . render_first_link($pagination, $route)
                 . render_previous_link($pagination, $route)
                 . render_page_links_with_interval($pagination, $route, 1)
