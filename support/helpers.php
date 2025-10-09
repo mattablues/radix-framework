@@ -529,26 +529,32 @@ if (!function_exists('paginate_links')) {
     function paginate_links(array $pagination, string $route, ?int $interval = null): string
     {
         if ($pagination['total'] <= $pagination['per_page']) {
-            return ''; // Inga länkar behövs
+            return '';
         }
 
-        $html = '<div class="flex items-center justify-center gap-1.5">';
+        // Mobil: litet intervall + horisontell scroll + mindre text
+        $mobile = '<div class="overflow-x-auto max-w-full md:hidden px-2 pb-2">'
+                . '<div class="inline-flex items-center gap-1.5 min-w-max text-sm">'
+                . render_first_link($pagination, $route)
+                . render_previous_link($pagination, $route)
+                . render_page_links_with_interval($pagination, $route, 1)
+                . render_next_link($pagination, $route)
+                . render_last_link($pagination, $route)
+                . '</div></div>';
 
-        $html .= render_first_link($pagination, $route);
-        $html .= render_previous_link($pagination, $route);
+        // Desktop: använd befintlig logik, med valt intervall eller fallback 3
+        $desktopInterval = $interval ?? 3;
+        $desktop = '<div class="hidden md:flex items-center justify-center gap-1.5">'
+                 . render_first_link($pagination, $route)
+                 . render_previous_link($pagination, $route)
+                 . ($desktopInterval === null
+                    ? render_page_links($pagination, $route)
+                    : render_page_links_with_interval($pagination, $route, $desktopInterval))
+                 . render_next_link($pagination, $route)
+                 . render_last_link($pagination, $route)
+                 . '</div>';
 
-        if ($interval === null) {
-            $html .= render_page_links($pagination, $route); // Visa alla sidor
-        } else {
-            $html .= render_page_links_with_interval($pagination, $route, $interval); // Visa med intervall
-        }
-
-        $html .= render_next_link($pagination, $route);
-        $html .= render_last_link($pagination, $route);
-
-        $html .= '</div>';
-
-        return $html;
+        return $mobile . $desktop;
     }
 
     function render_first_link(array $pagination, string $route): string
