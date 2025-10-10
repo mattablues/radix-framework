@@ -29,6 +29,47 @@ class QueryBuilder extends AbstractQueryBuilder
     protected array $withCountRelations = [];
     protected array $withAggregateExpressions = []; // <-- lägg till för aggregat
 
+    /**
+     * Ställ in vilka kolumner som ska väljas vid SELECT.
+     */
+    public function select(array|string $columns = ['*']): self
+    {
+        $this->type = 'SELECT';
+
+        // Ta bort defaultkolumnen '*'
+        if ($this->columns === ['*']) {
+            $this->columns = [];
+        }
+
+        $this->columns = array_map(function ($column) {
+            // Hantera kolumn med alias (t.ex. u.id AS user_id)
+            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
+                $columnPart = $this->wrapColumn(trim($matches[1])); // Wrappa kolumnen (u.id)
+                $aliasPart = $this->wrapAlias(trim($matches[2]));   // Wrappa aliaset (user_id)
+
+                return "{$columnPart} AS {$aliasPart}";
+            }
+
+            // Hantera funktioner med alias (t.ex. COUNT(*) AS total_employees)
+            if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
+                $function = $matches[1]; // Funktion, t.ex. COUNT
+                $parameters = $matches[2]; // Parametrar, t.ex. *
+                $alias = $matches[3]; // Alias, t.ex. total_employees
+
+                $wrappedParameters = implode(', ',
+                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters))));
+                $wrappedAlias = $this->wrapAlias($alias);
+
+                return strtoupper($function)."($wrappedParameters) AS $wrappedAlias";
+            }
+
+            // Hantera andra typer på vanligt sätt
+            return $this->wrapColumn($column);
+        }, (array) $columns);
+
+        return $this;
+    }
+
     public function withCount(string|array $relations): self
     {
         if ($this->modelClass === null) {
@@ -42,122 +83,6 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         return $this;
-    }
-
-    public function withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null): self
-    {
-        if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling withCountWhere().");
-        }
-
-        /** @var \Radix\Database\ORM\Model $parent */
-        $parent = new $this->modelClass();
-        $parentTable = trim($this->table, '`');
-        $parentPk = $parent::getPrimaryKey();
-
-        if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
-        }
-
-        $rel = $parent->$relation();
-        $aggAlias = $alias ?: "{$relation}_count_{$value}";
-
-        // Normalisera jämförelsevärde (literal i SQL)
-        $valSql = is_int($value) || is_float($value)
-            ? (string)$value
-            : ("'".addslashes((string)$value)."'");
-
-        // HasMany
-        if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
-            $relatedModelClassProp = (new \ReflectionClass($rel))->getProperty('modelClass');
-            $relatedModelClassProp->setAccessible(true);
-            $relatedClass = $relatedModelClassProp->getValue($rel);
-            $relatedInstance = class_exists($relatedClass) ? new $relatedClass() : null;
-            $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
-
-            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
-            $fkProp->setAccessible(true);
-            $foreignKey = $fkProp->getValue($rel);
-
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
-                "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
-                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
-
-            $this->withAggregateExpressions[] = $aggAlias;
-            return $this;
-        }
-
-        // HasOne
-        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
-            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
-            $fkProp->setAccessible(true);
-            $foreignKey = $fkProp->getValue($rel);
-
-            $mcProp = (new \ReflectionClass($rel))->getProperty('modelClass');
-            $mcProp->setAccessible(true);
-            $modelClass = $mcProp->getValue($rel);
-            $relatedInstance = new $modelClass();
-            $relatedTable = $relatedInstance->getTable();
-
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
-                "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
-                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
-
-            $this->withAggregateExpressions[] = $aggAlias;
-            return $this;
-        }
-
-        // BelongsTo
-        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
-            $ownerKeyProp = (new \ReflectionClass($rel))->getProperty('ownerKey');
-            $ownerKeyProp->setAccessible(true);
-            $ownerKey = $ownerKeyProp->getValue($rel);
-
-            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
-            $fkProp->setAccessible(true);
-            $parentForeignKey = $fkProp->getValue($rel);
-
-            $tableProp = (new \ReflectionClass($rel))->getProperty('relatedTable');
-            $tableProp->setAccessible(true);
-            $relatedTable = $tableProp->getValue($rel);
-
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
-                "WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}` " .
-                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
-
-            $this->withAggregateExpressions[] = $aggAlias;
-            return $this;
-        }
-
-        // BelongsToMany
-        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
-            $pivotTable = $rel->getPivotTable();
-            $foreignPivotKey = $rel->getForeignPivotKey();
-
-            $relatedClass = $rel->getRelatedModelClass();
-            /** @var \Radix\Database\ORM\Model $relatedInstance */
-            $relatedInstance = new $relatedClass();
-            $relatedTable = $relatedInstance->getTable();
-
-            $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
-            $relatedPivotKeyProp->setAccessible(true);
-            $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
-
-            $this->columns[] =
-                "(SELECT COUNT(*) " .
-                "FROM `{$pivotTable}` AS pivot " .
-                "INNER JOIN `{$relatedTable}` AS related ON related.`id` = pivot.`{$relatedPivotKey}` " .
-                "WHERE pivot.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}` " .
-                "AND related.`{$column}` = {$valSql}) AS `{$aggAlias}`";
-
-            $this->withAggregateExpressions[] = $aggAlias;
-            return $this;
-        }
-
-        throw new \InvalidArgumentException("withCountWhere() does not support relation type for '$relation'.");
     }
 
     public function withSum(string $relation, string $column, ?string $alias = null): self
@@ -229,6 +154,51 @@ class QueryBuilder extends AbstractQueryBuilder
             $foreignKey = $fkProp->getValue($rel);
 
             $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            return;
+        }
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
+            $ref = new \ReflectionClass($rel);
+
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
+            $relatedClassOrTable = $relatedProp->getValue($rel);
+
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
+            $throughClassOrTable = $throughProp->getValue($rel);
+
+            $firstKeyProp = $ref->getProperty('firstKey');     // ex: subjects.category_id
+            $firstKeyProp->setAccessible(true);
+            $firstKey = $firstKeyProp->getValue($rel);
+
+            $secondKeyProp = $ref->getProperty('secondKey');   // ex: votes.subject_id
+            $secondKeyProp->setAccessible(true);
+            $secondKey = $secondKeyProp->getValue($rel);
+
+            $secondLocalProp = $ref->getProperty('secondLocal'); // ex: subjects.id
+            $secondLocalProp->setAccessible(true);
+            $secondLocal = $secondLocalProp->getValue($rel);
+
+            // Resolva tabellnamn från klass eller tabellsträng
+            $resolveTable = function (string $classOrTable): string {
+                if (class_exists($classOrTable)) {
+                    $m = new $classOrTable();
+                    return $m->getTable();
+                }
+                return $classOrTable;
+            };
+
+            $relatedTable = $resolveTable($relatedClassOrTable); // t.ex. votes
+            $throughTable = $resolveTable($throughClassOrTable); // t.ex. subjects
+
+            // Aggregat via JOIN genom mellanmodellen
+            $this->columns[] =
+                "(SELECT {$fn}(`r`.`{$column}`)" .
+                " FROM `{$relatedTable}` AS r" .
+                " INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}`" .
+                " WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`" .
+                ") AS `{$aggAlias}`";
             return;
         }
 
@@ -333,6 +303,50 @@ class QueryBuilder extends AbstractQueryBuilder
             return;
         }
 
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
+            $ref = new \ReflectionClass($rel);
+
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
+            $relatedClassOrTable = $relatedProp->getValue($rel);
+
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
+            $throughClassOrTable = $throughProp->getValue($rel);
+
+            $firstKeyProp = $ref->getProperty('firstKey');     // t.ex. subjects.category_id
+            $firstKeyProp->setAccessible(true);
+            $firstKey = $firstKeyProp->getValue($rel);
+
+            $secondKeyProp = $ref->getProperty('secondKey');   // t.ex. votes.subject_id
+            $secondKeyProp->setAccessible(true);
+            $secondKey = $secondKeyProp->getValue($rel);
+
+            $secondLocalProp = $ref->getProperty('secondLocal'); // t.ex. subjects.id
+            $secondLocalProp->setAccessible(true);
+            $secondLocal = $secondLocalProp->getValue($rel);
+
+            // Resolva tabellnamn från klass eller tabellsträng
+            $resolveTable = function (string $classOrTable): string {
+                if (class_exists($classOrTable)) {
+                    $m = new $classOrTable();
+                    return $m->getTable();
+                }
+                return $classOrTable;
+            };
+
+            $relatedTable = $resolveTable($relatedClassOrTable); // ex: votes
+            $throughTable = $resolveTable($throughClassOrTable); // ex: subjects
+
+            $this->columns[] =
+                "(SELECT COUNT(*)" .
+                " FROM `{$relatedTable}` AS r" .
+                " INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}`" .
+                " WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`" .
+                ") AS `{$relation}_count`";
+            return;
+        }
+
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
             $pivotTable = $rel->getPivotTable();
             $foreignPivotKey = $rel->getForeignPivotKey();
@@ -375,6 +389,172 @@ class QueryBuilder extends AbstractQueryBuilder
         throw new \InvalidArgumentException("withCount() does not support relation type for '$relation'.");
     }
 
+    public function withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null): self
+    {
+        if ($this->modelClass === null) {
+            throw new \LogicException("Model class is not set. Use setModelClass() before calling withCountWhere().");
+        }
+
+        /** @var \Radix\Database\ORM\Model $parent */
+        $parent = new $this->modelClass();
+        $parentTable = trim($this->table, '`');
+        $parentPk = $parent::getPrimaryKey();
+
+        if (!method_exists($parent, $relation)) {
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+        }
+
+        $rel = $parent->$relation();
+        $aggAlias = $alias ?: "{$relation}_count_{$value}";
+
+        // Normalisera jämförelsevärde (literal i SQL)
+        $valSql = is_int($value) || is_float($value)
+            ? (string)$value
+            : ("'".addslashes((string)$value)."'");
+
+        // HasMany
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
+            $relatedModelClassProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $relatedModelClassProp->setAccessible(true);
+            $relatedClass = $relatedModelClassProp->getValue($rel);
+            $relatedInstance = class_exists($relatedClass) ? new $relatedClass() : null;
+            $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            $this->columns[] =
+                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
+                "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
+                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        // HasManyThrough
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
+            $ref = new \ReflectionClass($rel);
+
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
+            $relatedClassOrTable = $relatedProp->getValue($rel);
+
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
+            $throughClassOrTable = $throughProp->getValue($rel);
+
+            $firstKeyProp = $ref->getProperty('firstKey');     // t.ex. subjects.category_id
+            $firstKeyProp->setAccessible(true);
+            $firstKey = $firstKeyProp->getValue($rel);
+
+            $secondKeyProp = $ref->getProperty('secondKey');   // t.ex. votes.subject_id
+            $secondKeyProp->setAccessible(true);
+            $secondKey = $secondKeyProp->getValue($rel);
+
+            $secondLocalProp = $ref->getProperty('secondLocal'); // t.ex. subjects.id
+            $secondLocalProp->setAccessible(true);
+            $secondLocal = $secondLocalProp->getValue($rel);
+
+            // Resolva tabellnamn från klass eller tabellsträng
+            $resolve = function (string $classOrTable): string {
+                if (class_exists($classOrTable)) {
+                    $m = new $classOrTable();
+                    return $m->getTable();
+                }
+                // anta redan tabellnamn
+                return $classOrTable;
+            };
+
+            $relatedTable = $resolve($relatedClassOrTable); // "votes"
+            $throughTable = $resolve($throughClassOrTable); // "subjects"
+
+            // Bygg subquery: COUNT relaterade rader med filter på kolumn + värde
+            $this->columns[] =
+                "(SELECT COUNT(*) " .
+                " FROM `{$relatedTable}` AS r" .
+                " INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}`" .
+                " WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`" .
+                " AND r.`{$column}` = {$valSql}" .
+                ") AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        // HasOne
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $foreignKey = $fkProp->getValue($rel);
+
+            $mcProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $mcProp->setAccessible(true);
+            $modelClass = $mcProp->getValue($rel);
+            $relatedInstance = new $modelClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $this->columns[] =
+                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
+                "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
+                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        // BelongsTo
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
+            $ownerKeyProp = (new \ReflectionClass($rel))->getProperty('ownerKey');
+            $ownerKeyProp->setAccessible(true);
+            $ownerKey = $ownerKeyProp->getValue($rel);
+
+            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp->setAccessible(true);
+            $parentForeignKey = $fkProp->getValue($rel);
+
+            $tableProp = (new \ReflectionClass($rel))->getProperty('relatedTable');
+            $tableProp->setAccessible(true);
+            $relatedTable = $tableProp->getValue($rel);
+
+            $this->columns[] =
+                "(SELECT COUNT(*) FROM `{$relatedTable}` " .
+                "WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}` " .
+                "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        // BelongsToMany
+        if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
+            $pivotTable = $rel->getPivotTable();
+            $foreignPivotKey = $rel->getForeignPivotKey();
+
+            $relatedClass = $rel->getRelatedModelClass();
+            /** @var \Radix\Database\ORM\Model $relatedInstance */
+            $relatedInstance = new $relatedClass();
+            $relatedTable = $relatedInstance->getTable();
+
+            $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
+            $relatedPivotKeyProp->setAccessible(true);
+            $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
+
+            $this->columns[] =
+                "(SELECT COUNT(*) " .
+                "FROM `{$pivotTable}` AS pivot " .
+                "INNER JOIN `{$relatedTable}` AS related ON related.`id` = pivot.`{$relatedPivotKey}` " .
+                "WHERE pivot.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}` " .
+                "AND related.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        throw new \InvalidArgumentException("withCountWhere() does not support relation type for '$relation'.");
+    }
+
     public function setModelClass(string $modelClass): self
     {
         if (!class_exists($modelClass)) {
@@ -382,47 +562,6 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         $this->modelClass = $modelClass;
-        return $this;
-    }
-
-    /**
-     * Ställ in vilka kolumner som ska väljas vid SELECT.
-     */
-    public function select(array|string $columns = ['*']): self
-    {
-        $this->type = 'SELECT';
-
-        // Ta bort defaultkolumnen '*'
-        if ($this->columns === ['*']) {
-            $this->columns = [];
-        }
-
-        $this->columns = array_map(function ($column) {
-            // Hantera kolumn med alias (t.ex. u.id AS user_id)
-            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
-                $columnPart = $this->wrapColumn(trim($matches[1])); // Wrappa kolumnen (u.id)
-                $aliasPart = $this->wrapAlias(trim($matches[2]));   // Wrappa aliaset (user_id)
-
-                return "{$columnPart} AS {$aliasPart}";
-            }
-
-            // Hantera funktioner med alias (t.ex. COUNT(*) AS total_employees)
-            if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
-                $function = $matches[1]; // Funktion, t.ex. COUNT
-                $parameters = $matches[2]; // Parametrar, t.ex. *
-                $alias = $matches[3]; // Alias, t.ex. total_employees
-
-                $wrappedParameters = implode(', ',
-                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters))));
-                $wrappedAlias = $this->wrapAlias($alias);
-
-                return strtoupper($function)."($wrappedParameters) AS $wrappedAlias";
-            }
-
-            // Hantera andra typer på vanligt sätt
-            return $this->wrapColumn($column);
-        }, (array) $columns);
-
         return $this;
     }
 

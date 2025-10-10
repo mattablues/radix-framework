@@ -9,6 +9,7 @@ use Radix\Database\DatabaseManager;
 use Radix\Database\ORM\Relationships\BelongsTo;
 use Radix\Database\ORM\Relationships\BelongsToMany;
 use Radix\Database\ORM\Relationships\HasMany;
+use Radix\Database\ORM\Relationships\HasManyThrough;
 use Radix\Database\ORM\Relationships\HasOne;
 use Radix\Database\QueryBuilder\QueryBuilder;
 
@@ -582,7 +583,6 @@ abstract class Model implements JsonSerializable
     /**
      * Definiera en "hasMany"-relation.
      */
-// ... existing code ...
     public function hasMany(string $relatedModel, string $foreignKey, ?string $localKey = null): HasMany
     {
         $localKey = $localKey ?? $this->primaryKey;
@@ -600,6 +600,34 @@ abstract class Model implements JsonSerializable
         );
 
         // Koppla parent så att relationen kan läsa värdet vid get()
+        if (method_exists($relation, 'setParent')) {
+            $relation->setParent($this);
+        }
+
+        return $relation;
+    }
+
+    public function hasManyThrough(
+        string $related,
+        string $through,
+        string $firstKey,
+        string $secondKey,
+        ?string $localKey = null,
+        ?string $secondLocal = null
+    ): HasManyThrough {
+        $localKey = $localKey ?? $this->primaryKey;
+        $secondLocal = $secondLocal ?? 'id';
+
+        $relation = new HasManyThrough(
+            $this->getConnection(),
+            $related,
+            $through,
+            $firstKey,
+            $secondKey,
+            $localKey,
+            $secondLocal
+        );
+
         if (method_exists($relation, 'setParent')) {
             $relation->setParent($this);
         }
