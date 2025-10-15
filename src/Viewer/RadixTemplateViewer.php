@@ -34,9 +34,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         $data = $this->applyFilters($data);
 
+        // Disable cache i development
+        $appEnv = getenv('APP_ENV') ?: 'production';
+        $disableCache = ($appEnv === 'development');
+
         // Generera unik cache-nyckel baserat på data och version
         $cacheKey = $this->generateCacheKey($templatePath, $data, $version);
-        $cachedFile = $this->getCachedTemplate($cacheKey);
+        $cachedFile = $disableCache ? null : $this->getCachedTemplate($cacheKey);
 
         if ($cachedFile !== null) {
             $this->debug("[DEBUG] Using cached template: $cachedFile");
@@ -59,8 +63,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $code = $this->loadIncludes($this->viewsDirectory, $code);
         $code = $this->replacePlaceholders($code);
 
-        $this->cacheTemplate($cacheKey, $code);
-        $this->debug("Compiled template cached under key: $cacheKey");
+        if (!$disableCache) {
+            $this->cacheTemplate($cacheKey, $code);
+            $this->debug("Compiled template cached under key: $cacheKey");
+        } else {
+            $this->debug("[DEBUG] Cache disabled in development");
+        }
 
         return $this->evaluateTemplate($code, $data);
     }
