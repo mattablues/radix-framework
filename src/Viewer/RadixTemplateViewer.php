@@ -153,13 +153,26 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     private function processExtends(string $code, string $viewsDirectory): string
     {
-        while (preg_match('#^{% extends "(?<view>.*?)" %}#', $code, $matches)) {
+        // Samla block från alla nivåer, där barnets block har prioritet
+        $accumulatedBlocks = [];
+
+        // Utgå från child-koden först
+        $currentCode = $code;
+        $accumulatedBlocks = array_merge($this->getBlocks($currentCode), $accumulatedBlocks);
+
+        // Iterera uppåt i hierarkin och merg:a block vid varje nivå
+        while (preg_match('#^{% extends "(?<view>.*?)" %}#', $currentCode, $matches)) {
             $parentTemplate = $this->loadTemplate($viewsDirectory . $matches['view']);
-            $blocks = $this->getBlocks($code);
-            $code = $this->replaceYields($parentTemplate, $blocks);
+
+            // Merg:a block från mellanlayouten (om den definierar t.ex. sidebar/hasSidebar)
+            $parentBlocks = $this->getBlocks($currentCode);
+            $accumulatedBlocks = array_merge($parentBlocks, $accumulatedBlocks);
+
+            // Ersätt yields i parent med alla hittills kända block
+            $currentCode = $this->replaceYields($parentTemplate, $accumulatedBlocks);
         }
 
-        return $code;
+        return $currentCode;
     }
 
     /**
@@ -357,9 +370,25 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Replace `{% yield %}` directives with corresponding block content.
      */
+    /**
+     * Replace `{% yield %}` directives with corresponding block content.
+     */
     private function replaceYields(string $code, array $blocks): string
     {
-        preg_match_all("#{% yield (?<name>\w+) %}#", $code, $matches, PREG_SET_ORDER);
+        // Hantera block-yield med fallback:
+        // {% yield name %} ...fallback... {% endyield name %}
+        $code = preg_replace_callback(
+            "#{% yield (?<name>\\w+) %}(?<fallback>.*?){% endyield \\k{name} %}#s",
+            function ($m) use ($blocks) {
+                $name = $m['name'];
+                $fallback = $m['fallback'] ?? '';
+                return array_key_exists($name, $blocks) ? $blocks[$name] : $fallback;
+            },
+            $code
+        );
+
+        // Hantera enkla yield-taggar utan fallback: {% yield name %}
+        preg_match_all("#{% yield (?<name>\\w+) %}#", $code, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             $yieldName = $match['name'];
