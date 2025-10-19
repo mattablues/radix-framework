@@ -532,26 +532,32 @@ if (!function_exists('paginate_links')) {
             return '';
         }
 
-        // Mobil: litet intervall + horisontell scroll + mindre text
-        $mobile = '<div class="overflow-x-auto max-w-full md:hidden px-2 pb-2">'
-                . '<div class="w-full inline-flex items-center justify-center gap-1.5 min-w-max text-sm">'
-                . render_first_link($pagination, $route)
-                . render_previous_link($pagination, $route)
-                . render_page_links_with_interval($pagination, $route, 1)
-                . render_next_link($pagination, $route)
-                . render_last_link($pagination, $route)
+        $desktopInterval = $interval ?? 3;
+
+        // Gemensamma delar
+        $first  = render_first_link($pagination, $route);
+        $prev   = render_previous_link($pagination, $route);
+        $next   = render_next_link($pagination, $route);
+        $last   = render_last_link($pagination, $route);
+
+        // Innehåll per breakpoint
+        $pagesMobile  = render_page_links_with_interval($pagination, $route, 1);
+        $pagesDesktop = ($desktopInterval === null)
+            ? render_page_links($pagination, $route)
+            : render_page_links_with_interval($pagination, $route, $desktopInterval);
+
+        $linksMobile  = $first . $prev . $pagesMobile . $next . $last;
+        $linksDesktop = $first . $prev . $pagesDesktop . $next . $last;
+
+        // Mobil: horisontell scroll som matchar innehållets bredd
+        $mobile = '<div class="md:hidden w-full overflow-x-auto pb-2 snap-x" aria-label="Sidnavigering">'
+                . '<div class="flex min-w-fit shrink-0 items-center justify-center gap-1.5 px-2 text-sm">'
+                . $linksMobile
                 . '</div></div>';
 
-        // Desktop: använd befintlig logik, med valt intervall eller fallback 3
-        $desktopInterval = $interval ?? 3;
-        $desktop = '<div class="hidden md:flex items-center justify-center gap-1.5">'
-                 . render_first_link($pagination, $route)
-                 . render_previous_link($pagination, $route)
-                 . ($desktopInterval === null
-                    ? render_page_links($pagination, $route)
-                    : render_page_links_with_interval($pagination, $route, $desktopInterval))
-                 . render_next_link($pagination, $route)
-                 . render_last_link($pagination, $route)
+        // Desktop
+        $desktop = '<div class="hidden md:flex items-center justify-center gap-1.5" aria-label="Sidnavigering">'
+                 . $linksDesktop
                  . '</div>';
 
         return $mobile . $desktop;
