@@ -526,7 +526,7 @@ if (!function_exists('paginate_links')) {
      * @param  int|null  $interval  Antal sidor att visa som intervall runt den aktuella sidan.
      * @return string HTML-sträng för sidnavigeringen.
      */
-    function paginate_links(array $pagination, string $route, ?int $interval = null): string
+    function paginate_links(array $pagination, string $route, ?int $interval = null, array $routeParams = []): string
     {
         if ($pagination['total'] <= $pagination['per_page']) {
             return '';
@@ -534,28 +534,24 @@ if (!function_exists('paginate_links')) {
 
         $desktopInterval = $interval ?? 3;
 
-        // Gemensamma delar
-        $first  = render_first_link($pagination, $route);
-        $prev   = render_previous_link($pagination, $route);
-        $next   = render_next_link($pagination, $route);
-        $last   = render_last_link($pagination, $route);
+        $first  = render_first_link($pagination, $route, $routeParams);
+        $prev   = render_previous_link($pagination, $route, $routeParams);
+        $next   = render_next_link($pagination, $route, $routeParams);
+        $last   = render_last_link($pagination, $route, $routeParams);
 
-        // Innehåll per breakpoint
-        $pagesMobile  = render_page_links_with_interval($pagination, $route, 1);
+        $pagesMobile  = render_page_links_with_interval($pagination, $route, 1, $routeParams);
         $pagesDesktop = ($desktopInterval === null)
-            ? render_page_links($pagination, $route)
-            : render_page_links_with_interval($pagination, $route, $desktopInterval);
+            ? render_page_links($pagination, $route, $routeParams)
+            : render_page_links_with_interval($pagination, $route, $desktopInterval, $routeParams);
 
         $linksMobile  = $first . $prev . $pagesMobile . $next . $last;
         $linksDesktop = $first . $prev . $pagesDesktop . $next . $last;
 
-        // Mobil: horisontell scroll som matchar innehållets bredd
         $mobile = '<div class="md:hidden w-full overflow-x-auto pb-2 snap-x" aria-label="Sidnavigering">'
                 . '<div class="flex min-w-fit shrink-0 items-center justify-center gap-1.5 px-2 text-sm">'
                 . $linksMobile
                 . '</div></div>';
 
-        // Desktop
         $desktop = '<div class="hidden md:flex items-center justify-center gap-1.5" aria-label="Sidnavigering">'
                  . $linksDesktop
                  . '</div>';
@@ -602,92 +598,95 @@ if (!function_exists('paginate_links')) {
         };
     }
 
-   function render_first_link(array $pagination, string $route): string
+    function render_first_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] > $pagination['first_page']);
         $cls = _pager_btn_classes($disabled);
         $icon = _icon_svg('chevrons-left', 18);
+
+        $baseUrl = route($route, $routeParams);
+
+        $currentQuery = request()->get ?? [];
+        unset($currentQuery['page']);
+
         if (!$disabled) {
-            $url = route($route) . '?' . http_build_query(['page' => $pagination['first_page']]);
-            return sprintf(
-                '<a href="%s" class="%s" aria-label="Gå till första sidan" style="line-height:1">%s</a>',
-                secure_output($url),
-                $cls . ' rounded-l-lg',
-                $icon
-            );
+            $query = http_build_query($currentQuery + ['page' => $pagination['first_page']]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
+            return sprintf('<a href="%s" class="%s" aria-label="Gå till första sidan" style="line-height:1">%s</a>',
+                secure_output($url), $cls . ' rounded-l-lg', $icon);
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-l-lg', $icon);
     }
 
-    function render_previous_link(array $pagination, string $route): string
+    function render_previous_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] > $pagination['first_page']);
         $cls = _pager_btn_classes($disabled);
         $icon = _icon_svg('chevron-left', 18);
+
+        $baseUrl = route($route, $routeParams);
+        $currentQuery = request()->get ?? [];
+        unset($currentQuery['page']);
+
         if (!$disabled) {
-            $url = route($route) . '?' . http_build_query(['page' => $pagination['current_page'] - 1]);
-            return sprintf(
-                '<a href="%s" class="%s" aria-label="Föregående sida" style="line-height:1">%s</a>',
-                secure_output($url),
-                $cls,
-                $icon
-            );
+            $query = http_build_query($currentQuery + ['page' => $pagination['current_page'] - 1]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
+            return sprintf('<a href="%s" class="%s" aria-label="Föregående sida" style="line-height:1">%s</a>',
+                secure_output($url), $cls, $icon);
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
     }
 
-    function render_page_links(array $pagination, string $route): string
+    function render_page_links(array $pagination, string $route, array $routeParams = []): string
     {
         $html = '';
+        $baseUrl = route($route, $routeParams);
+        $currentQuery = request()->get ?? [];
+        unset($currentQuery['page']);
 
         for ($page = $pagination['first_page']; $page <= $pagination['last_page']; $page++) {
-            $url = route($route) . '?' . http_build_query(['page' => $page]);
+            $query = http_build_query($currentQuery + ['page' => $page]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
             if ($page === $pagination['current_page']) {
                 $html .= sprintf('<span class="%s" aria-current="page" style="line-height:1">%d</span>', _pager_btn_classes(false, true), $page);
             } else {
-                $html .= sprintf(
-                    '<a href="%s" class="%s" style="line-height:1">%d</a>',
-                    secure_output($url),
-                    _pager_btn_classes(),
-                    $page
-                );
+                $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
+                    secure_output($url), _pager_btn_classes(), $page);
             }
         }
 
         return $html;
     }
 
-    function render_page_links_with_interval(array $pagination, string $route, int $interval): string
+    function render_page_links_with_interval(array $pagination, string $route, int $interval, array $routeParams = []): string
     {
         $html = '';
         $current = $pagination['current_page'];
         $first = $pagination['first_page'];
         $last = $pagination['last_page'];
 
+        $baseUrl = route($route, $routeParams);
+        $currentQuery = request()->get ?? [];
+        unset($currentQuery['page']);
+
         if ($current > $first + $interval) {
-            $url = route($route) . '?' . http_build_query(['page' => $first]);
-            $html .= sprintf(
-                '<a href="%s" class="%s" style="line-height:1">%d</a>',
-                secure_output($url),
-                _pager_btn_classes(),
-                $first
-            );
+            $query = http_build_query($currentQuery + ['page' => $first]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
+            $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
+                secure_output($url), _pager_btn_classes(), $first);
             if ($current > $first + $interval + 1) {
                 $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
             }
         }
 
         for ($page = max($first, $current - $interval); $page <= min($last, $current + $interval); $page++) {
-            $url = route($route) . '?' . http_build_query(['page' => $page]);
+            $query = http_build_query($currentQuery + ['page' => $page]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
             if ($page === $current) {
                 $html .= sprintf('<span class="%s" aria-current="page" style="line-height:1">%d</span>', _pager_btn_classes(false, true), $page);
             } else {
-                $html .= sprintf(
-                    '<a href="%s" class="%s" style="line-height:1">%d</a>',
-                    secure_output($url),
-                    _pager_btn_classes(),
-                    $page
-                );
+                $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
+                    secure_output($url), _pager_btn_classes(), $page);
             }
         }
 
@@ -695,48 +694,49 @@ if (!function_exists('paginate_links')) {
             if ($current < $last - $interval - 1) {
                 $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
             }
-            $url = route($route) . '?' . http_build_query(['page' => $last]);
-            $html .= sprintf(
-                '<a href="%s" class="%s" style="line-height:1">%d</a>',
-                secure_output($url),
-                _pager_btn_classes(),
-                $last
-            );
+            $query = http_build_query($currentQuery + ['page' => $last]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
+            $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
+                secure_output($url), _pager_btn_classes(), $last);
         }
 
         return $html;
     }
 
-    function render_next_link(array $pagination, string $route): string
+    function render_next_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] < $pagination['last_page']);
         $cls = _pager_btn_classes($disabled);
         $icon = _icon_svg('chevron-right', 18);
+
+        $baseUrl = route($route, $routeParams);
+        $currentQuery = request()->get ?? [];
+        unset($currentQuery['page']);
+
         if (!$disabled) {
-            $url = route($route) . '?' . http_build_query(['page' => $pagination['current_page'] + 1]);
-            return sprintf(
-                '<a href="%s" class="%s" aria-label="Nästa sida" style="line-height:1">%s</a>',
-                secure_output($url),
-                $cls,
-                $icon
-            );
+            $query = http_build_query($currentQuery + ['page' => $pagination['current_page'] + 1]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
+            return sprintf('<a href="%s" class="%s" aria-label="Nästa sida" style="line-height:1">%s</a>',
+                secure_output($url), $cls, $icon);
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
     }
 
-    function render_last_link(array $pagination, string $route): string
+    function render_last_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] < $pagination['last_page']);
         $cls = _pager_btn_classes($disabled);
         $icon = _icon_svg('chevrons-right', 18);
+
+        $baseUrl = route($route, $routeParams);
+        $currentQuery = request()->get ?? [];
+        unset($currentQuery['page']);
+
         if (!$disabled) {
-            $url = route($route) . '?' . http_build_query(['page' => $pagination['last_page']]);
-            return sprintf(
-                '<a href="%s" class="%s" aria-label="Gå till sista sidan" style="line-height:1">%s</a>',
-                secure_output($url),
-                $cls . ' rounded-r-lg',
-                $icon
-            );
+            $query = http_build_query($currentQuery + ['page' => $pagination['last_page']]);
+            $url = $baseUrl . ($query ? '?' . $query : '');
+            return sprintf('<a href="%s" class="%s" aria-label="Gå till sista sidan" style="line-height:1">%s</a>',
+                secure_output($url), $cls . ' rounded-r-lg', $icon);
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-r-lg', $icon);
     }
