@@ -568,13 +568,21 @@ if (!function_exists('paginate_links')) {
     {
         // Öka höjd och padding för ~29-30px totalhöjd (matcha tidigare utseende)
         $base = 'h-7 min-w-7 px-2 py-1 inline-flex items-center justify-center align-middle border rounded text-sm';
+
+        // Basfärger via variabler
+        $baseColors = 'pager-base pager-hover';
+
         if ($active) {
-            return $base . ' bg-blue-600 text-white border-blue-600';
+            // Aktiva färger via variabler
+            return $base . ' pager-active';
         }
         if ($disabled) {
-            return $base . ' text-gray-300 border-gray-200 cursor-not-allowed';
+            // Inaktiva färger via variabler
+            return $base . ' pager-disabled';
         }
-        return $base . ' text-blue-600 border-blue-200 hover:bg-blue-50';
+
+        // Standard (länkbar) via variabler
+        return $base . ' ' . $baseColors;
     }
 
     // Liten, enhetlig SVG-storlek så den inte blir större än sidlänkarna
@@ -665,7 +673,7 @@ if (!function_exists('paginate_links')) {
                 $first
             );
             if ($current > $first + $interval + 1) {
-                $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle text-gray-400" style="line-height:1">…</span>';
+                $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
             }
         }
 
@@ -685,7 +693,7 @@ if (!function_exists('paginate_links')) {
 
         if ($current < $last - $interval) {
             if ($current < $last - $interval - 1) {
-                $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle text-gray-400" style="line-height:1">…</span>';
+                $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
             }
             $url = route($route) . '?' . http_build_query(['page' => $last]);
             $html .= sprintf(
