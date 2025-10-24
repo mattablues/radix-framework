@@ -87,7 +87,7 @@ class BelongsTo
     {
         $modelClass = $this->resolveModelClass($classOrTable);
         $model = new $modelClass();
-        $model->fill($data);
+        $model->hydrateFromDatabase($data);
         $model->markAsExisting();
 
         return $model;

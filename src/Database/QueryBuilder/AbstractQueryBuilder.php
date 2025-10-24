@@ -47,7 +47,7 @@ abstract class AbstractQueryBuilder
         $results = [];
         foreach ($rows as $row) {
             $model = new $this->modelClass();
-            $model->fill($row);
+            $model->hydrateFromDatabase($row);
             $model->markAsExisting();
 
             // withCount: lägg in {relation}_count som int

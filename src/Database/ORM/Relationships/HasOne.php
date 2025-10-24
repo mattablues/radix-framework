@@ -69,7 +69,7 @@ class HasOne
     private function createModelInstance(array $data): Model
     {
         $model = new $this->modelClass();
-        $model->fill($data); // Fyll modellen, 'exists' exkluderas här
+        $model->hydrateFromDatabase($data); // Fyll modellen, 'exists' exkluderas här
         $model->markAsExisting(); // Använd metod för att explicit sätta flaggan
 
         return $model;

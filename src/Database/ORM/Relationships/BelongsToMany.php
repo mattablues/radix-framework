@@ -116,7 +116,7 @@ class BelongsToMany
     {
         $modelClass = $this->resolveModelClass($classOrTable);
         $model = new $modelClass();
-        $model->fill($data);
+        $model->hydrateFromDatabase($data);
         $model->markAsExisting();
 
         return $model;

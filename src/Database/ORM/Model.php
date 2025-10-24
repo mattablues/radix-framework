@@ -258,6 +258,20 @@ abstract class Model implements JsonSerializable
         return $this;
     }
 
+    public function hydrateFromDatabase(array $row): self
+    {
+        $guardAll = !empty($this->guarded) && in_array('*', $this->guarded, true);
+
+        foreach ($row as $key => $value) {
+            if ($guardAll || in_array($key, $this->guarded ?? [], true)) {
+                continue; // hoppa över guarded vid hydrering
+            }
+            $this->attributes[$key] = $value;
+        }
+
+        return $this;
+    }
+
     public function fill(array $attributes): void
     {
         $this->blockUndefinableAttributes();
