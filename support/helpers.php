@@ -467,6 +467,70 @@ if (!function_exists('generate_honeypot_id')) {
     }
 }
 
+if (!function_exists('human_name')) {
+    /**
+     * Normaliserar personnamn med Unicode-stöd.
+     * - Trimmar och normaliserar mellanslag
+     * - Titelcasing per ord och per del-segment (bindestreck/apostrof)
+     * - Partiklar (t.ex. von, van, de, da, del, di, la, le, du, den, af, av, och) hålls gemena om de inte är första ordet
+     *
+     * Ex:
+     *  " aNNa-mARIA  von   SYdOw " => "Anna-Maria von Sydow"
+     *  "  o'connor  " => "O'Connor"
+     *  "JOÃO da SILVA" => "João da Silva"
+     */
+    function human_name(string $name): string
+    {
+        $name = preg_replace('/\s+/', ' ', trim($name));
+        if ($name === '') {
+            return '';
+        }
+
+        // Lista med partiklar som ska vara gemena om de inte är första ordet
+        $particles = [
+            'von','van','de','da','del','della','di','la','le','du','den','af','av','och',
+        ];
+
+        $words = explode(' ', $name);
+
+        foreach ($words as $i => &$w) {
+            $w = mb_strtolower($w, 'UTF-8');
+
+            // Hantera bindestreck först, och inuti varje del hantera apostrof
+            $hyphenParts = explode('-', $w);
+            foreach ($hyphenParts as &$hp) {
+                // Om detta är ett helt ord och i>0 samt finns i partiklar -> lämna gemen
+                if ($i > 0 && in_array($hp, $particles, true)) {
+                    continue;
+                }
+
+                // Dela på apostrof: o'connor, d'angelo etc.
+                $apostParts = explode("'", $hp);
+                foreach ($apostParts as $j => &$ap) {
+                    if ($ap === '') {
+                        continue;
+                    }
+                    // Versalisera del med vår mb_ucfirst, resten gemen
+                    $ap = mb_ucfirst($ap, 'UTF-8', true);
+                }
+                unset($ap);
+                $hp = implode("'", $apostParts);
+            }
+            unset($hp);
+
+            $w = implode('-', $hyphenParts);
+
+            // Om hela ordet är partikel och inte först, håll det gemen
+            if ($i > 0 && in_array($w, $particles, true)) {
+                // redan gemen
+            }
+        }
+        unset($w);
+
+        return implode(' ', $words);
+    }
+}
+
 if (!function_exists('honeypot_field')) {
     function honeypot_field(string $formContext = ''): string
     {
