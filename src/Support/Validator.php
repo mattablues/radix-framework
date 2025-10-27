@@ -73,6 +73,14 @@ class Validator
         $this->errors[$field][] = $message;
     }
 
+    // Hjälpmetod att generera nytt honeypot-id efter validering
+    public function regenerateHoneypotId(callable $generator): string
+    {
+        $newId = $generator();
+        $_SESSION['honeypot_id'] = $newId;
+        return $newId;
+    }
+
     protected function applyRule(string $field, string $rule, mixed $value): void
     {
         if (str_contains($rule, ':')) {
@@ -117,6 +125,10 @@ class Validator
         // Applicera valideringen och hantera fel
         if (!$this->$method($value, $parameter)) {
             $this->addError($field, $this->getErrorMessage($field, $rule, $parameter));
+            // Särskild hantering: om honeypot_dynamic faller, lägg ett generellt formulärfel
+            if ($rule === 'honeypot_dynamic') {
+                $this->addError('form-error', 'Det verkar som att du försöker skicka spam. Försök igen.');
+            }
         }
     }
 
@@ -154,6 +166,7 @@ class Validator
             'alphanumeric' => "Fältet $translatedField får endast innehålla bokstäver och siffror.",
             'match' => "Fältet $translatedField måste matcha fältet $translatedParameter.",
             'honeypot' => "Spam.",
+            'honeypot_dynamic' => "Spam.",
             'unique' => "Fältet $translatedField måste vara unikt, '{placeholder}' används redan.",
             'regex' => "Fältet $translatedField har ett ogiltigt format.",
             'in' => "Fältet $translatedField måste vara ett av följande värden: $parameter.",
@@ -369,6 +382,25 @@ class Validator
     protected function validateHoneypot(mixed $value, ?string $parameter = null): bool
     {
         return empty($value); // Ett giltigt honeypot-fält bör vara tomt
+    }
+
+    // Dynamisk honeypot: fältets namn är den förväntade honeypot-nyckeln i sessionen
+    protected function validateHoneypotDynamic(mixed $value, ?string $parameter = null): bool
+    {
+        $expected = $_SESSION['honeypot_id'] ?? null;
+        if (!$expected || !is_string($expected) || !str_starts_with($expected, 'hp_')) {
+            // Om inget förväntat id finns, betrakta som fel (hårdare hållning)
+            return false;
+        }
+
+        // Fältet måste finnas och heta exakt som expected
+        if (!array_key_exists($expected, $this->data)) {
+            return false;
+        }
+
+        // Värdet måste vara tomt
+        $submitted = $this->data[$expected] ?? null;
+        return $submitted === '' || $submitted === null;
     }
 
     protected function validateNotIn(mixed $value, ?string $parameter = null): bool
