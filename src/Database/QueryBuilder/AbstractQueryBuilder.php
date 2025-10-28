@@ -33,7 +33,7 @@ abstract class AbstractQueryBuilder
         return $this->connection->execute($sql, $this->bindings);
     }
 
-     public function get(): array
+    public function get(): array
     {
         if (is_null($this->modelClass)) {
             throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
@@ -49,82 +49,10 @@ abstract class AbstractQueryBuilder
             $model->hydrateFromDatabase($row);
             $model->markAsExisting();
 
-            // ... existing code ...
-            // withCount: lägg in {relation}_count som int
-            if (!empty($this->withCountRelations)) {
-                foreach ($this->withCountRelations as $rel) {
-                    $k = $rel . '_count';
-                    if (array_key_exists($k, $row)) {
-                        // TA BORT att lagra som relation: vi vill endast ha dessa i attributes
-                        // $model->setRelation($k, (int)$row[$k]);
-                    }
-                }
-            }
+            // Obs: Inga aggregat eller *_count sätts som relationer här längre.
+            // De finns redan i $attributes via hydrateFromDatabase.
 
-            // withAggregate/withCountWhere: lägg in alias och typkasta
-            if (!empty($this->withAggregateExpressions)) {
-                foreach ($this->withAggregateExpressions as $aggAlias) {
-                    if (array_key_exists($aggAlias, $row)) {
-                        $val = $row[$aggAlias];
-
-                        // Försök hitta motsvarande uttryck för aliaset i columns för typning
-                        $typed = false;
-                        if (property_exists($this, 'columns') && !empty($this->columns)) {
-                            foreach ($this->columns as $colExpr) {
-                                $expr = (string)$colExpr;
-                                if (preg_match('/\b(COUNT|SUM|AVG|MIN|MAX)\s*\([^)]*\)\s+AS\s+`?'.preg_quote($aggAlias, '/').'`?/i', $expr, $m)) {
-                                    $fn = strtoupper($m[1]);
-                                    if ($fn === 'COUNT') {
-                                        $val = (int)$val;
-                                    } elseif ($fn === 'AVG') {
-                                        $val = (float)$val;
-                                    } else { // SUM/MIN/MAX
-                                        $val = is_numeric($val) && (string)(int)$val === (string)$val ? (int)$val : (float)$val;
-                                    }
-                                    $typed = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!$typed && is_numeric($val)) {
-                            // fallback: försök rimlig typning
-                            $val = (string)(int)$val === (string)$val ? (int)$val : (float)$val;
-                        }
-
-                        // TA BORT att lagra som relation: vi vill endast ha dessa i attributes
-                        // $model->setRelation($aggAlias, $val);
-                    }
-                }
-            }
-
-            // Detektera enkla aggregat i SELECT (ex COUNT(...) AS `count`) och lägg som relation med korrekt typ
-            if (property_exists($this, 'columns') && !empty($this->columns)) {
-                foreach ($this->columns as $colExpr) {
-                    $expr = (string)$colExpr;
-
-                    if (preg_match('/\b(COUNT|SUM|AVG|MIN|MAX|ROUND|CEIL|FLOOR|ABS|YEAR|MONTH)\s*\([^)]*\)\s+AS\s+`?([a-zA-Z0-9_]+)`?/i', $expr, $m)) {
-                        $fn = strtoupper($m[1]);
-                        $alias = $m[2];
-                        if (array_key_exists($alias, $row)) {
-                            $val = $row[$alias];
-
-                            if ($fn === 'COUNT') {
-                                $val = (int)$val;
-                            } elseif ($fn === 'AVG') {
-                                $val = (float)$val;
-                            } elseif (in_array($fn, ['SUM','MIN','MAX','ROUND','CEIL','FLOOR','ABS','YEAR','MONTH'], true)) {
-                                $val = is_numeric($val) && (string)(int)$val === (string)$val ? (int)$val : (float)$val;
-                            }
-
-                            // TA BORT att lagra som relation: vi vill endast ha dessa i attributes
-                            // $model->setRelation($alias, $val);
-                        }
-                    }
-                }
-            }
-
-            // Eager load
+            // Eager load endast riktiga relationer (behåll denna del)
             if (!empty($this->eagerLoadRelations)) {
                 foreach ($this->eagerLoadRelations as $relation) {
                     if (!method_exists($model, $relation)) {
