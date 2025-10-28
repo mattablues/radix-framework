@@ -179,7 +179,8 @@ class Validator
             'ends_with' => "Fältet $translatedField måste sluta med ett av följande: $parameter.",
             'ip' => "Fältet $translatedField måste vara en giltig IP-adress.",
             'url' => "Fältet $translatedField måste vara en giltig URL.",
-            'required_with' => "Fältet $translatedField är obligatoriskt när $translatedParameter anges.",
+//            'required_with' => "Fältet $translatedField är obligatoriskt när $translatedParameter anges.",
+            'required_with' => "Fältet $translatedField är obligatoriskt med $translatedParameter.",
             'nullable' => "Fältet $translatedField får lämnas tomt, men om det anges måste det uppfylla valideringsreglerna.",
             'string' => "Fältet $translatedField måste vara en giltig textsträng.", // Lägg till detta
             'file_type' => "Fältet $translatedField måste vara av typen: $parameter.",
