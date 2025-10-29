@@ -602,36 +602,6 @@ class QueryBuilder extends AbstractQueryBuilder
         return parent::get();
     }
 
-//    public function get(): array
-//    {
-//        if (is_null($this->modelClass)) {
-//            throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
-//        }
-//
-//        $results = parent::get();
-//
-//        // Konvertera arrays -> modeller
-//        foreach ($results as &$result) {
-//            if (!$result instanceof $this->modelClass) {
-//                $modelInstance = new $this->modelClass();
-//                $modelInstance->fill($result);
-//                $modelInstance->markAsExisting();
-//
-//                // plocka upp *_count-fält från SELECT och sätt som relation
-//                foreach ($this->withCountRelations as $rel) {
-//                    $k = $rel . '_count';
-//                    if (is_array($result) && array_key_exists($k, $result)) {
-//                        $modelInstance->setRelation($k, (int)$result[$k]);
-//                    }
-//                }
-//
-//                $result = $modelInstance;
-//            }
-//        }
-//
-//        return $results;
-//    }
-
     public function with(array|string $relations): self
     {
         if (!$this->modelClass) {
