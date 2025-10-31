@@ -70,6 +70,14 @@ class QueryBuilder extends AbstractQueryBuilder
         return $this;
     }
 
+    /**
+     * Räkna antal relaterade poster och exponera som {relation}_count.
+     *
+     * Stöder: HasMany, HasOne, BelongsTo, BelongsToMany, HasManyThrough, HasOneThrough.
+     *
+     * Exempel (HasOneThrough):
+     *  Category::query()->withCount('topVote')->get();
+     */
     public function withCount(string|array $relations): self
     {
         if ($this->modelClass === null) {
@@ -105,6 +113,20 @@ class QueryBuilder extends AbstractQueryBuilder
         return $this->withAggregate($relation, $column, 'MAX', $alias);
     }
 
+    /**
+     * Lägg till aggregat på en relation (SUM/AVG/MIN/MAX).
+     *
+     * Stöder relationstyper: HasMany, HasOne, BelongsTo, BelongsToMany, HasManyThrough, HasOneThrough.
+     *
+     * Exempel (HasOneThrough):
+     *  // I modellen:
+     *  // public function topVote(): HasOneThrough { ... }
+     *  //
+     *  // I query:
+     *  Category::query()
+     *      ->withAggregate('topVote', 'points', 'MAX', 'topVote_max')
+     *      ->get();
+     */
     public function withAggregate(string $relation, string $column, string $fn, ?string $alias = null): self
     {
         if ($this->modelClass === null) {
@@ -154,6 +176,49 @@ class QueryBuilder extends AbstractQueryBuilder
             $foreignKey = $fkProp->getValue($rel);
 
             $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            return;
+        }
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
+            $ref = new \ReflectionClass($rel);
+
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
+            $relatedClassOrTable = $relatedProp->getValue($rel);
+
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
+            $throughClassOrTable = $throughProp->getValue($rel);
+
+            $firstKeyProp = $ref->getProperty('firstKey');     // t.ex. subjects.category_id
+            $firstKeyProp->setAccessible(true);
+            $firstKey = $firstKeyProp->getValue($rel);
+
+            $secondKeyProp = $ref->getProperty('secondKey');   // t.ex. votes.subject_id
+            $secondKeyProp->setAccessible(true);
+            $secondKey = $secondKeyProp->getValue($rel);
+
+            $secondLocalProp = $ref->getProperty('secondLocal'); // t.ex. subjects.id
+            $secondLocalProp->setAccessible(true);
+            $secondLocal = $secondLocalProp->getValue($rel);
+
+            $resolveTable = function (string $classOrTable): string {
+                if (class_exists($classOrTable)) {
+                    $m = new $classOrTable();
+                    return $m->getTable();
+                }
+                return $classOrTable;
+            };
+
+            $relatedTable = $resolveTable($relatedClassOrTable);
+            $throughTable = $resolveTable($throughClassOrTable);
+
+            $this->columns[] =
+                "(SELECT {$fn}(`r`.`{$column}`)" .
+                " FROM `{$relatedTable}` AS r" .
+                " INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}`" .
+                " WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`" .
+                " LIMIT 1) AS `{$aggAlias}`";
             return;
         }
 
@@ -303,6 +368,49 @@ class QueryBuilder extends AbstractQueryBuilder
             return;
         }
 
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
+            $ref = new \ReflectionClass($rel);
+
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
+            $relatedClassOrTable = $relatedProp->getValue($rel);
+
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
+            $throughClassOrTable = $throughProp->getValue($rel);
+
+            $firstKeyProp = $ref->getProperty('firstKey');
+            $firstKeyProp->setAccessible(true);
+            $firstKey = $firstKeyProp->getValue($rel);
+
+            $secondKeyProp = $ref->getProperty('secondKey');
+            $secondKeyProp->setAccessible(true);
+            $secondKey = $secondKeyProp->getValue($rel);
+
+            $secondLocalProp = $ref->getProperty('secondLocal');
+            $secondLocalProp->setAccessible(true);
+            $secondLocal = $secondLocalProp->getValue($rel);
+
+            $resolveTable = function (string $classOrTable): string {
+                if (class_exists($classOrTable)) {
+                    $m = new $classOrTable();
+                    return $m->getTable();
+                }
+                return $classOrTable;
+            };
+
+            $relatedTable = $resolveTable($relatedClassOrTable);
+            $throughTable = $resolveTable($throughClassOrTable);
+
+            $this->columns[] =
+                "(SELECT COUNT(*)" .
+                " FROM `{$relatedTable}` AS r" .
+                " INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}`" .
+                " WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`" .
+                " LIMIT 1) AS `{$relation}_count`";
+            return;
+        }
+
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             $ref = new \ReflectionClass($rel);
 
@@ -389,6 +497,16 @@ class QueryBuilder extends AbstractQueryBuilder
         throw new \InvalidArgumentException("withCount() does not support relation type for '$relation'.");
     }
 
+    /**
+     * Räkna relaterade poster med ett extra WHERE-filter och alias.
+     *
+     * Stöder: HasMany, HasOne, BelongsTo, BelongsToMany, HasManyThrough, HasOneThrough.
+     *
+     * Exempel (HasOneThrough):
+     *  Category::query()
+     *      ->withCountWhere('topVote', 'status', 'approved', 'topVote_approved')
+     *      ->get();
+     */
     public function withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null): self
     {
         if ($this->modelClass === null) {
@@ -428,6 +546,52 @@ class QueryBuilder extends AbstractQueryBuilder
                 "(SELECT COUNT(*) FROM `{$relatedTable}` " .
                 "WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` " .
                 "AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+
+            $this->withAggregateExpressions[] = $aggAlias;
+            return $this;
+        }
+
+        if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
+            $ref = new \ReflectionClass($rel);
+
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
+            $relatedClassOrTable = $relatedProp->getValue($rel);
+
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
+            $throughClassOrTable = $throughProp->getValue($rel);
+
+            $firstKeyProp = $ref->getProperty('firstKey');
+            $firstKeyProp->setAccessible(true);
+            $firstKey = $firstKeyProp->getValue($rel);
+
+            $secondKeyProp = $ref->getProperty('secondKey');
+            $secondKeyProp->setAccessible(true);
+            $secondKey = $secondKeyProp->getValue($rel);
+
+            $secondLocalProp = $ref->getProperty('secondLocal');
+            $secondLocalProp->setAccessible(true);
+            $secondLocal = $secondLocalProp->getValue($rel);
+
+            $resolve = function (string $classOrTable): string {
+                if (class_exists($classOrTable)) {
+                    $m = new $classOrTable();
+                    return $m->getTable();
+                }
+                return $classOrTable;
+            };
+
+            $relatedTable = $resolve($relatedClassOrTable);
+            $throughTable = $resolve($throughClassOrTable);
+
+            $this->columns[] =
+                "(SELECT COUNT(*)" .
+                " FROM `{$relatedTable}` AS r" .
+                " INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}`" .
+                " WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`" .
+                " AND r.`{$column}` = {$valSql}" .
+                " LIMIT 1) AS `{$aggAlias}`";
 
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;

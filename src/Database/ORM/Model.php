@@ -650,6 +650,56 @@ abstract class Model implements JsonSerializable
     }
 
     /**
+     * Definiera en "hasOneThrough"-relation.
+     *
+     * Struktur:
+     *  parent -> through -> related
+     *
+     * Parametrar:
+     *  - $related     Relaterad modellklass eller tabellnamn (ex: Vote::class eller 'votes')
+     *  - $through     Mellanmodellklass eller tabellnamn (ex: Subject::class eller 'subjects')
+     *  - $firstKey    Kolumn på through som pekar till parent (ex: subjects.category_id)
+     *  - $secondKey   Kolumn på related som pekar till through (ex: votes.subject_id)
+     *  - $localKey    Kolumn på parent som matchar $firstKey (default 'id')
+     *  - $secondLocal Kolumn på through som matchar $secondKey (default 'id')
+     *
+     * Exempel:
+     *  public function topVote(): HasOneThrough {
+     *      return $this->hasOneThrough(Vote::class, Subject::class, 'category_id', 'subject_id', 'id', 'id');
+     *  }
+     *
+     *  // Hämta posten
+     *  $category->topVote()->first();
+     */
+    public function hasOneThrough(
+        string $related,
+        string $through,
+        string $firstKey,
+        string $secondKey,
+        ?string $localKey = null,
+        ?string $secondLocal = null
+    ): \Radix\Database\ORM\Relationships\HasOneThrough {
+        $localKey = $localKey ?? $this->primaryKey;
+        $secondLocal = $secondLocal ?? 'id';
+
+        $relation = new \Radix\Database\ORM\Relationships\HasOneThrough(
+            $this->getConnection(),
+            $related,
+            $through,
+            $firstKey,
+            $secondKey,
+            $localKey,
+            $secondLocal
+        );
+
+        if (method_exists($relation, 'setParent')) {
+            $relation->setParent($this);
+        }
+
+        return $relation;
+    }
+
+    /**
      * Definiera en "hasOne"-relation.
      */
     public function hasOne(string $relatedModel, string $foreignKey, ?string $localKey = null): HasOne
