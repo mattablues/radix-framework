@@ -173,12 +173,6 @@ abstract class Model implements JsonSerializable
         throw new \BadMethodCallException("Method $method does not exist in " . static::class);
     }
 
-    public static function availableQueryBuilderMethods(): array
-    {
-        $queryBuilderClass = QueryBuilder::class;
-        return get_class_methods($queryBuilderClass);
-    }
-
     /**
      * Hämta anslutningen från DatabaseManager via app().
      */
@@ -800,7 +794,101 @@ abstract class Model implements JsonSerializable
         );
     }
 
+    public static function availableQueryBuilderMethods(): array
+    {
+        $queryBuilderClass = QueryBuilder::class;
+        return get_class_methods($queryBuilderClass);
+    }
 
+    /**
+     * Ladda relationer på den aktuella modellen.
+     *
+     * Exempel:
+     *  $user->load('posts');
+     *  $user->load(['posts', 'profile']);
+     *  $user->load(['posts' => function (QueryBuilder $q) { $q->where('status', '=', 'published'); }]);
+     */
+    public function load(array|string $relations): self
+    {
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        foreach ($relations as $key => $constraint) {
+            // Stöd både 'rel' och 'rel' => closure
+            $name = is_int($key) ? $constraint : $key;
+            $closure = is_int($key) ? null : $constraint;
+
+            if (!$this->relationExists($name)) {
+                throw new \InvalidArgumentException("Relation '$name' är inte definierad i modellen ".static::class.".");
+            }
+
+            $relObj = $this->$name();
+
+            // Sätt parent om möjligt
+            if (method_exists($relObj, 'setParent')) {
+                $relObj->setParent($this);
+            }
+
+            // Om relationen exponerar en query (via ->query eller getQuery), applicera constraint
+            if ($closure instanceof \Closure) {
+                // Försök extrahera en QueryBuilder att modifiera
+                $query = null;
+                if (method_exists($relObj, 'getQuery')) {
+                    $query = $relObj->getQuery();
+                } elseif (method_exists($relObj, 'query')) {
+                    $query = $relObj->query();
+                }
+
+                if ($query instanceof QueryBuilder) {
+                    $closure($query);
+                    // Hämta relaterat via query om möjligt
+                    $relatedData = method_exists($query, 'get') ? $query->get() : $relObj->get();
+                } else {
+                    // Fallback: ladda utan constraint
+                    $relatedData = $relObj->get();
+                }
+            } else {
+                $relatedData = $relObj->get();
+            }
+
+            $this->setRelation($name, is_array($relatedData) ? $relatedData : ($relatedData ?? null));
+        }
+
+        return $this;
+    }
+
+    /**
+     * Ladda relationer endast om de saknas (inte redan laddade).
+     *
+     * Exempel:
+     *  $user->loadMissing(['posts', 'profile']);
+     *  $user->loadMissing(['posts' => function (QueryBuilder $q) { $q->where('status', '=', 'published'); }]);
+     */
+    public function loadMissing(array|string $relations): self
+    {
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        foreach ($relations as $key => $constraint) {
+            $name = is_int($key) ? $constraint : $key;
+            if (array_key_exists($name, $this->relations)) {
+                continue; // redan laddad
+            }
+        }
+
+        // Kör load() med full uppsättning, men filtrera bort redan laddade
+        $toLoad = [];
+        foreach ($relations as $key => $constraint) {
+            $name = is_int($key) ? $constraint : $key;
+            if (!array_key_exists($name, $this->relations)) {
+                $toLoad[$key] = $constraint;
+            }
+        }
+
+        if (!empty($toLoad)) {
+            $this->load($toLoad);
+        }
+
+        return $this;
+    }
 
     public function toArray(): array
     {
