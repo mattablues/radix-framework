@@ -8,6 +8,35 @@ use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
 
+/**
+ * HasManyThrough: En "has many" relation via en mellanmodell/tabell.
+ *
+ * Typiskt scenario:
+ *  - Category (parent)
+ *  - Subject (through) har column: category_id -> pekar på categories.id
+ *  - Vote (related) har column: subject_id     -> pekar på subjects.id
+ *
+ * Nycklar:
+ *  - $firstKey:    kolumn på through-tabellen som pekar till parent (ex: subjects.category_id)
+ *  - $secondKey:   kolumn på related-tabellen som pekar till through (ex: votes.subject_id)
+ *  - $localKey:    kolumn på parent som matchas mot $firstKey (default 'id') (ex: categories.id)
+ *  - $secondLocal: kolumn på through som matchas mot $secondKey (default 'id') (ex: subjects.id)
+ *
+ * SQL som genereras (förenklad):
+ *  SELECT r.*
+ *  FROM related AS r
+ *  JOIN through AS t ON t.secondLocal = r.secondKey
+ *  WHERE t.firstKey = parent.localKeyValue
+ *
+ * Användning i en modell:
+ *  public function votes(): HasManyThrough {
+ *      return $this->hasManyThrough(Vote::class, Subject::class, 'category_id', 'subject_id', 'id', 'id');
+ *  }
+ *
+ * Hämta poster:
+ *  $category->votes()->get();   // array av Vote
+ *  $category->votes()->first(); // första Vote eller null
+ */
 class HasManyThrough
 {
     private Connection $connection;

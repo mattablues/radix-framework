@@ -621,6 +621,31 @@ abstract class Model implements JsonSerializable
         return $relation;
     }
 
+    /**
+     * Definiera en "hasManyThrough"-relation.
+     *
+     * Struktur:
+     *  parent -> through -> related (många)
+     *
+     * Parametrar:
+     *  - $related     Relaterad modellklass eller tabellnamn (ex: Vote::class eller 'votes')
+     *  - $through     Mellanmodellklass eller tabellnamn (ex: Subject::class eller 'subjects')
+     *  - $firstKey    Kolumn på through som pekar till parent (ex: subjects.category_id)
+     *  - $secondKey   Kolumn på related som pekar till through (ex: votes.subject_id)
+     *  - $localKey    Kolumn på parent som matchar $firstKey (default 'id')
+     *  - $secondLocal Kolumn på through som matchar $secondKey (default 'id')
+     *
+     * Exempel:
+     *  public function votes(): HasManyThrough {
+     *      return $this->hasManyThrough(Vote::class, Subject::class, 'category_id', 'subject_id', 'id', 'id');
+     *  }
+     *
+     *  // Hämta alla relaterade
+     *  $category->votes()->get();
+     *
+     *  // Aggregat via QueryBuilder:
+     *  Category::query()->withCount('votes')->withSum('votes', 'points', 'votes_sum')->get();
+     */
     public function hasManyThrough(
         string $related,
         string $through,
