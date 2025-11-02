@@ -15,6 +15,9 @@ class HasOne
     private string $foreignKey;
     private string $localKeyName;
     private ?Model $parent = null;
+    private bool $useDefault = false;
+    /** @var null|array|callable */
+    private $defaultAttributes = null;
 
     public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
     {
@@ -35,13 +38,20 @@ class HasOne
         return $this;
     }
 
+    public function withDefault(null|array|callable $attributes = null): self
+    {
+        $this->useDefault = true;
+        $this->defaultAttributes = $attributes;
+        return $this;
+    }
+
     public function get(): ?Model
     {
         // Om parent finns: hämta värdet från parent
         if ($this->parent !== null) {
             $localValue = $this->parent->getAttribute($this->localKeyName);
             if ($localValue === null) {
-                return null;
+                return $this->returnDefaultOrNull();
             }
         } else {
             // Backwards compatibility: tillåt att localKeyName redan är ett värde ('id' numeriskt)
@@ -58,12 +68,35 @@ class HasOne
             return $this->createModelInstance($result);
         }
 
-        return null;
+        return $this->returnDefaultOrNull();
     }
 
     public function first(): ?Model
     {
         return $this->get();
+    }
+
+    private function returnDefaultOrNull(): ?Model
+    {
+        if (!$this->useDefault) {
+            return null;
+        }
+
+        $model = new $this->modelClass();
+
+        // Applicera default
+        if (is_array($this->defaultAttributes)) {
+            // Försök fill först; om attribut ej är fillable kan projektet välja forceFill utanför,
+            // men vi ger en smidig fallback:
+            $model->forceFill($this->defaultAttributes);
+        } elseif (is_callable($this->defaultAttributes)) {
+            ($this->defaultAttributes)($model);
+        }
+
+        // Denna är en ny, icke-existerande post
+        $model->markAsNew();
+
+        return $model;
     }
 
     private function createModelInstance(array $data): Model

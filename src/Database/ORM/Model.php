@@ -828,27 +828,109 @@ abstract class Model implements JsonSerializable
                 $relObj->setParent($this);
             }
 
-            // Om relationen exponerar en query (via ->query eller getQuery), applicera constraint
-            if ($closure instanceof \Closure) {
-                // Försök extrahera en QueryBuilder att modifiera
-                $query = null;
-                if (method_exists($relObj, 'getQuery')) {
-                    $query = $relObj->getQuery();
-                } elseif (method_exists($relObj, 'query')) {
-                    $query = $relObj->query();
-                }
+            $relatedData = null;
 
-                if ($query instanceof QueryBuilder) {
-                    $closure($query);
-                    // Hämta relaterat via query om möjligt
-                    $relatedData = method_exists($query, 'get') ? $query->get() : $relObj->get();
+                if ($closure instanceof \Closure) {
+                    $ref = new \ReflectionFunction($closure);
+                    $paramType = $ref->getNumberOfParameters() === 1
+                        ? ($ref->getParameters()[0]->getType()?->getName() ?? null)
+                        : null;
+
+                    // Försök extrahera QueryBuilder (om relationen har en)
+                    $query = null;
+                    if (method_exists($relObj, 'getQuery')) {
+                        $query = $relObj->getQuery();
+                    } elseif (method_exists($relObj, 'query')) {
+                        $query = $relObj->query();
+                    }
+
+                    if ($paramType === QueryBuilder::class) {
+                        if ($query instanceof QueryBuilder) {
+                            // Ge closuren relationens QueryBuilder
+                            $closure($query);
+                            // Låt relationen hämta enligt sin get() (kan respektera parent/filter)
+                            $relatedData = method_exists($relObj, 'get')
+                                ? $relObj->get()
+                                : $query->get();
+                        } else {
+                            // Skapa en fristående QB som verkar mot relaterade tabellen
+                            // 1) Försök ta fram relaterad modelklass/tabell från relationen
+                            $relatedTable = null;
+                            $relatedModelClass = null;
+
+                            // HasMany/HasOne: har 'modelClass'
+                            if (property_exists($relObj, 'modelClass')) {
+                                $rc = new \ReflectionClass($relObj);
+                                if ($rc->hasProperty('modelClass')) {
+                                    $p = $rc->getProperty('modelClass'); $p->setAccessible(true);
+                                    $relatedModelClass = $p->getValue($relObj);
+                                }
+                            }
+                            // BelongsTo: har 'relatedTable'
+                            if (!$relatedModelClass && property_exists($relObj, 'relatedTable')) {
+                                $rc = new \ReflectionClass($relObj);
+                                if ($rc->hasProperty('relatedTable')) {
+                                    $p = $rc->getProperty('relatedTable'); $p->setAccessible(true);
+                                    $relatedTable = $p->getValue($relObj);
+                                }
+                            }
+                            if ($relatedModelClass && class_exists($relatedModelClass)) {
+                                $tmpModel = new $relatedModelClass();
+                                $relatedTable = $tmpModel->getTable();
+                            }
+
+                            // 2) Bygg QB
+                            $qb = (new QueryBuilder())
+                                ->setConnection($this->getConnection())
+                                ->setModelClass($relatedModelClass ?? static::class)
+                                ->from($relatedTable ?? $name);
+
+                            // 3) Applicera foreign key-filter om möjligt (för HasMany/HasOne)
+                            try {
+                                $rc = new \ReflectionClass($relObj);
+                                if ($rc->hasProperty('foreignKey') && $rc->hasProperty('localKeyName')) {
+                                    $pfk = $rc->getProperty('foreignKey'); $pfk->setAccessible(true);
+                                    $plk = $rc->getProperty('localKeyName'); $plk->setAccessible(true);
+                                    $foreignKey = $pfk->getValue($relObj);
+                                    $localKeyName = $plk->getValue($relObj);
+                                    $localValue = $this->getAttribute($localKeyName);
+                                    if ($localValue !== null) {
+                                        $qb->where($foreignKey, '=', $localValue);
+                                    }
+                                }
+                            } catch (\Throwable) {
+                                // ignoreras – saknar meta
+                            }
+
+                            // 4) Kör användar-closure mot QB
+                            $closure($qb);
+
+                            // 5) Hämta data och hydrerar som relation
+                            $relatedData = $qb->get();
+                        }
+                    } elseif (
+                        $paramType === null
+                        || str_starts_with((string)$paramType, 'Radix\\Database\\ORM\\Relationships\\')
+                    ) {
+                        // Skicka relationsobjektet (withDefault m.m.)
+                        $closure($relObj);
+                        $relatedData = method_exists($relObj, 'get')
+                            ? $relObj->get()
+                            : ($query instanceof QueryBuilder ? $query->get() : null);
+                    } else {
+                        // Okänd typ: försök QB, annars relation
+                        if ($query instanceof QueryBuilder) {
+                            $closure($query);
+                            $relatedData = method_exists($relObj, 'get') ? $relObj->get() : $query->get();
+                        } else {
+                            $closure($relObj);
+                            $relatedData = method_exists($relObj, 'get') ? $relObj->get() : null;
+                        }
+                    }
                 } else {
-                    // Fallback: ladda utan constraint
+                    // Ingen constraint
                     $relatedData = $relObj->get();
                 }
-            } else {
-                $relatedData = $relObj->get();
-            }
 
             $this->setRelation($name, is_array($relatedData) ? $relatedData : ($relatedData ?? null));
         }

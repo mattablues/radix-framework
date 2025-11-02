@@ -15,6 +15,9 @@ class BelongsTo
     private string $foreignKey;
     private string $ownerKey;
     private Model $parentModel;
+    private bool $useDefault = false;
+    /** @var null|array|callable */
+    private $defaultAttributes = null;
 
     public function __construct(
         Connection $connection,
@@ -30,16 +33,27 @@ class BelongsTo
         $this->parentModel = $parentModel;
     }
 
+    public function withDefault(null|array|callable $attributes = null): self
+    {
+        $this->useDefault = true;
+        $this->defaultAttributes = $attributes;
+        return $this;
+    }
+
     public function get(): ?Model
     {
         // Hämta värdet av foreignKey från den aktuella modellens attribut
         $foreignKeyValue = $this->getParentModelAttribute($this->foreignKey);
 
+        if ($foreignKeyValue === null) {
+            return $this->returnDefaultOrNull();
+        }
+
         $query = "SELECT * FROM `$this->relatedTable` WHERE `$this->ownerKey` = ? LIMIT 1";
         $result = $this->connection->fetchOne($query, [$foreignKeyValue]); // Använder rätt värde här
 
         if ($result === null) {
-            return null; // Inget resultat från databasen
+            return $this->returnDefaultOrNull(); // Inget resultat från databasen
         }
 
         return $this->createModelInstance($result, $this->relatedTable); // Skapa modellinstans
@@ -50,12 +64,31 @@ class BelongsTo
         $result = $this->get(); // Hämta en enda relaterad post
 
         if (!$result) {
-            return null; // Ingen data hittades
+            return $this->returnDefaultOrNull();
         }
 
         return $result; // Returera modellen direkt
     }
 
+    private function returnDefaultOrNull(): ?Model
+    {
+        if (!$this->useDefault) {
+            return null;
+        }
+
+        $modelClass = $this->resolveModelClass($this->relatedTable);
+        /** @var Model $model */
+        $model = new $modelClass();
+
+        if (is_array($this->defaultAttributes)) {
+            $model->forceFill($this->defaultAttributes);
+        } elseif (is_callable($this->defaultAttributes)) {
+            ($this->defaultAttributes)($model);
+        }
+
+        $model->markAsNew();
+        return $model;
+    }
 
     private function getParentModelAttribute(string $attribute): mixed
     {
