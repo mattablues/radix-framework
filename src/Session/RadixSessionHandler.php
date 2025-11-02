@@ -59,7 +59,7 @@ class RadixSessionHandler implements SessionHandlerInterface
 
         $stmt = $this->pdo->prepare("SELECT data FROM $this->tableName WHERE id = :id AND expiry > :expiry");
         $stmt->execute([':id' => $id, ':expiry' => time()]);
-        return (string) $stmt->fetchColumn() ?? '';
+        return ($val = $stmt->fetchColumn()) === false || $val === null ? '' : (string) $val;
     }
 
     public function write($id, $data): bool
@@ -93,12 +93,15 @@ class RadixSessionHandler implements SessionHandlerInterface
     public function gc(int $max_lifetime): int|false
     {
         if ($this->driver === 'file') {
+            $deleted = 0;
             foreach (glob("$this->filePath/sess_*") as $file) {
                 if (filemtime($file) + $max_lifetime < time()) {
-                    unlink($file);
+                    if (@unlink($file)) {
+                        $deleted++;
+                    }
                 }
             }
-            return true;
+            return $deleted; // int enligt SessionHandlerInterface
         }
 
         $stmt = $this->pdo->prepare("DELETE FROM $this->tableName WHERE expiry < :time");

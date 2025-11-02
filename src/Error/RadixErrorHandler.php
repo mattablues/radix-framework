@@ -27,7 +27,6 @@ class RadixErrorHandler
         throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
     }
 
-    #[NoReturn]
     public static function handleException(Throwable $exception): void
     {
         // Identifiera om det är ett API-anrop (baserat på URI)

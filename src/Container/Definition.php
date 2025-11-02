@@ -195,7 +195,7 @@ class Definition
 
     public function addTag(string $name, array $attributes = []): Definition
     {
-        if (!is_string($name) || empty($name)) {
+        if (empty($name)) {
             throw new \InvalidArgumentException('Tag name must be a non-empty string.');
         }
 

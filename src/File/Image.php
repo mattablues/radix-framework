@@ -50,10 +50,6 @@ class Image
 
         $this->imageResized = imagecreatetruecolor($optimalWidth, $optimalHeight);
 
-        if (!$this->imageResized) {
-            throw new RuntimeException('Kunde inte skapa en bild för att ändra storlek.');
-        }
-
         $transparent = imagecolorallocatealpha($this->imageResized, 0, 0, 0, 127);
         imagefill($this->imageResized, 0, 0, $transparent);
         imagesavealpha($this->imageResized, true);
@@ -177,7 +173,7 @@ class Image
         // Kontrollera filens MIME-typ
         $mimeType = mime_content_type($filePath);
 
-        return match ($mimeType) {
+        $img = match ($mimeType) {
             'image/jpeg' => imagecreatefromjpeg($filePath),
             'image/png' => imagecreatefrompng($filePath),
             'image/gif' => imagecreatefromgif($filePath),
@@ -186,6 +182,12 @@ class Image
                 : throw new InvalidArgumentException('WEBP-bilder stöds inte på denna server.'),
             default => throw new InvalidArgumentException("Bildformat \"$mimeType\" stöds inte."),
         };
+
+        if (!$img instanceof \GdImage) {
+            throw new RuntimeException('Kunde inte öppna bilden.');
+        }
+
+        return $img;
     }
 
     protected function getDimensions(int $newWidth, int $newHeight, string $option): array
@@ -263,12 +265,9 @@ class Image
 
     public function __destruct()
     {
-        if (isset($this->image)) {
-            imagedestroy($this->image);
-        }
-
-        if (isset($this->imageResized)) {
+        if ($this->imageResized !== null) {
             imagedestroy($this->imageResized);
         }
+        imagedestroy($this->image);
     }
 }

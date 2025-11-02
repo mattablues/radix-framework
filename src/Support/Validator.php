@@ -118,7 +118,7 @@ class Validator
         }
 
         // Extra logik för filbaserade valideringar
-        if (in_array($rule, ['file_type', 'file_size']) && is_array($this->data) && isset($this->data[$field])) {
+        if (in_array($rule, ['file_type', 'file_size']) && isset($this->data[$field])) {
             $value = $this->data[$field];
         }
 

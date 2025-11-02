@@ -12,6 +12,7 @@ abstract class AbstractQueryBuilder
     protected ?Connection $connection = null;
     /** @var array<string, callable> */
     protected array $eagerLoadConstraints = []; // nya: closures per relation
+    protected ?string $modelClass = null;
 
     /**
      * Sätt `Connection`-instans för QueryBuilder.
@@ -90,4 +91,6 @@ abstract class AbstractQueryBuilder
 
         return $results;
     }
+
+    abstract public function toSql(): string;
 }

@@ -407,20 +407,21 @@ abstract class Model implements JsonSerializable
     /**
      * Spara objektet i databasen (insert eller update).
      */
-    public function save(): bool
-    {
-        if ($this->timestamps) {
-            $this->attributes['updated_at'] = date('Y-m-d H:i:s');
-            if (!$this->exists) {
-                $this->attributes['created_at'] = date('Y-m-d H:i:s');
+        public function save(): bool
+        {
+            if ($this->timestamps) {
+                $this->attributes['updated_at'] = date('Y-m-d H:i:s');
+                if (!$this->exists) {
+                    $this->attributes['created_at'] = date('Y-m-d H:i:s');
+                }
             }
+
+            // Kontrollera om modellen ska uppdateras eller infogas
+            $this->exists = isset($this->attributes[$this->primaryKey]);
+
+            // @phpstan-ignore-next-line new.static is safe for our ORM factory usage
+            return $this->exists ? $this->persistUpdate() : $this->persistInsert();
         }
-
-        // Kontrollera om modellen ska uppdateras eller infogas
-        $this->exists = isset($this->attributes[$this->primaryKey]);
-
-        return $this->exists ? $this->update() : $this->insert();
-    }
 
     public function setTimestamps(bool $enable): void
     {
@@ -430,7 +431,7 @@ abstract class Model implements JsonSerializable
     /**
      * Uppdatera aktuell rad i databasen.
      */
-    private function update(): bool
+    private function persistUpdate(): bool
     {
         // Samma här: Ta endast med relevanta attribut
         $attributes = $this->getAttributes();
@@ -445,7 +446,7 @@ abstract class Model implements JsonSerializable
     /**
      * Infoga en ny rad i databasen.
      */
-    private function insert(): bool
+    private function persistInsert(): bool
     {
         // Hämta endast giltiga attribut som får sparas
         $attributes = $this->getAttributes();
@@ -471,16 +472,20 @@ abstract class Model implements JsonSerializable
     public function delete(): bool
     {
         if (!$this->exists) {
-            return false; // Modellen måste existera för att kunna raderas
+            return false;
         }
 
         if ($this->softDeletes) {
-            // Hantera soft delete: sätt 'deleted_at' i modellen
+            // Soft delete: sätt deleted_at direkt via UPDATE istället för save()/persistUpdate()
             $this->attributes['deleted_at'] = date('Y-m-d H:i:s');
-            return $this->update(); // Uppdatera raden
+
+            $query = "UPDATE `{$this->table}` SET `deleted_at` = ? WHERE `{$this->primaryKey}` = ?";
+            $ok = $this->getConnection()->execute($query, [$this->attributes['deleted_at'], $this->attributes[$this->primaryKey]])->rowCount() > 0;
+
+            return $ok;
         }
 
-        // Om softDeletes inte är aktivt, utför hård radering
+        // Hård radering
         return $this->forceDelete();
     }
 

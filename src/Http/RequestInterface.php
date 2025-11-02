@@ -6,5 +6,5 @@ namespace Radix\Http;
 
 interface RequestInterface
 {
-    public static function createFromGlobals(): static;
+    public static function createFromGlobals(): self;
 }

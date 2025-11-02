@@ -23,9 +23,9 @@ class Request implements RequestInterface
     {
     }
 
-    public static function createFromGlobals(): static
+    public static function createFromGlobals(): self
     {
-        $request = new static(
+        $request = new self(
             $_SERVER['REQUEST_URI'],
             $_SERVER['REQUEST_METHOD'],
             $_GET,

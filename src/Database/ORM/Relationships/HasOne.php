@@ -64,7 +64,7 @@ class HasOne
         $query = "SELECT * FROM `$table` WHERE `$this->foreignKey` = ? LIMIT 1";
         $result = $this->connection->fetchOne($query, [$localValue]);
 
-        if ($result !== false && is_array($result)) {
+        if ($result !== null) {
             return $this->createModelInstance($result);
         }
 

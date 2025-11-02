@@ -12,7 +12,7 @@ class RedirectResponse extends Response
     {
     }
 
-    #[NoReturn] public function send(): void
+    public function send(): void
     {
         header('Location: ' . $this->location, true, 302);
         exit();

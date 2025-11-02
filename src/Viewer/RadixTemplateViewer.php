@@ -224,8 +224,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
             '#<x-([\w\.\-]+)([^>]*)>(.*?)<\/x-\1>#s',
             function (array $matches) {
                 $componentName = str_replace('.', '/', $matches[1]);
-                $attributes = $this->parseAttributes(trim($matches[2] ?? ''));
-                $content = trim($matches[3] ?? '');
+                $attributes = $this->parseAttributes(trim($matches[2]));
+                $content = trim($matches[3]);
 
                 return $this->renderComponent($componentName, $attributes, $this->replacePlaceholders($content));
             },
@@ -296,7 +296,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         foreach ($matches as $match) {
             $slotName = $match[1];
             // Hantera tomma slots genom att sätta ett standardvärde som tom sträng
-            $slotValue = isset($match[2]) ? trim($this->replacePlaceholders($match[2])) : '';
+            $slotValue = trim($this->replacePlaceholders($match[2]));
             $slots[$slotName] = $slotValue;
 
             $this->debug("[DEBUG] Extraherad slot: $slotName, Innehåll:\n" . htmlspecialchars($slotValue));
@@ -378,11 +378,11 @@ class RadixTemplateViewer implements TemplateViewerInterface
         // Hantera block-yield med fallback:
         // {% yield name %} ...fallback... {% endyield name %}
         $code = preg_replace_callback(
-            "#{% yield (?<name>\\w+) %}(?<fallback>.*?){% endyield \\k{name} %}#s",
-            function ($m) use ($blocks) {
+            "#{% yield (?<name>\w+) %}(?<fallback>.*?){% endyield \k<name> %}#s",
+            function (array $m) use ($blocks): string {
                 $name = $m['name'];
-                $fallback = $m['fallback'] ?? '';
-                return array_key_exists($name, $blocks) ? $blocks[$name] : $fallback;
+                $fallback = (string)$m['fallback'];
+                return array_key_exists($name, $blocks) ? (string)$blocks[$name] : $fallback;
             },
             $code
         );

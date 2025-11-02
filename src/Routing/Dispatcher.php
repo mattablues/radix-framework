@@ -62,7 +62,7 @@ readonly class Dispatcher
         }
 
         if ($params === false) {
-            throw new PageNotFoundException("No route matched for '$path' with method '$request->method'", 404);
+            throw new PageNotFoundException("No route matched for '$path' with method '$request->method'");
         }
 
         if(is_callable($params[0])) {
@@ -96,7 +96,7 @@ readonly class Dispatcher
             }
 
             if(count($args) !== count($arguments)) {
-                throw new PageNotFoundException("Function argument(s) missing in query string", 404);
+                throw new PageNotFoundException("Function argument(s) missing in query string");
             }
 
         } else {
@@ -112,7 +112,7 @@ readonly class Dispatcher
                 $args = $this->actionArguments($controller, $action, $params);
 
             } catch (Exception) {
-                throw new PageNotFoundException("Controller method '$action' does not exist.'", 404);
+                throw new PageNotFoundException("Controller method '$action' does not exist.'");
             }
         }
 
