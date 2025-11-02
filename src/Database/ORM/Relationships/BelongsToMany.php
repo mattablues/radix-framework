@@ -18,6 +18,8 @@ class BelongsToMany
     private string $parentKeyName;
     private ?Model $parent = null;
     private array $pivotColumns = []; // nya: extra kolumner att hämta från pivot
+    private ?\Radix\Database\QueryBuilder\QueryBuilder $builder = null; // ny: relationens QB
+
 
     public function __construct(
         Connection $connection,
@@ -41,14 +43,91 @@ class BelongsToMany
         return $this;
     }
 
+    // Ny: bygg en QueryBuilder för relaterade med JOIN pivot och standard WHERE på parent
+    public function query(): \Radix\Database\QueryBuilder\QueryBuilder
+    {
+        if ($this->builder instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
+            return $this->builder;
+        }
+
+        /** @var Model $relatedInstance */
+        $relatedInstance = new $this->relatedModelClass();
+        $relatedTable = $relatedInstance->getTable();
+
+        $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
+            ->setConnection($this->connection)
+            ->setModelClass($this->relatedModelClass)
+            ->from("{$relatedTable} AS related")
+            ->join($this->pivotTable . ' AS pivot', 'related.id', '=', "pivot.{$this->relatedPivotKey}");
+
+        // WHERE pivot.foreignPivotKey = parent.id
+        if ($this->parent !== null) {
+            $parentValue = $this->parent->getAttribute($this->parentKeyName);
+            if ($parentValue !== null) {
+                $qb->where("pivot.{$this->foreignPivotKey}", '=', $parentValue);
+            } else {
+                // tomt resultat om parent saknar id
+                $qb->where('1', '=', 0);
+            }
+        } else {
+            // Backcompat: anta parentKeyName är ett värde
+            $qb->where("pivot.{$this->foreignPivotKey}", '=', $this->parentKeyName);
+        }
+
+        // Kolumner: related.* + ev. pivot-aliased
+        $columns = ['related.*'];
+        foreach ($this->pivotColumns as $col) {
+            $columns[] = "pivot.`{$col}` AS `pivot_{$col}`";
+        }
+        $qb->select($columns);
+
+        $this->builder = $qb;
+        return $this->builder;
+    }
+
     public function withPivot(string ...$columns): self
     {
         $this->pivotColumns = array_values(array_unique(array_filter($columns, fn($c) => $c !== '')));
+        // Om builder redan finns, uppdatera select-kolumnerna så pivot-fält inkluderas
+        if ($this->builder instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
+            $cols = ['related.*'];
+            foreach ($this->pivotColumns as $col) {
+                $cols[] = "pivot.`{$col}` AS `pivot_{$col}`";
+            }
+            $this->builder->select($cols);
+        }
         return $this;
     }
 
     public function get(): array
     {
+        // 1) Om query()-builder finns (används av eager loading med closure), kör den
+        if ($this->builder instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
+            $models = $this->builder->get();
+
+            // Mappa pivot_* alias till relation 'pivot'
+            if (!empty($this->pivotColumns)) {
+                foreach ($models as $m) {
+                    $pivotData = [];
+                    foreach ($this->pivotColumns as $col) {
+                        $alias = "pivot_{$col}";
+                        $val = $m->getAttribute($alias);
+                        if ($val !== null) {
+                            $pivotData[$col] = $val;
+                        }
+                    }
+                    if (!empty($pivotData) && method_exists($m, 'setRelation')) {
+                        $m->setRelation('pivot', $pivotData);
+                    } elseif (!empty($pivotData) && method_exists($m, 'setAttribute')) {
+                        $m->setAttribute('pivot', $pivotData);
+                    }
+                }
+            }
+
+            return $models;
+        }
+
+        // 2) Fallback: manuell SQL (behåller din tidigare logik)
         // Parent-flöde
         if ($this->parent !== null) {
             $parentValue = $this->parent->getAttribute($this->parentKeyName);
@@ -92,7 +171,6 @@ class BelongsToMany
                         $pivotData[$col] = $results[$i][$key];
                     }
                 }
-                // Anta att Model stödjer setRelation('pivot', array)
                 if (!empty($pivotData) && method_exists($model, 'setRelation')) {
                     $model->setRelation('pivot', $pivotData);
                 } elseif (!empty($pivotData) && method_exists($model, 'setAttribute')) {

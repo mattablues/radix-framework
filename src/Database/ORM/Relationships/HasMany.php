@@ -6,6 +6,7 @@ namespace Radix\Database\ORM\Relationships;
 
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Database\QueryBuilder\QueryBuilder;
 use Radix\Support\StringHelper;
 
 class HasMany
@@ -15,6 +16,7 @@ class HasMany
     private string $foreignKey;
     private string $localKeyName;
     private ?Model $parent = null;
+    private ?QueryBuilder $builder = null; // ny: relationens QB
 
     public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
     {
@@ -35,8 +37,41 @@ class HasMany
         return $this;
     }
 
+        // Ny: exponera en QueryBuilder med förifyllt WHERE foreignKey = parent.localKey
+    public function query(): QueryBuilder
+    {
+        if ($this->builder instanceof QueryBuilder) {
+            return $this->builder;
+        }
+
+        /** @var Model $instance */
+        $instance = new $this->modelClass();
+        $table = $instance->getTable();
+
+        $qb = (new QueryBuilder())
+            ->setConnection($this->connection)
+            ->setModelClass($this->modelClass)
+            ->from($table);
+
+        // Sätt standardvillkor baserat på parent
+        if ($this->parent !== null) {
+            $value = $this->parent->getAttribute($this->localKeyName);
+            if ($value !== null) {
+                $qb->where($this->foreignKey, '=', $value);
+            }
+        }
+
+        $this->builder = $qb;
+        return $this->builder;
+    }
+
     public function get(): array
     {
+        // Använd builder om query() har anropats (då gäller constraints från with-closure)
+        if ($this->builder instanceof QueryBuilder) {
+            return $this->builder->get();
+        }
+
         $modelClass = $this->resolveModelClass($this->modelClass);
         $modelInstance = new $modelClass();
         $table = $modelInstance->getTable();

@@ -62,26 +62,22 @@ abstract class AbstractQueryBuilder
                         $relObj->setParent($model);
                     }
 
-                    // Om det finns en constraint-closure för denna relation, applicera den
+                    $relationData = null;
                     $closure = $this->eagerLoadConstraints[$relation] ?? null;
-                    if ($closure instanceof \Closure) {
-                        // Försök extrahera QueryBuilder från relationen om möjligt
-                        $qb = null;
-                        if (method_exists($relObj, 'getQuery')) {
-                            $qb = $relObj->getQuery();
-                        } elseif (method_exists($relObj, 'query')) {
-                            $qb = $relObj->query();
-                        }
 
-                        if ($qb instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
-                            $closure($qb);
-                            $relationData = method_exists($relObj, 'get') ? $relObj->get() : $qb->get();
-                        } else {
-                            // Fallback: skicka relationen själv till closuren
-                            $closure($relObj);
-                            $relationData = method_exists($relObj, 'get') ? $relObj->get() : null;
-                        }
+                    // Försök få en QueryBuilder från relationen
+                    $qb = null;
+                    if (method_exists($relObj, 'query')) {
+                        $qb = $relObj->query();
+                    }
+
+                    if ($closure instanceof \Closure && $qb instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
+                        // Applicera constraints på relationens QB
+                        $closure($qb);
+                        // Låt relationen själv hämta (om get() hydrerar korrekt) annars QB->get()
+                        $relationData = method_exists($relObj, 'get') ? $relObj->get() : $qb->get();
                     } else {
+                        // Fallback till relationens get()
                         $relationData = method_exists($relObj, 'get') ? $relObj->get() : null;
                     }
 
