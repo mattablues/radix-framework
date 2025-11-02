@@ -17,6 +17,7 @@ class BelongsToMany
     private string $relatedPivotKey;
     private string $parentKeyName;
     private ?Model $parent = null;
+    private array $pivotColumns = []; // nya: extra kolumner att hämta från pivot
 
     public function __construct(
         Connection $connection,
@@ -40,6 +41,12 @@ class BelongsToMany
         return $this;
     }
 
+    public function withPivot(string ...$columns): self
+    {
+        $this->pivotColumns = array_values(array_unique(array_filter($columns, fn($c) => $c !== '')));
+        return $this;
+    }
+
     public function get(): array
     {
         // Parent-flöde
@@ -57,8 +64,15 @@ class BelongsToMany
         $relatedInstance = new $this->relatedModelClass();
         $relatedTable = $relatedInstance->getTable();
 
+        // Bygg select för pivot-kolumner
+        $pivotSelects = [];
+        foreach ($this->pivotColumns as $col) {
+            $pivotSelects[] = "pivot.`$col` AS `pivot_$col`";
+        }
+        $pivotSelectSql = empty($pivotSelects) ? '' : ', ' . implode(', ', $pivotSelects);
+
         $query = "
-            SELECT related.*
+            SELECT related.*{$pivotSelectSql}
             FROM `$relatedTable` AS related
             INNER JOIN `$this->pivotTable` AS pivot
               ON related.id = pivot.`$this->relatedPivotKey`
@@ -66,7 +80,120 @@ class BelongsToMany
 
         $results = $this->connection->fetchAll($query, [$parentValue]);
 
-        return array_map(fn($data) => $this->createModelInstance($data, $this->relatedModelClass), $results);
+        $models = array_map(fn($data) => $this->createModelInstance($data, $this->relatedModelClass), $results);
+
+        // Injicera pivot-data på modellerna om withPivot använts
+        if (!empty($this->pivotColumns)) {
+            foreach ($models as $i => $model) {
+                $pivotData = [];
+                foreach ($this->pivotColumns as $col) {
+                    $key = "pivot_$col";
+                    if (array_key_exists($key, $results[$i])) {
+                        $pivotData[$col] = $results[$i][$key];
+                    }
+                }
+                // Anta att Model stödjer setRelation('pivot', array)
+                if (!empty($pivotData) && method_exists($model, 'setRelation')) {
+                    $model->setRelation('pivot', $pivotData);
+                } elseif (!empty($pivotData) && method_exists($model, 'setAttribute')) {
+                    $model->setAttribute('pivot', $pivotData);
+                }
+            }
+        }
+
+        return $models;
+    }
+
+    public function attach($ids, array $attributes = [], bool $ignoreDuplicates = true): void
+    {
+        $parentId = $this->requireParentId();
+        $rows = $this->normalizeAttachInput($ids, $attributes);
+
+        foreach ($rows as $relatedId => $attrs) {
+            // Kolla om redan finns om vi vill ignorera dubletter
+            if ($ignoreDuplicates && $this->existsInPivot($parentId, (int)$relatedId)) {
+                // Uppdatera endast extra attribut om de skickats
+                if (!empty($attrs)) {
+                    $set = implode(', ', array_map(fn($k) => "`$k` = ?", array_keys($attrs)));
+                    $sql = "UPDATE `$this->pivotTable` SET $set WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` = ?";
+                    $bindings = array_values($attrs);
+                    $bindings[] = $parentId;
+                    $bindings[] = (int)$relatedId;
+                    $this->connection->execute($sql, $bindings);
+                }
+                continue;
+            }
+
+            // INSERT
+            $payload = array_merge($attrs, [
+                $this->foreignPivotKey => $parentId,
+                $this->relatedPivotKey => (int)$relatedId,
+            ]);
+
+            $columns = array_keys($payload);
+            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+            $colsSql = '`' . implode('`, `', $columns) . '`';
+            $sql = "INSERT INTO `$this->pivotTable` ($colsSql) VALUES ($placeholders)";
+            $this->connection->execute($sql, array_values($payload));
+        }
+    }
+
+    public function detach($ids = null): void
+    {
+        $parentId = $this->requireParentId();
+
+        if ($ids === null) {
+            $sql = "DELETE FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ?";
+            $this->connection->execute($sql, [$parentId]);
+            return;
+        }
+
+        // Tillåt [1,2] eller [1 => attrs]
+        $ids = is_array($ids) ? $ids : [$ids];
+        $normalized = [];
+        foreach ($ids as $k => $v) {
+            $normalized[] = is_int($k) ? (int)$v : (int)$k;
+        }
+        if (empty($normalized)) {
+            return;
+        }
+
+        $in = implode(', ', array_fill(0, count($normalized), '?'));
+        $sql = "DELETE FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` IN ($in)";
+        $this->connection->execute($sql, array_merge([$parentId], $normalized));
+    }
+
+    public function sync(array $idsWithAttributes, bool $detaching = true): void
+    {
+        $parentId = $this->requireParentId();
+
+        $target = $this->normalizeAttachInput($idsWithAttributes);
+        $existing = $this->getExistingRelatedIds($parentId);
+
+        // Detach som saknas
+        if ($detaching) {
+            $toDetach = array_values(array_diff($existing, array_keys($target)));
+            if (!empty($toDetach)) {
+                $this->detach($toDetach);
+            }
+        }
+
+        // Attach/Update
+        foreach ($target as $relatedId => $attrs) {
+            $relatedId = (int)$relatedId;
+            if (in_array($relatedId, $existing, true)) {
+                if (!empty($attrs)) {
+                    $set = implode(', ', array_map(fn($k) => "`$k` = ?", array_keys($attrs)));
+                    $sql = "UPDATE `$this->pivotTable` SET $set WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` = ?";
+                    $bindings = array_values($attrs);
+                    $bindings[] = $parentId;
+                    $bindings[] = $relatedId;
+                    $this->connection->execute($sql, $bindings);
+                }
+            } else {
+                $this->attach($relatedId, $attrs);
+            }
+        }
     }
 
     public function first(): ?Model
@@ -120,5 +247,54 @@ class BelongsToMany
         $model->markAsExisting();
 
         return $model;
+    }
+
+    // --- Hjälpmetoder ---
+
+    private function requireParentId(): int
+    {
+        if ($this->parent === null) {
+            throw new \RuntimeException('Parent-modell måste vara satt via setParent() för pivot-operationer.');
+        }
+        $id = $this->parent->getAttribute($this->parentKeyName);
+        if ($id === null) {
+            throw new \RuntimeException('Parent-modellen saknar primärnyckel.');
+        }
+        return (int)$id;
+    }
+
+    private function normalizeAttachInput($ids, array $attributes = []): array
+    {
+        if (!is_array($ids)) {
+            return [(int)$ids => $attributes];
+        }
+        // Lista: [1,2] -> [1=>attrs,2=>attrs]
+        if (array_keys($ids) === range(0, count($ids) - 1)) {
+            $out = [];
+            foreach ($ids as $id) {
+                $out[(int)$id] = $attributes;
+            }
+            return $out;
+        }
+        // Assoc: [id => attrs]
+        $out = [];
+        foreach ($ids as $k => $v) {
+            $out[(int)$k] = is_array($v) ? $v : $attributes;
+        }
+        return $out;
+    }
+
+    private function existsInPivot(int $parentId, int $relatedId): bool
+    {
+        $sql = "SELECT 1 FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` = ? LIMIT 1";
+        $row = $this->connection->fetchOne($sql, [$parentId, $relatedId]);
+        return $row !== null;
+    }
+
+    private function getExistingRelatedIds(int $parentId): array
+    {
+        $sql = "SELECT `$this->relatedPivotKey` AS rid FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ?";
+        $rows = $this->connection->fetchAll($sql, [$parentId]);
+        return array_map(fn($r) => (int)$r['rid'], $rows);
     }
 }

@@ -772,20 +772,41 @@ class QueryBuilder extends AbstractQueryBuilder
             throw new \LogicException('Model class is not set. Use setModelClass() to assign a model.');
         }
 
-        // Se till att $relations alltid är en array
-        $relations = is_array($relations) ? $relations : func_get_args();
-
-        foreach ($relations as $relation) {
-            $method = $relation;
-
-            // Kontrollera att metoden för relationen existerar
-            if (!method_exists($this->modelClass, $method)) {
-                throw new \InvalidArgumentException("Relation '{$relation}' is not defined in the model '{$this->modelClass}'.");
-            }
-
-            // Reservera för att senare ladda upp relationerna
-            $this->eagerLoadRelations[] = $relation;
+        // Normalisera: tillåt
+        // - with('posts', 'roles')
+        // - with(['posts', 'roles'])
+        // - with(['posts' => fn(QueryBuilder $q)=>..., 'roles' => fn(...)=>...])
+        if (!is_array($relations)) {
+            $relations = func_get_args();
         }
+
+        foreach ($relations as $key => $value) {
+            if (is_int($key)) {
+                // Enkel relation utan constraints
+                $relation = $value;
+                if (!method_exists($this->modelClass, $relation)) {
+                    throw new \InvalidArgumentException("Relation '{$relation}' is not defined in the model '{$this->modelClass}'.");
+                }
+                $this->eagerLoadRelations[] = $relation;
+            } else {
+                // Assoc: 'relation' => closure
+                $relation = $key;
+                if (!method_exists($this->modelClass, $relation)) {
+                    throw new \InvalidArgumentException("Relation '{$relation}' is not defined in the model '{$this->modelClass}'.");
+                }
+                $this->eagerLoadRelations[] = $relation;
+
+                if ($value instanceof \Closure) {
+                    // Spara constraint-closure per relation
+                    $this->eagerLoadConstraints[$relation] = $value;
+                } else {
+                    throw new \InvalidArgumentException("The value for with('{$relation}') must be a Closure.");
+                }
+            }
+        }
+
+        // Ta bort dubbletter utan att tappa constraints
+        $this->eagerLoadRelations = array_values(array_unique($this->eagerLoadRelations));
 
         return $this;
     }

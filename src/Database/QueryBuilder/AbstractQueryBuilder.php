@@ -10,6 +10,8 @@ abstract class AbstractQueryBuilder
 {
     protected array $bindings = [];
     protected ?Connection $connection = null;
+    /** @var array<string, callable> */
+    protected array $eagerLoadConstraints = []; // nya: closures per relation
 
     /**
      * Sätt `Connection`-instans för QueryBuilder.
@@ -49,10 +51,7 @@ abstract class AbstractQueryBuilder
             $model->hydrateFromDatabase($row);
             $model->markAsExisting();
 
-            // Obs: Inga aggregat eller *_count sätts som relationer här längre.
-            // De finns redan i $attributes via hydrateFromDatabase.
-
-            // Eager load endast riktiga relationer (behåll denna del)
+            // Eager load relationer med ev. constraints
             if (!empty($this->eagerLoadRelations)) {
                 foreach ($this->eagerLoadRelations as $relation) {
                     if (!method_exists($model, $relation)) {
@@ -62,7 +61,30 @@ abstract class AbstractQueryBuilder
                     if (method_exists($relObj, 'setParent')) {
                         $relObj->setParent($model);
                     }
-                    $relationData = $relObj->get();
+
+                    // Om det finns en constraint-closure för denna relation, applicera den
+                    $closure = $this->eagerLoadConstraints[$relation] ?? null;
+                    if ($closure instanceof \Closure) {
+                        // Försök extrahera QueryBuilder från relationen om möjligt
+                        $qb = null;
+                        if (method_exists($relObj, 'getQuery')) {
+                            $qb = $relObj->getQuery();
+                        } elseif (method_exists($relObj, 'query')) {
+                            $qb = $relObj->query();
+                        }
+
+                        if ($qb instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
+                            $closure($qb);
+                            $relationData = method_exists($relObj, 'get') ? $relObj->get() : $qb->get();
+                        } else {
+                            // Fallback: skicka relationen själv till closuren
+                            $closure($relObj);
+                            $relationData = method_exists($relObj, 'get') ? $relObj->get() : null;
+                        }
+                    } else {
+                        $relationData = method_exists($relObj, 'get') ? $relObj->get() : null;
+                    }
+
                     $model->setRelation($relation, is_array($relationData) ? $relationData : ($relationData ?? null));
                 }
             }
