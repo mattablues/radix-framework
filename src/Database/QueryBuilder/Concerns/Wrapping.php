@@ -8,7 +8,7 @@ trait Wrapping
 {
     protected function wrapColumn(string $column): string
     {
-        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_\.]*$/', $column)) {
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_.]*$/', $column)) {
             return $column;
         }
 

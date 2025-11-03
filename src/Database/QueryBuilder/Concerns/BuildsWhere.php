@@ -31,7 +31,7 @@ trait BuildsWhere
 
             $validOperators = ['=', '!=', '<', '<=', '>', '>=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'BETWEEN', 'IS', 'IS NOT'];
             if (!in_array(strtoupper($operator), $validOperators, true)) {
-                throw new \InvalidArgumentException("Invalid operator '{$operator}' in WHERE clause.");
+                throw new \InvalidArgumentException("Invalid operator '$operator' in WHERE clause.");
             }
 
             // Hantera "IS NULL" och "IS NOT NULL"
@@ -173,7 +173,7 @@ trait BuildsWhere
                 case 'nested':
                     $nestedWhere = $condition['query']->buildWhere();
                     $nestedWhere = preg_replace('/^WHERE\s+/i', '', $nestedWhere);
-                    $conditions[] = "{$condition['boolean']} ({$nestedWhere})";
+                    $conditions[] = "{$condition['boolean']} ($nestedWhere)";
                     break;
 
                 default:

@@ -57,27 +57,27 @@ class BelongsToMany
         $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
             ->setConnection($this->connection)
             ->setModelClass($this->relatedModelClass)
-            ->from("{$relatedTable} AS related")
-            ->join($this->pivotTable . ' AS pivot', 'related.id', '=', "pivot.{$this->relatedPivotKey}");
+            ->from("$relatedTable AS related")
+            ->join($this->pivotTable . ' AS pivot', 'related.id', '=', "pivot.$this->relatedPivotKey");
 
         // WHERE pivot.foreignPivotKey = parent.id
         if ($this->parent !== null) {
             $parentValue = $this->parent->getAttribute($this->parentKeyName);
             if ($parentValue !== null) {
-                $qb->where("pivot.{$this->foreignPivotKey}", '=', $parentValue);
+                $qb->where("pivot.$this->foreignPivotKey", '=', $parentValue);
             } else {
                 // tomt resultat om parent saknar id
                 $qb->where('1', '=', 0);
             }
         } else {
             // Backcompat: anta parentKeyName är ett värde
-            $qb->where("pivot.{$this->foreignPivotKey}", '=', $this->parentKeyName);
+            $qb->where("pivot.$this->foreignPivotKey", '=', $this->parentKeyName);
         }
 
         // Kolumner: related.* + ev. pivot-aliased
         $columns = ['related.*'];
         foreach ($this->pivotColumns as $col) {
-            $columns[] = "pivot.`{$col}` AS `pivot_{$col}`";
+            $columns[] = "pivot.`$col` AS `pivot_$col`";
         }
         $qb->select($columns);
 
@@ -92,7 +92,7 @@ class BelongsToMany
         if ($this->builder instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
             $cols = ['related.*'];
             foreach ($this->pivotColumns as $col) {
-                $cols[] = "pivot.`{$col}` AS `pivot_{$col}`";
+                $cols[] = "pivot.`$col` AS `pivot_$col`";
             }
             $this->builder->select($cols);
         }
@@ -110,7 +110,7 @@ class BelongsToMany
                 foreach ($models as $m) {
                     $pivotData = [];
                     foreach ($this->pivotColumns as $col) {
-                        $alias = "pivot_{$col}";
+                        $alias = "pivot_$col";
                         $val = $m->getAttribute($alias);
                         if ($val !== null) {
                             $pivotData[$col] = $val;

@@ -26,10 +26,6 @@ class ApplicationContainer
             throw new RuntimeException('Application container är inte satt.');
         }
 
-        if (!(self::$instance instanceof \Psr\Container\ContainerInterface)) {
-            throw new RuntimeException('Application container är inte en giltig ContainerInterface.');
-        }
-
         return self::$instance;
     }
 

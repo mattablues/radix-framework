@@ -390,14 +390,16 @@ abstract class Model implements JsonSerializable
 
     public static function query(): QueryBuilder
     {
-        $instance = new static();
+        $modelClass = static::class;
+        /** @var static $instance */
+        $instance = new $modelClass();
+
         $query = (new QueryBuilder())
-           ->setConnection($instance->getConnection())  // Anslutning
-           ->setModelClass(static::class)              // Sätt rätt modellklass
+           ->setConnection($instance->getConnection())
+           ->setModelClass($modelClass)
            ->from($instance->getTable());
 
-        // Lägg till standard för Soft Deletes om det behövs
-        if ($instance->softDeletes && !$query->getWithSoftDeletes()) { // Kontrollera flaggan
+        if ($instance->softDeletes && !$query->getWithSoftDeletes()) {
            $query->whereNull('deleted_at');
         }
 
@@ -419,7 +421,6 @@ abstract class Model implements JsonSerializable
             // Kontrollera om modellen ska uppdateras eller infogas
             $this->exists = isset($this->attributes[$this->primaryKey]);
 
-            // @phpstan-ignore-next-line new.static is safe for our ORM factory usage
             return $this->exists ? $this->persistUpdate() : $this->persistInsert();
         }
 
@@ -513,13 +514,14 @@ abstract class Model implements JsonSerializable
             if (!is_null($this->attributes['deleted_at'])) {
                 $this->attributes['deleted_at'] = null;
 
-                // Uppdatera posten i databasen
-                $result = $this->update();
+                // Uppdatera posten i databasen och returnera bool
+                $query = "UPDATE `{$this->table}` SET `deleted_at` = NULL WHERE `{$this->primaryKey}` = ?";
+                $affected = $this->getConnection()->execute($query, [$this->attributes[$this->primaryKey]])->rowCount() > 0;
 
                 // Återställ den ursprungliga `guarded`
                 $this->setGuarded($originalGuarded);
 
-                return $result;
+                return $affected;
             }
 
             // Återställ den ursprungliga `guarded` om inget krävdes
@@ -554,26 +556,23 @@ abstract class Model implements JsonSerializable
      */
     public static function find(int|string $id, bool $withTrashed = false): ?static
     {
-        $instance = new static(); // Skapa en ny instans av modellen
+        $modelClass = static::class;
+        /** @var static $instance */
+        $instance = new $modelClass();
 
-        // Skapa en query med rätt modellklass
         $query = (new QueryBuilder())
             ->setConnection($instance->getConnection())
-            ->setModelClass(static::class) // Sätt rätt modellklass
+            ->setModelClass($modelClass)
             ->from($instance->getTable());
 
-        // Filtrera bort soft-deleted poster om `$withTrashed` = false
         if (!$withTrashed && $instance->softDeletes) {
             $query->whereNull('deleted_at');
         }
 
-        // Lägg till WHERE-filter för primärnyckeln
         $query->where($instance->primaryKey, '=', $id);
 
-        // Hämta det första resultatet som en modell
         $model = $query->first();
 
-        // Om modellen har autoloadRelations, ladda dem
         if ($model && property_exists($model, 'autoloadRelations') && !empty($model->autoloadRelations)) {
             foreach ($model->autoloadRelations as $relation) {
                 if ($model->relationExists($relation)) {
@@ -612,10 +611,7 @@ abstract class Model implements JsonSerializable
             $localKey
         );
 
-        // Koppla parent så att relationen kan läsa värdet vid get()
-        if (method_exists($relation, 'setParent')) {
-            $relation->setParent($this);
-        }
+        $relation->setParent($this);
 
         return $relation;
     }
@@ -666,9 +662,7 @@ abstract class Model implements JsonSerializable
             $secondLocal
         );
 
-        if (method_exists($relation, 'setParent')) {
-            $relation->setParent($this);
-        }
+        $relation->setParent($this);
 
         return $relation;
     }
@@ -716,9 +710,7 @@ abstract class Model implements JsonSerializable
             $secondLocal
         );
 
-        if (method_exists($relation, 'setParent')) {
-            $relation->setParent($this);
-        }
+        $relation->setParent($this);
 
         return $relation;
     }
@@ -741,9 +733,7 @@ abstract class Model implements JsonSerializable
             $localKey // skicka key-namn
         );
 
-        if (method_exists($relation, 'setParent')) {
-            $relation->setParent($this);
-        }
+        $relation->setParent($this);
 
         return $relation;
     }
@@ -769,9 +759,7 @@ abstract class Model implements JsonSerializable
             $parentKey         // skicka key-namn
         );
 
-        if (method_exists($relation, 'setParent')) {
-            $relation->setParent($this);
-        }
+        $relation->setParent($this);
 
         return $relation;
     }
@@ -835,62 +823,81 @@ abstract class Model implements JsonSerializable
 
             $relatedData = null;
 
-                if ($closure instanceof \Closure) {
-                    $ref = new \ReflectionFunction($closure);
-                    $paramType = $ref->getNumberOfParameters() === 1
-                        ? ($ref->getParameters()[0]->getType()?->getName() ?? null)
-                        : null;
-
-                    // Försök extrahera QueryBuilder (om relationen har en)
-                    $query = null;
-                    if (method_exists($relObj, 'getQuery')) {
-                        $query = $relObj->getQuery();
-                    } elseif (method_exists($relObj, 'query')) {
-                        $query = $relObj->query();
+            if ($closure instanceof \Closure) {
+                $ref = new \ReflectionFunction($closure);
+                // Säker typ-hämtning utan ReflectionType::getName()
+                $paramType = null;
+                if ($ref->getNumberOfParameters() === 1) {
+                    $type = $ref->getParameters()[0]->getType();
+                    if ($type instanceof \ReflectionNamedType) {
+                        $paramType = $type->getName();
+                    } elseif ($type instanceof \ReflectionUnionType) {
+                        $names = array_map(
+                            static fn($t) => $t instanceof \ReflectionNamedType ? $t->getName() : null,
+                            $type->getTypes()
+                        );
+                        $names = array_values(array_filter($names));
+                        $paramType = in_array(\Radix\Database\QueryBuilder\QueryBuilder::class, $names, true)
+                            ? \Radix\Database\QueryBuilder\QueryBuilder::class
+                            : ($names[0] ?? null);
+                    } elseif (class_exists('\ReflectionIntersectionType') && $type instanceof \ReflectionIntersectionType) {
+                        $names = array_map(
+                            static fn($t) => $t instanceof \ReflectionNamedType ? $t->getName() : null,
+                            $type->getTypes()
+                        );
+                        $names = array_values(array_filter($names));
+                        $paramType = $names[0] ?? null;
                     }
+                }
 
-                    if ($paramType === QueryBuilder::class) {
-                        if ($query instanceof QueryBuilder) {
-                            // Ge closuren relationens QueryBuilder
-                            $closure($query);
-                            // Låt relationen hämta enligt sin get() (kan respektera parent/filter)
-                            $relatedData = method_exists($relObj, 'get')
-                                ? $relObj->get()
-                                : $query->get();
-                        } else {
-                            // Skapa en fristående QB som verkar mot relaterade tabellen
-                            // 1) Försök ta fram relaterad modelklass/tabell från relationen
-                            $relatedTable = null;
-                            $relatedModelClass = null;
+                // Försök extrahera QueryBuilder (om relationen har en)
+                $query = null;
+                if (method_exists($relObj, 'getQuery')) {
+                    $query = $relObj->getQuery();
+                } elseif (method_exists($relObj, 'query')) {
+                    $query = $relObj->query();
+                }
 
-                            // HasMany/HasOne: har 'modelClass'
-                            if (property_exists($relObj, 'modelClass')) {
-                                $rc = new \ReflectionClass($relObj);
-                                if ($rc->hasProperty('modelClass')) {
-                                    $p = $rc->getProperty('modelClass'); $p->setAccessible(true);
-                                    $relatedModelClass = $p->getValue($relObj);
-                                }
-                            }
-                            // BelongsTo: har 'relatedTable'
-                            if (!$relatedModelClass && property_exists($relObj, 'relatedTable')) {
-                                $rc = new \ReflectionClass($relObj);
-                                if ($rc->hasProperty('relatedTable')) {
-                                    $p = $rc->getProperty('relatedTable'); $p->setAccessible(true);
-                                    $relatedTable = $p->getValue($relObj);
-                                }
-                            }
-                            if ($relatedModelClass && class_exists($relatedModelClass)) {
-                                $tmpModel = new $relatedModelClass();
-                                $relatedTable = $tmpModel->getTable();
-                            }
+                if ($paramType === QueryBuilder::class) {
+                    if ($query instanceof QueryBuilder) {
+                        // Ge closuren relationens QueryBuilder
+                        $closure($query);
+                        // Låt relationen hämta enligt sin get()
+                        $relatedData = method_exists($relObj, 'get')
+                            ? $relObj->get()
+                            : $query->get();
+                    } else {
+                        // Skapa en fristående QB som verkar mot relaterade tabellen
+                        $relatedTable = null;
+                        $relatedModelClass = null;
 
-                            // 2) Bygg QB
-                            $qb = (new QueryBuilder())
+                        // HasMany/HasOne: har 'modelClass'
+                        if (property_exists($relObj, 'modelClass')) {
+                            $rc = new \ReflectionClass($relObj);
+                            if ($rc->hasProperty('modelClass')) {
+                                $p = $rc->getProperty('modelClass'); $p->setAccessible(true);
+                                $relatedModelClass = $p->getValue($relObj);
+                            }
+                        }
+                        // BelongsTo: har 'relatedTable'
+                        if (!$relatedModelClass && property_exists($relObj, 'relatedTable')) {
+                            $rc = new \ReflectionClass($relObj);
+                            if ($rc->hasProperty('relatedTable')) {
+                                $p = $rc->getProperty('relatedTable'); $p->setAccessible(true);
+                                $relatedTable = $p->getValue($relObj);
+                            }
+                        }
+                        if ($relatedModelClass && class_exists($relatedModelClass)) {
+                            $tmpModel = new $relatedModelClass();
+                            $relatedTable = $tmpModel->getTable();
+                        }
+
+                        $qb = (new QueryBuilder())
                                 ->setConnection($this->getConnection())
                                 ->setModelClass($relatedModelClass ?? static::class)
                                 ->from($relatedTable ?? $name);
 
-                            // 3) Applicera foreign key-filter om möjligt (för HasMany/HasOne)
+                            // Applicera foreign key-filter om möjligt (för HasMany/HasOne)
                             try {
                                 $rc = new \ReflectionClass($relObj);
                                 if ($rc->hasProperty('foreignKey') && $rc->hasProperty('localKeyName')) {
@@ -904,13 +911,10 @@ abstract class Model implements JsonSerializable
                                     }
                                 }
                             } catch (\Throwable) {
-                                // ignoreras – saknar meta
+                                // ignoreras
                             }
 
-                            // 4) Kör användar-closure mot QB
                             $closure($qb);
-
-                            // 5) Hämta data och hydrerar som relation
                             $relatedData = $qb->get();
                         }
                     } elseif (
@@ -937,7 +941,7 @@ abstract class Model implements JsonSerializable
                     $relatedData = $relObj->get();
                 }
 
-            $this->setRelation($name, is_array($relatedData) ? $relatedData : ($relatedData ?? null));
+                $this->setRelation($name, is_array($relatedData) ? $relatedData : ($relatedData ?? null));
         }
 
         return $this;

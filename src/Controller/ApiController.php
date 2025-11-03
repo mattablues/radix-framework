@@ -122,7 +122,6 @@ abstract class ApiController extends AbstractController
     /**
      * Returnera felmeddelande för dålig förfrågan (400).
      */
-    #[NoReturn]
     protected function respondWithBadRequest(string $message): void
     {
         $this->respondWithErrors(['Request' => [$message]], 400);
@@ -131,7 +130,6 @@ abstract class ApiController extends AbstractController
     /**
      * Returnera fel.
      */
-    #[NoReturn]
     protected function respondWithErrors(array $errors, int $status = 422): void
     {
         $formattedErrors = [];

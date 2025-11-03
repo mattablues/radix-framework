@@ -9,12 +9,12 @@ use Psr\Container\ContainerInterface;
 class ConsoleApplication
 {
     private array $commands = [];
-    private ContainerInterface $container;
+//    private ContainerInterface $container;
 
-    public function __construct(ContainerInterface $container)
-    {
-        $this->container = $container;
-    }
+//    public function __construct(ContainerInterface $container)
+//    {
+//        $this->container = $container;
+//    }
 
     /**
      * Lägg till ett nytt kommando med dess namn och callable.

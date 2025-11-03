@@ -18,7 +18,7 @@ trait CompilesSelect
             if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
                 $columnPart = $this->wrapColumn(trim($matches[1]));
                 $aliasPart = $this->wrapAlias(trim($matches[2]));
-                return "{$columnPart} AS {$aliasPart}";
+                return "$columnPart AS $aliasPart";
             }
 
             if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
@@ -53,7 +53,7 @@ trait CompilesSelect
         }
 
         if ($this->type !== 'SELECT') {
-            throw new \RuntimeException("Query type '{$this->type}' är inte implementerad.");
+            throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
         }
 
         $distinct = $this->distinct ? 'DISTINCT ' : '';
@@ -65,7 +65,7 @@ trait CompilesSelect
             return $this->wrapColumn($col);
         }, $this->columns));
 
-        $sql = "SELECT {$distinct}{$columns} FROM {$this->table}";
+        $sql = "SELECT $distinct$columns FROM $this->table";
 
         if (!empty($this->joins)) {
             $sql .= ' ' . implode(' ', $this->joins);
@@ -73,7 +73,7 @@ trait CompilesSelect
 
         $where = $this->buildWhere();
         if (!empty($where)) {
-            $sql .= " {$where}";
+            $sql .= " $where";
         }
 
         if (!empty($this->groupBy)) {
@@ -81,7 +81,7 @@ trait CompilesSelect
         }
 
         if (!empty($this->having)) {
-            $sql .= " HAVING {$this->having}";
+            $sql .= " HAVING $this->having";
         }
 
         if (!empty($this->orderBy)) {
@@ -89,11 +89,11 @@ trait CompilesSelect
         }
 
         if ($this->limit !== null) {
-            $sql .= " LIMIT {$this->limit}";
+            $sql .= " LIMIT $this->limit";
         }
 
         if ($this->offset !== null) {
-            $sql .= " OFFSET {$this->offset}";
+            $sql .= " OFFSET $this->offset";
         }
 
         if (!empty($this->unions)) {
