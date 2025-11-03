@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Console;
 
-use Psr\Container\ContainerInterface;
+//use Psr\Container\ContainerInterface;
 
 class ConsoleApplication
 {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Routing;
 
 use Exception;
+use Psr\Container\ContainerInterface;
 use Radix\Container\Container;
 use Radix\Http\Exception\PageNotFoundException;
 use Radix\Http\JsonResponse;
@@ -22,7 +23,7 @@ readonly class Dispatcher
 {
     public function __construct (
         private Router    $router,
-        private Container $container,
+        private ContainerInterface $container,
         private array     $middlewareClasses
     )
     {

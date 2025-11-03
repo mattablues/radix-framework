@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Radix\Error;
 
 use ErrorException;
-use JetBrains\PhpStorm\NoReturn;
 use Radix\Http\Exception\HttpException;
-use Radix\Http\Exception\MaintenanceException;
-use Radix\Http\Exception\PageNotFoundException;
 use Radix\Http\JsonResponse;
 use Throwable;
 

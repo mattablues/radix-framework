@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Radix\Controller;
 
 use App\Models\Token;
-use JetBrains\PhpStorm\NoReturn;
 use Radix\Http\JsonResponse;
 use Radix\Support\Validator;
 
