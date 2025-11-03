@@ -20,20 +20,20 @@ trait EagerLoad
             if (is_int($key)) {
                 $relation = $value;
                 if (!method_exists($this->modelClass, $relation)) {
-                    throw new \InvalidArgumentException("Relation '{$relation}' is not defined in the model '{$this->modelClass}'.");
+                    throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
                 }
                 $this->eagerLoadRelations[] = $relation;
             } else {
                 $relation = $key;
                 if (!method_exists($this->modelClass, $relation)) {
-                    throw new \InvalidArgumentException("Relation '{$relation}' is not defined in the model '{$this->modelClass}'.");
+                    throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
                 }
                 $this->eagerLoadRelations[] = $relation;
 
                 if ($value instanceof \Closure) {
                     $this->eagerLoadConstraints[$relation] = $value;
                 } else {
-                    throw new \InvalidArgumentException("The value for with('{$relation}') must be a Closure.");
+                    throw new \InvalidArgumentException("The value for with('$relation') must be a Closure.");
                 }
             }
         }

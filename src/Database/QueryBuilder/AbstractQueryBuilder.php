@@ -56,7 +56,7 @@ abstract class AbstractQueryBuilder
             if (!empty($this->eagerLoadRelations)) {
                 foreach ($this->eagerLoadRelations as $relation) {
                     if (!method_exists($model, $relation)) {
-                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '{$this->modelClass}'.");
+                        throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
                     }
                     $relObj = $model->$relation();
                     if (method_exists($relObj, 'setParent')) {

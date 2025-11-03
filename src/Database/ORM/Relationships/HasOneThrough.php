@@ -81,9 +81,9 @@ class HasOneThrough
         }
 
         $sql = "SELECT r.*
-                  FROM `{$relatedTable}` r
-                  JOIN `{$throughTable}` t ON t.`{$this->secondLocal}` = r.`{$this->secondKey}`
-                 WHERE t.`{$this->firstKey}` = ?
+                  FROM `$relatedTable` r
+                  JOIN `$throughTable` t ON t.`$this->secondLocal` = r.`$this->secondKey`
+                 WHERE t.`$this->firstKey` = ?
                  LIMIT 1";
 
         $row = $this->connection->fetchOne($sql, [$parentValue]);

@@ -29,7 +29,7 @@ trait WithCount
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
         }
 
         $rel = $parent->$relation();
@@ -52,7 +52,7 @@ trait WithCount
             $fkProp->setAccessible(true);
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
             return;
         }
 
@@ -91,7 +91,7 @@ trait WithCount
             $throughTable = $resolveTable($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` AS r INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}` WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}` LIMIT 1) AS `{$relation}_count`";
+                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `{$relation}_count`";
             return;
         }
 
@@ -130,14 +130,14 @@ trait WithCount
             $throughTable = $resolveTable($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` AS r INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}` WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
             $pivotTable = $rel->getPivotTable();
             $foreignPivotKey = $rel->getForeignPivotKey();
-            $this->columns[] = "(SELECT COUNT(*) FROM `{$pivotTable}` WHERE `{$pivotTable}`.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$pivotTable` WHERE `$pivotTable`.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
             return;
         }
 
@@ -152,7 +152,7 @@ trait WithCount
             $relatedInstance = new $modelClass();
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
             return;
         }
 
@@ -169,7 +169,7 @@ trait WithCount
             $tableProp->setAccessible(true);
             $relatedTable = $tableProp->getValue($rel);
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `{$relation}_count`";
             return;
         }
 
@@ -188,11 +188,11 @@ trait WithCount
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
         }
 
         $rel = $parent->$relation();
-        $aggAlias = $alias ?: "{$relation}_count_{$value}";
+        $aggAlias = $alias ?: "{$relation}_count_$value";
         $valSql = is_int($value) || is_float($value) ? (string)$value : ("'".addslashes((string)$value)."'");
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
@@ -207,7 +207,7 @@ trait WithCount
             $foreignKey = $fkProp->getValue($rel);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -247,7 +247,7 @@ trait WithCount
             $throughTable = $resolve($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` AS r INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}` WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}` AND r.`{$column}` = {$valSql} LIMIT 1) AS `{$aggAlias}`";
+                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` AND r.`$column` = $valSql LIMIT 1) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -287,7 +287,7 @@ trait WithCount
             $throughTable = $resolve($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` AS r INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}` WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}` AND r.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` AND r.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -304,7 +304,7 @@ trait WithCount
             $relatedTable = $relatedInstance->getTable();
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}` AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -323,7 +323,7 @@ trait WithCount
             $relatedTable = $tableProp->getValue($rel);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}` AND `{$relatedTable}`.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -342,7 +342,7 @@ trait WithCount
             $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `{$pivotTable}` AS pivot INNER JOIN `{$relatedTable}` AS related ON related.`id` = pivot.`{$relatedPivotKey}` WHERE pivot.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}` AND related.`{$column}` = {$valSql}) AS `{$aggAlias}`";
+                "(SELECT COUNT(*) FROM `$pivotTable` AS pivot INNER JOIN `$relatedTable` AS related ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk` AND related.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }

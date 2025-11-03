@@ -34,7 +34,7 @@ trait WithAggregate
 
         $fn = strtoupper($fn);
         if (!in_array($fn, ['SUM', 'AVG', 'MIN', 'MAX'], true)) {
-            throw new \InvalidArgumentException("Unsupported aggregate function: {$fn}");
+            throw new \InvalidArgumentException("Unsupported aggregate function: $fn");
         }
 
         $computedAlias = $alias ?: "{$relation}_" . strtolower($fn);
@@ -53,7 +53,7 @@ trait WithAggregate
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
         }
 
         $rel = $parent->$relation();
@@ -70,7 +70,7 @@ trait WithAggregate
             $fkProp->setAccessible(true);
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            $this->columns[] = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
@@ -109,7 +109,7 @@ trait WithAggregate
             $throughTable = $resolveTable($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT {$fn}(`r`.`{$column}`) FROM `{$relatedTable}` AS r INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}` WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}` LIMIT 1) AS `{$aggAlias}`";
+                "(SELECT $fn(`r`.`$column`) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `$aggAlias`";
             return;
         }
 
@@ -148,7 +148,7 @@ trait WithAggregate
             $throughTable = $resolveTable($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT {$fn}(`r`.`{$column}`) FROM `{$relatedTable}` AS r INNER JOIN `{$throughTable}` AS t ON t.`{$secondLocal}` = r.`{$secondKey}` WHERE t.`{$firstKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+                "(SELECT $fn(`r`.`$column`) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
@@ -163,7 +163,7 @@ trait WithAggregate
             $relatedInstance = new $modelClass();
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$foreignKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+            $this->columns[] = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
@@ -180,7 +180,7 @@ trait WithAggregate
             $tableProp->setAccessible(true);
             $relatedTable = $tableProp->getValue($rel);
 
-            $this->columns[] = "(SELECT {$fn}(`{$relatedTable}`.`{$column}`) FROM `{$relatedTable}` WHERE `{$relatedTable}`.`{$ownerKey}` = `{$parentTable}`.`{$parentForeignKey}`) AS `{$aggAlias}`";
+            $this->columns[] = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `$aggAlias`";
             return;
         }
 
@@ -198,7 +198,7 @@ trait WithAggregate
             $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
 
             $this->columns[] =
-                "(SELECT {$fn}(`related`.`{$column}`) FROM `{$relatedTable}` AS related INNER JOIN `{$pivotTable}` AS pivot ON related.`id` = pivot.`{$relatedPivotKey}` WHERE pivot.`{$foreignPivotKey}` = `{$parentTable}`.`{$parentPk}`) AS `{$aggAlias}`";
+                "(SELECT $fn(`related`.`$column`) FROM `$relatedTable` AS related INNER JOIN `$pivotTable` AS pivot ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 

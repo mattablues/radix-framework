@@ -93,9 +93,9 @@ class HasManyThrough
         }
 
         $sql = "SELECT r.*
-                  FROM `{$relatedTable}` r
-                  JOIN `{$throughTable}` t ON t.`{$this->secondLocal}` = r.`{$this->secondKey}`
-                 WHERE t.`{$this->firstKey}` = ?";
+                  FROM `$relatedTable` r
+                  JOIN `$throughTable` t ON t.`$this->secondLocal` = r.`$this->secondKey`
+                 WHERE t.`$this->firstKey` = ?";
 
         $rows = $this->connection->fetchAll($sql, [$parentValue]);
 

@@ -82,7 +82,7 @@ class RadixErrorHandler
         } else {
             ini_set('display_errors', '0');
             ini_set('log_errors', '1');      // Logga fel
-            require dirname(__DIR__, 3) . "/views/errors/{$statusCode}.php";
+            require dirname(__DIR__, 3) . "/views/errors/$statusCode.php";
         }
 
         exit;

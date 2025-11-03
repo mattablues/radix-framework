@@ -6,7 +6,6 @@ namespace Radix\Routing;
 
 use Exception;
 use Psr\Container\ContainerInterface;
-use Radix\Container\Container;
 use Radix\Http\Exception\PageNotFoundException;
 use Radix\Http\JsonResponse;
 use Radix\Http\Request;

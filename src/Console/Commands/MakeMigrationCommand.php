@@ -81,7 +81,7 @@ class MakeMigrationCommand extends BaseCommand
             $template
         );
 
-        // Skriv filens innehåll till målfilen
+        // Skriv filens innehåll till målfilén
         file_put_contents($filePath, $content);
 
         $this->coloredOutput("Migration created: $filePath", "green");

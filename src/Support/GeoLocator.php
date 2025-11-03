@@ -13,17 +13,17 @@ class GeoLocator
     public function getLocation(?string $ip = null): array
     {
         $ip = $ip ?? $_SERVER['REMOTE_ADDR'];
-        $url = "{$this->baseUrl}/{$ip}";
+        $url = "$this->baseUrl/$ip";
         $data = @file_get_contents($url);
 
         if ($data === false) {
-            throw new GeoLocatorException("Kunde inte nå API: {$url}");
+            throw new GeoLocatorException("Kunde inte nå API: $url");
         }
 
         $location = json_decode($data, true);
 
         if (!is_array($location) || !isset($location['status'])) {
-            throw new GeoLocatorException("Ogiltig API-respons: {$data}");
+            throw new GeoLocatorException("Ogiltig API-respons: $data");
         }
 
         if ($location['status'] !== 'success') {

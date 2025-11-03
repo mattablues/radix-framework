@@ -37,7 +37,7 @@ class MakeModelCommand extends BaseCommand
             return;
         }
 
-        // Skapa modellfilen
+        // Skapa modellfilén
         $this->createModelFile($modelName);
     }
 

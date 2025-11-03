@@ -37,7 +37,7 @@ class MakeServiceCommand extends BaseCommand
             return;
         }
 
-        // Skapa servicefilen
+        // Skapa servicefilén
         $this->createServiceFile($serviceName);
     }
 

@@ -12,7 +12,7 @@ trait CompilesMutations
         if ($this->type === 'INSERT') {
             $columns = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->columns));
             $placeholders = implode(', ', array_fill(0, count($this->columns), '?'));
-            return "INSERT INTO {$this->table} ($columns) VALUES ($placeholders)";
+            return "INSERT INTO $this->table ($columns) VALUES ($placeholders)";
         }
 
         // UPDATE
@@ -21,11 +21,11 @@ trait CompilesMutations
                 array_map(fn($col) => "{$this->wrapColumn($col)} = ?", array_keys($this->columns))
             );
 
-            $sql = "UPDATE {$this->table} SET {$setClause}";
+            $sql = "UPDATE $this->table SET $setClause";
 
             $where = $this->buildWhere();
             if (!empty($where)) {
-                $sql .= " {$where}";
+                $sql .= " $where";
             }
 
             return $sql;
@@ -33,17 +33,17 @@ trait CompilesMutations
 
         // DELETE
         if ($this->type === 'DELETE') {
-            $sql = "DELETE FROM {$this->table}";
+            $sql = "DELETE FROM $this->table";
             $where = $this->buildWhere();
 
             if (!empty($where)) {
-                $sql .= " {$where}";
+                $sql .= " $where";
             }
 
             return $sql;
         }
 
-        throw new \RuntimeException("Query type '{$this->type}' är inte implementerad.");
+        throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
     }
 
     public function insert(array $data): self

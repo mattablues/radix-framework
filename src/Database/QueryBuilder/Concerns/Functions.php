@@ -95,7 +95,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "upper_{$column}";
+        $alias = $alias ?: "upper_$column";
         $this->columns[] = "UPPER($column) AS `$alias`";
         return $this;
     }
@@ -106,7 +106,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "lower_{$column}";
+        $alias = $alias ?: "lower_$column";
         $this->columns[] = "LOWER($column) AS `$alias`";
         return $this;
     }
@@ -117,7 +117,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "year_{$column}";
+        $alias = $alias ?: "year_$column";
         $this->columns[] = "YEAR($column) AS `$alias`";
         return $this;
     }
@@ -128,7 +128,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "month_{$column}";
+        $alias = $alias ?: "month_$column";
         $this->columns[] = "MONTH($column) AS `$alias`";
         return $this;
     }
@@ -139,7 +139,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "date_{$column}";
+        $alias = $alias ?: "date_$column";
         $this->columns[] = "DATE($column) AS `$alias`";
         return $this;
     }
@@ -147,7 +147,7 @@ trait Functions
     public function round(string $column, int $decimals = 0, string $alias = null): self
     {
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "round_{$column}";
+        $alias = $alias ?: "round_$column";
         $this->columns[] = "ROUND($column, $decimals) AS `$alias`";
         return $this;
     }
@@ -158,7 +158,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "ceil_{$column}";
+        $alias = $alias ?: "ceil_$column";
         $this->columns[] = "CEIL($column) AS `$alias`";
         return $this;
     }
@@ -169,7 +169,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "floor_{$column}";
+        $alias = $alias ?: "floor_$column";
         $this->columns[] = "FLOOR($column) AS `$alias`";
         return $this;
     }
@@ -180,7 +180,7 @@ trait Functions
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $alias = $alias ?: "abs_{$column}";
+        $alias = $alias ?: "abs_$column";
         $this->columns[] = "ABS($column) AS `$alias`";
         return $this;
     }

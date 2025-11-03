@@ -480,7 +480,7 @@ abstract class Model implements JsonSerializable
             // Soft delete: sätt deleted_at direkt via UPDATE istället för save()/persistUpdate()
             $this->attributes['deleted_at'] = date('Y-m-d H:i:s');
 
-            $query = "UPDATE `{$this->table}` SET `deleted_at` = ? WHERE `{$this->primaryKey}` = ?";
+            $query = "UPDATE `$this->table` SET `deleted_at` = ? WHERE `$this->primaryKey` = ?";
             $ok = $this->getConnection()->execute($query, [$this->attributes['deleted_at'], $this->attributes[$this->primaryKey]])->rowCount() > 0;
 
             return $ok;
@@ -515,7 +515,7 @@ abstract class Model implements JsonSerializable
                 $this->attributes['deleted_at'] = null;
 
                 // Uppdatera posten i databasen och returnera bool
-                $query = "UPDATE `{$this->table}` SET `deleted_at` = NULL WHERE `{$this->primaryKey}` = ?";
+                $query = "UPDATE `$this->table` SET `deleted_at` = NULL WHERE `$this->primaryKey` = ?";
                 $affected = $this->getConnection()->execute($query, [$this->attributes[$this->primaryKey]])->rowCount() > 0;
 
                 // Återställ den ursprungliga `guarded`

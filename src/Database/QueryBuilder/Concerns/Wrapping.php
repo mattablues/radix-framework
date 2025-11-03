@@ -14,10 +14,10 @@ trait Wrapping
 
         if (str_contains($column, '.')) {
             [$table, $col] = explode('.', $column, 2);
-            return $this->wrapAlias($table) . '.' . "`{$col}`";
+            return $this->wrapAlias($table) . '.' . "`$col`";
         }
 
-        return "`{$column}`";
+        return "`$column`";
     }
 
     protected function wrapAlias(string $alias): string
