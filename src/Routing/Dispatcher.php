@@ -115,8 +115,6 @@ readonly class Dispatcher
             }
         }
 
-        $request->setSession($this->container->get(SessionInterface::class));
-
         $requestHandler = new RequestHandler(
             handler: $handler,
             eventDispatcher: $this->container->get(\Radix\EventDispatcher\EventDispatcher::class),

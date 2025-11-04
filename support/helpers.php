@@ -61,17 +61,9 @@ if (!function_exists('response')) {
 if (!function_exists('request')) {
     function request(): \Radix\Http\Request
     {
-        // Antag att app() hämtar från DI-containern där Request redan satts av Dispatcher/bootstrap
         return app(\Radix\Http\Request::class);
     }
 }
-
-//if (!function_exists('request')) {
-//    function request(): \Radix\Http\Request
-//    {
-//        return \Radix\Http\Request::createFromGlobals();
-//    }
-//}
 
 if (!function_exists('route')) {
     function route(string $name, array $data = []): string

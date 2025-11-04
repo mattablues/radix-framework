@@ -34,12 +34,6 @@ class Request implements RequestInterface
             $_COOKIE,
             $_SERVER,
         );
-
-        // Tilldela en session
-//        $session = app(\Radix\Session\SessionInterface::class); // Hämta session via DI
-//        $request->setSession($session);
-
-        //return $request;
     }
 
     public function ip(): string
