@@ -160,27 +160,27 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     // Hjälp: sätt samman alla buckets till $this->bindings innan körning
-       protected function compileAllBindings(): void
-        {
-            $bindings = [];
+    protected function compileAllBindings(): void
+    {
+        $bindings = [];
 
-            // CTE-bindningar först (traits finns alltid)
-            $bindings = array_merge($bindings, $this->compileCteBindings());
+        // CTE-bindningar först (traits finns alltid)
+        $bindings = array_merge($bindings, $this->compileCteBindings());
 
-            // Viktigt: mutation före where (för att få SET-bindningar före WHERE-bindningar)
-            $bindings = array_merge(
-                $bindings,
-                $this->bindingsMutation ?? [],
-                $this->bindingsWhere ?? [],
-                $this->bindingsJoin ?? [],
-                $this->bindingsHaving ?? [],
-                $this->bindingsUnion ?? [],
-                $this->bindingsSelect ?? [],
-                $this->bindingsOrder ?? []
-            );
+        // Viktigt: mutation före where (för att få SET-bindningar före WHERE-bindningar)
+        $bindings = array_merge(
+            $bindings,
+            $this->bindingsMutation ?? [],
+            $this->bindingsWhere ?? [],
+            $this->bindingsJoin ?? [],
+            $this->bindingsHaving ?? [],
+            $this->bindingsUnion ?? [],
+            $this->bindingsSelect ?? [],
+            $this->bindingsOrder ?? []
+        );
 
-            $this->bindings = $bindings;
-        }
+        $this->bindings = $bindings;
+    }
 
     public function value(string $column): mixed
     {
