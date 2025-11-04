@@ -53,7 +53,16 @@ trait CompilesSelect
         if ($this->columns === ['*']) {
             $this->columns = [];
         }
-        $this->bindings = array_merge($this->bindings, $sub->getBindings());
+
+        if (method_exists($this, 'addSelectBinding')) {
+            // sub->getBindings() hör snarare till select-bucket
+            foreach ($sub->getBindings() as $b) {
+                $this->addSelectBinding($b);
+            }
+        } else {
+            $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        }
+
         $this->columns[] = '(' . $sub->toSql() . ') AS ' . $this->wrapAlias($alias);
         return $this;
     }

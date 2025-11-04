@@ -31,7 +31,13 @@ trait Ordering
     public function havingRaw(string $expression, array $bindings = []): self
     {
         $this->having = $expression;
-        $this->addHavingBindings($bindings);
+
+        if (method_exists($this, 'addHavingBindings')) {
+            $this->addHavingBindings($bindings);
+        } else {
+            $this->bindings = array_merge($this->bindings, $bindings);
+        }
+
         return $this;
     }
 

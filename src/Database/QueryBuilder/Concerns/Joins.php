@@ -49,7 +49,13 @@ trait Joins
     public function joinRaw(string $raw, array $bindings = []): self
     {
         $this->joins[] = $raw;
-        $this->addJoinBindings($bindings);
+
+        if (method_exists($this, 'addJoinBindings')) {
+            $this->addJoinBindings($bindings);
+        } else {
+            $this->bindings = array_merge($this->bindings, $bindings);
+        }
+
         return $this;
     }
 }

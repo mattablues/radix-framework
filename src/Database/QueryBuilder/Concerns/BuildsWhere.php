@@ -153,7 +153,9 @@ trait BuildsWhere
         if (empty($values)) {
             throw new \InvalidArgumentException("Argumentet 'values' måste innehålla minst ett värde för whereNotIn.");
         }
+
         $placeholders = implode(', ', array_fill(0, count($values), '?'));
+
         $this->where[] = [
             'type' => 'list',
             'column' => $this->wrapColumn($column),
@@ -161,7 +163,14 @@ trait BuildsWhere
             'value' => "($placeholders)",
             'boolean' => $boolean,
         ];
-        $this->bindings = array_merge($this->bindings, $values);
+
+        // Lägg i where-bucket om stöds, annars direkt
+        if (method_exists($this, 'addWhereBindings')) {
+            $this->addWhereBindings($values);
+        } else {
+            $this->bindings = array_merge($this->bindings, $values);
+        }
+
         return $this;
     }
 
@@ -171,6 +180,7 @@ trait BuildsWhere
         if (count($range) !== 2) {
             throw new \InvalidArgumentException('whereBetween kräver exakt två värden.');
         }
+
         $this->where[] = [
             'type' => 'between',
             'column' => $this->wrapColumn($column),
@@ -178,7 +188,13 @@ trait BuildsWhere
             'value' => '? AND ?',
             'boolean' => $boolean,
         ];
-        $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
+
+        if (method_exists($this, 'addWhereBindings')) {
+            $this->addWhereBindings([$range[0], $range[1]]);
+        } else {
+            $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
+        }
+
         return $this;
     }
 
@@ -187,6 +203,7 @@ trait BuildsWhere
         if (count($range) !== 2) {
             throw new \InvalidArgumentException('whereNotBetween kräver exakt två värden.');
         }
+
         $this->where[] = [
             'type' => 'between',
             'column' => $this->wrapColumn($column),
@@ -194,7 +211,13 @@ trait BuildsWhere
             'value' => '? AND ?',
             'boolean' => $boolean,
         ];
-        $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
+
+        if (method_exists($this, 'addWhereBindings')) {
+            $this->addWhereBindings([$range[0], $range[1]]);
+        } else {
+            $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
+        }
+
         return $this;
     }
 
@@ -214,7 +237,12 @@ trait BuildsWhere
     // NYTT: whereExists / whereNotExists
     public function whereExists(QueryBuilder $sub, string $boolean = 'AND'): self
     {
-        $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        if (method_exists($this, 'addWhereBindings')) {
+            $this->addWhereBindings($sub->getBindings());
+        } else {
+            $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        }
+
         $this->where[] = [
             'type' => 'exists',
             'operator' => 'EXISTS',
@@ -226,7 +254,12 @@ trait BuildsWhere
 
     public function whereNotExists(QueryBuilder $sub, string $boolean = 'AND'): self
     {
-        $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        if (method_exists($this, 'addWhereBindings')) {
+            $this->addWhereBindings($sub->getBindings());
+        } else {
+            $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        }
+
         $this->where[] = [
             'type' => 'exists',
             'operator' => 'NOT EXISTS',
@@ -244,7 +277,13 @@ trait BuildsWhere
             'sql' => $sql,
             'boolean' => $boolean,
         ];
-        $this->bindings = array_merge($this->bindings, $bindings);
+
+        if (method_exists($this, 'addWhereBindings')) {
+            $this->addWhereBindings($bindings);
+        } else {
+            $this->bindings = array_merge($this->bindings, $bindings);
+        }
+
         return $this;
     }
 

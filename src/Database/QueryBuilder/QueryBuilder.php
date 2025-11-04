@@ -159,4 +159,18 @@ class QueryBuilder extends AbstractQueryBuilder
             $this->bindingsUnion
         ));
     }
+
+    // ... existing code ...
+    public function value(string $column): mixed
+    {
+        $this->limit(1);
+        $this->select([$column]);
+        $row = $this->connection->fetchOne($this->toSql(), $this->bindings);
+        if ($row === null) {
+            return null;
+        }
+        // Hämta första nyckeln om alias/namn okänd
+        $values = array_values($row);
+        return $values[0] ?? null;
+    }
 }

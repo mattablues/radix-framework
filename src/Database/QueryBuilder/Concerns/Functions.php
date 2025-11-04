@@ -189,19 +189,20 @@ trait Functions
     public function pluck(string $column, ?string $key = null): array
     {
         $this->select([$column]);
-        $rows = $this->connection->fetchAll($this->toSql(), $this->bindings);
+        $rows = $this->connection->fetchAll($this->toSql(), $this->getBindings());
+
         if ($key === null) {
-            return array_map(function ($row) {
-                $values = array_values($row);
-                return $values[0] ?? null;
+            return array_map(static function ($row) {
+                $vals = array_values($row);
+                return $vals[0] ?? null;
             }, $rows);
         }
-        $result = [];
+
+        $out = [];
         foreach ($rows as $row) {
             $vals = array_values($row);
-            $val = $vals[0] ?? null;
-            $result[$row[$key] ?? null] = $val;
+            $out[$row[$key] ?? null] = $vals[0] ?? null;
         }
-        return $result;
+        return $out;
     }
 }
