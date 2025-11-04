@@ -105,7 +105,6 @@ readonly class Dispatcher
 
             $handler = $this->container->get($controller);
             $handler->setViewer($this->container->get(TemplateViewerInterface::class));
-            //$handler->setAuthUser($this->container->get(AuthInterface::class));
             $handler->setResponse($this->container->get(Response::class));
 
             try {

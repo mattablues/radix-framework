@@ -25,7 +25,7 @@ class Request implements RequestInterface
 
     public static function createFromGlobals(): self
     {
-        $request = new self(
+        return new self(
             $_SERVER['REQUEST_URI'],
             $_SERVER['REQUEST_METHOD'],
             $_GET,
@@ -36,10 +36,10 @@ class Request implements RequestInterface
         );
 
         // Tilldela en session
-        $session = app(\Radix\Session\SessionInterface::class); // Hämta session via DI
-        $request->setSession($session);
+//        $session = app(\Radix\Session\SessionInterface::class); // Hämta session via DI
+//        $request->setSession($session);
 
-        return $request;
+        //return $request;
     }
 
     public function ip(): string
