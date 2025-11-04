@@ -9,6 +9,11 @@ trait CompilesMutations
     protected array $withAggregateExpressions = [];
     protected ?array $upsertUnique = null; // för UPSERT
     protected ?array $upsertUpdate = null;  // för UPSERT
+    protected array $bindingsUnion = [];
+    protected array $bindingsMutation = [];
+
+    // Håller färdigbyggd SQL för mutations (används av t.ex. InsertSelect)
+    protected ?string $mutationSql = null;
 
     protected function compileMutationSql(): string
     {

@@ -66,9 +66,11 @@ trait CompilesSelect
     public function toSql(): string
     {
         if ($this->type === 'INSERT' || $this->type === 'UPDATE' || $this->type === 'DELETE') {
-            // Anropa direkt – traits finns alltid
             $cte = $this->compileCtePrefix();
-            $sql = $this->compileMutationSql();
+            $sql = (is_string($this->mutationSql ?? null) && $this->mutationSql !== '')
+                ? $this->mutationSql
+                : $this->compileMutationSql();
+
             if ($cte !== '') {
                 $sql = $cte . ' ' . $sql;
             }
@@ -79,7 +81,7 @@ trait CompilesSelect
             throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
         }
 
-        // Window-uttryck (traits finns alltid)
+        // Window expressions
         $windowExpr = $this->compileWindowSelects();
         if (!empty($windowExpr)) {
             $this->columns = array_merge($this->columns, $windowExpr);
@@ -94,7 +96,6 @@ trait CompilesSelect
             return $this->wrapColumn($col);
         }, $this->columns));
 
-        // CTE-prefix direkt
         $ctePrefix = $this->compileCtePrefix();
         $prefix = $ctePrefix !== '' ? $ctePrefix . ' ' : '';
 
@@ -104,13 +105,32 @@ trait CompilesSelect
             $sql .= ' ' . implode(' ', $this->joins);
         }
 
+        // Standard WHERE byggd via BuildsWhere
         $where = $this->buildWhere();
-        if (!empty($where)) {
+        $hasStandardWhere = !empty($where);
+
+        // Rå WHERE-sträng (utan parenteser)
+        $rawWhere = is_string($this->whereRawString ?? null) ? trim((string)$this->whereRawString) : '';
+
+        if ($hasStandardWhere && $rawWhere !== '') {
+            $sql .= " $where AND " . $rawWhere;
+        } elseif ($hasStandardWhere) {
             $sql .= " $where";
+        } elseif ($rawWhere !== '') {
+            $sql .= " WHERE " . $rawWhere;
         }
 
+        // GROUP BY / ROLLUP / GROUPING SETS
         if (!empty($this->groupBy)) {
-            $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
+            $group = $this->compileGroupByClause();
+            if ($group !== '') {
+                $sql .= ' ' . $group;
+            }
+        } elseif (!empty($this->groupingSets)) {
+            $group = $this->compileGroupByClause();
+            if ($group !== '') {
+                $sql .= ' ' . $group;
+            }
         }
 
         if (!empty($this->having)) {
@@ -133,7 +153,6 @@ trait CompilesSelect
             $sql .= ' ' . implode(' ', $this->unions);
         }
 
-        // Lås-suffix (trait finns alltid)
         if ($this->lockMode !== null) {
             $sql .= $this->compileLockSuffix();
         }

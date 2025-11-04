@@ -25,13 +25,13 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder selectRaw(string $expression) Rå SELECT-uttryck.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder selectSub(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $alias) Subquery i SELECT.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder distinct(bool $value = true) DISTINCT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder toSql() Generera SQL.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder getBindings() Hämta bindningar.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder debugSql() SQL med interpolerade bindningar.
- * @method static mixed                                                value(string $column) Hämta ett enda värde.
- * @method static array                                                pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
- * @method static array                                                get() Hämta resultat (hydreras till modeller).
- * @method static mixed                                                first() Första raden (modell eller null).
+ * @method static string                                          toSql() Generera SQL.
+ * @method static array                                           getBindings() Hämta bindningar.
+ * @method static string                                          debugSql() SQL med interpolerade bindningar.
+ * @method static mixed                                           value(string $column) Hämta ett enda värde.
+ * @method static array                                           pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
+ * @method static array                                           get() Hämta resultat (hydreras till modeller).
+ * @method static mixed                                           first() Första raden (modell eller null).
  *
  * Paginering/Sök
  * @method static array paginate(int $perPage = 10, int $currentPage = 1)
@@ -59,6 +59,11 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhereNotNull(string $column)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder whereLike(string $column, string $value, string $boolean = 'AND')
  *
+ * JSON
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder jsonExtract(string $column, string $path, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereJsonContains(string $column, mixed $needle, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereJsonPath(string $column, string $path, string $operator, mixed $value, string $boolean = 'AND')
+ *
  * Joins
  * @method static \Radix\Database\QueryBuilder\QueryBuilder join(string $table, string $first, string $operator, string $second, string $type = 'INNER')
  * @method static \Radix\Database\QueryBuilder\QueryBuilder leftJoin(string $table, string $first, string $operator, string $second)
@@ -74,9 +79,35 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder orderBy(string $column, string $direction = 'ASC')
  * @method static \Radix\Database\QueryBuilder\QueryBuilder orderByRaw(string $expression)
  *
+ * Grouping sets och rollup
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder rollup(array $columns)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder groupingSets(array $sets)
+ *
  * Union
  * @method static \Radix\Database\QueryBuilder\QueryBuilder union(self|\Radix\Database\QueryBuilder\QueryBuilder $query, bool $all = false)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder unionAll(self|\Radix\Database\QueryBuilder\QueryBuilder $query)
+ *
+ * Fönsterfunktioner (Windows)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder rowNumber(string $alias, array $partitionBy = [], array $orderBy = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder rank(string $alias, array $partitionBy = [], array $orderBy = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder denseRank(string $alias, array $partitionBy = [], array $orderBy = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder sumOver(string $column, string $alias, array $partitionBy = [], array $orderBy = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder avgOver(string $column, string $alias, array $partitionBy = [], array $orderBy = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder windowRaw(string $expression, ?string $alias = null)
+ *
+ * CASE-uttryck
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder caseWhen(array $whenThenRows, string $elseExpr, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder orderByCase(string $column, array $map, string $default, string $direction = 'ASC')
+ *
+ * CTE (WITH / RECURSIVE)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withCte(string $name, \Radix\Database\QueryBuilder\QueryBuilder $sub)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withCteRaw(string $raw, array $bindings = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withRecursive(string $name, \Radix\Database\QueryBuilder\QueryBuilder $anchor, \Radix\Database\QueryBuilder\QueryBuilder $recursive, array $columns = [])
+ *
+ * Låsning
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder forUpdate(bool $enable = true)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder lockInShareMode(bool $enable = true)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder lock(string $mode)
  *
  * Aggregatfunktioner (SELECT)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder count(string $column = '*', string $alias = 'count')
@@ -96,7 +127,8 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder month(string $column, string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder date(string $column, string $alias = null)
  *
- * Mutationer
+ * Insert-Select och mutationer
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder insertSelect(string $table, array $columns, \Radix\Database\QueryBuilder\QueryBuilder $select)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder insert(array $data)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder update(array $data)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder delete()
@@ -112,7 +144,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder onlyTrashed()
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withoutTrashed()
  *
- * Eager load/aggregat
+ * Eager load/aggregat över relationer
  * @method static \Radix\Database\QueryBuilder\QueryBuilder with(string|string[] $relations)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|string[] $relations)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null)

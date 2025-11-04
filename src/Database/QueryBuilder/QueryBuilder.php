@@ -8,11 +8,15 @@ use Radix\Database\QueryBuilder\Concerns\Aggregates\WithAggregate;
 use Radix\Database\QueryBuilder\Concerns\Aggregates\WithCount;
 use Radix\Database\QueryBuilder\Concerns\Bindings;
 use Radix\Database\QueryBuilder\Concerns\BuildsWhere;
+use Radix\Database\QueryBuilder\Concerns\CaseExpressions;
 use Radix\Database\QueryBuilder\Concerns\CompilesMutations;
 use Radix\Database\QueryBuilder\Concerns\CompilesSelect;
 use Radix\Database\QueryBuilder\Concerns\EagerLoad;
 use Radix\Database\QueryBuilder\Concerns\Functions;
+use Radix\Database\QueryBuilder\Concerns\GroupingSets;
+use Radix\Database\QueryBuilder\Concerns\InsertSelect;
 use Radix\Database\QueryBuilder\Concerns\Joins;
+use Radix\Database\QueryBuilder\Concerns\JsonFunctions;
 use Radix\Database\QueryBuilder\Concerns\Locks;
 use Radix\Database\QueryBuilder\Concerns\Ordering;
 use Radix\Database\QueryBuilder\Concerns\Pagination;
@@ -43,6 +47,10 @@ class QueryBuilder extends AbstractQueryBuilder
     use WithAggregate;
     use WithCount;
     use Transactions;
+    use CaseExpressions;
+    use InsertSelect;
+    use JsonFunctions;
+    use GroupingSets;
 
     protected string $type = 'SELECT';
     protected array $columns = ['*'];
