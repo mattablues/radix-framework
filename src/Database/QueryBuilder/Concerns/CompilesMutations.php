@@ -15,9 +15,7 @@ trait CompilesMutations
         if ($this->type === 'INSERT') {
             $columns = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->columns));
             $placeholders = implode(', ', array_fill(0, count($this->columns), '?'));
-            if (method_exists($this, 'compileAllBindings')) {
-                $this->compileAllBindings();
-            }
+            $this->compileAllBindings();
             return "INSERT INTO $this->table ($columns) VALUES ($placeholders)";
         }
 
@@ -33,9 +31,7 @@ trait CompilesMutations
                 $sql .= " $where";
             }
 
-            if (method_exists($this, 'compileAllBindings')) {
-                $this->compileAllBindings();
-            }
+            $this->compileAllBindings();
             return $sql;
         }
 
@@ -47,18 +43,14 @@ trait CompilesMutations
                 $sql .= " $where";
             }
 
-            if (method_exists($this, 'compileAllBindings')) {
-                $this->compileAllBindings();
-            }
+            $this->compileAllBindings();
             return $sql;
         }
 
         if ($this->type === 'INSERT_IGNORE') {
             $columns = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->columns));
             $placeholders = implode(', ', array_fill(0, count($this->columns), '?'));
-            if (method_exists($this, 'compileAllBindings')) {
-                $this->compileAllBindings();
-            }
+            $this->compileAllBindings();
             return "INSERT OR IGNORE INTO $this->table ($columns) VALUES ($placeholders)";
         }
 
@@ -77,9 +69,7 @@ trait CompilesMutations
                 fn($col) => $this->wrapColumn($col) . ' = EXCLUDED.' . $this->wrapColumn($col),
                 array_keys($updates)
             ));
-            if (method_exists($this, 'compileAllBindings')) {
-                $this->compileAllBindings();
-            }
+            $this->compileAllBindings();
             return "INSERT INTO $this->table ($columns) VALUES ($placeholders) ON CONFLICT ($conflict) DO UPDATE SET $updateSql";
         }
 
@@ -108,7 +98,6 @@ trait CompilesMutations
         $this->bindingsMutation = array_values($data);
         return $this;
     }
-
 
     public function delete(): self
     {

@@ -86,7 +86,6 @@ trait BuildsWhere
         return $this;
     }
 
-    // ... existing code ...
     public function orWhere(string $column, string $operator, mixed $value): self
     {
         return $this->where($column, $operator, $value, 'OR');
@@ -164,13 +163,7 @@ trait BuildsWhere
             'boolean' => $boolean,
         ];
 
-        // Lägg i where-bucket om stöds, annars direkt
-        if (method_exists($this, 'addWhereBindings')) {
-            $this->addWhereBindings($values);
-        } else {
-            $this->bindings = array_merge($this->bindings, $values);
-        }
-
+        $this->addWhereBindings($values);
         return $this;
     }
 
@@ -189,12 +182,7 @@ trait BuildsWhere
             'boolean' => $boolean,
         ];
 
-        if (method_exists($this, 'addWhereBindings')) {
-            $this->addWhereBindings([$range[0], $range[1]]);
-        } else {
-            $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
-        }
-
+        $this->addWhereBindings([$range[0], $range[1]]);
         return $this;
     }
 
@@ -212,12 +200,7 @@ trait BuildsWhere
             'boolean' => $boolean,
         ];
 
-        if (method_exists($this, 'addWhereBindings')) {
-            $this->addWhereBindings([$range[0], $range[1]]);
-        } else {
-            $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
-        }
-
+        $this->addWhereBindings([$range[0], $range[1]]);
         return $this;
     }
 
@@ -237,11 +220,7 @@ trait BuildsWhere
     // NYTT: whereExists / whereNotExists
     public function whereExists(QueryBuilder $sub, string $boolean = 'AND'): self
     {
-        if (method_exists($this, 'addWhereBindings')) {
-            $this->addWhereBindings($sub->getBindings());
-        } else {
-            $this->bindings = array_merge($this->bindings, $sub->getBindings());
-        }
+        $this->addWhereBindings($sub->getBindings());
 
         $this->where[] = [
             'type' => 'exists',
@@ -254,11 +233,7 @@ trait BuildsWhere
 
     public function whereNotExists(QueryBuilder $sub, string $boolean = 'AND'): self
     {
-        if (method_exists($this, 'addWhereBindings')) {
-            $this->addWhereBindings($sub->getBindings());
-        } else {
-            $this->bindings = array_merge($this->bindings, $sub->getBindings());
-        }
+        $this->addWhereBindings($sub->getBindings());
 
         $this->where[] = [
             'type' => 'exists',
@@ -278,12 +253,7 @@ trait BuildsWhere
             'boolean' => $boolean,
         ];
 
-        if (method_exists($this, 'addWhereBindings')) {
-            $this->addWhereBindings($bindings);
-        } else {
-            $this->bindings = array_merge($this->bindings, $bindings);
-        }
-
+        $this->addWhereBindings($bindings);
         return $this;
     }
 

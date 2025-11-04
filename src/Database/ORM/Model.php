@@ -16,72 +16,108 @@ use Radix\Database\QueryBuilder\QueryBuilder;
 /**
  * Dynamiska metoder som hämtas från QueryBuilder.
  *
- * @method static \Radix\Database\QueryBuilder\QueryBuilder select(string|string[] $columns = ['*']) Ställer in vilka kolumner som ska hämtas.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder setModelClass(string $modelClass) Anger modellklassen för QueryBuilder.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder first() Hämtar den första posten.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder get() Hämtar resultaten som en array.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder with(string|string[] $relations) Förladdar relationer.
+ * Bas
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder setConnection(\Radix\Database\Connection $connection) Sätt DB-anslutning.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder setModelClass(string $modelClass) Ange modellklass.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder from(string $table) Ange tabell (stödjer "AS").
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder fromRaw(string $raw) Ange FROM som rått uttryck/subquery.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder select(string|string[] $columns = ['*']) Kolumner.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder selectRaw(string $expression) Rå SELECT-uttryck.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder distinct(bool $value = true) DISTINCT.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder toSql() Generera SQL.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder getBindings() Hämta bindningar.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder debugSql() SQL med interpolerade bindningar.
+ * @method static mixed                                                value(string $column) Hämta ett enda värde.
+ * @method static array                                                pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
+ * @method static array                                                get() Hämta resultat (hydreras till modeller).
+ * @method static mixed                                                first() Första raden (modell eller null).
+ *
+ * Where/Filter
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder where(string|\Radix\Database\QueryBuilder\QueryBuilder|\Closure $column, ?string $operator = null, mixed $value = null, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhere(string $column, string $operator, mixed $value)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereIn(string $column, array $values, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotIn(string $column, array $values, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereBetween(string $column, array $range, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotBetween(string $column, array $range, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereColumn(string $left, string $operator, string $right, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereExists(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotExists(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereRaw(string $sql, array $bindings = [], string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNull(string $column, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotNull(string $column, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhereNotNull(string $column)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereLike(string $column, string $value, string $boolean = 'AND')
+ *
+ * Joins
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder join(string $table, string $first, string $operator, string $second, string $type = 'INNER')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder leftJoin(string $table, string $first, string $operator, string $second)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder rightJoin(string $table, string $first, string $operator, string $second)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder fullJoin(string $table, string $first, string $operator, string $second)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder joinSub(self|\Radix\Database\QueryBuilder\QueryBuilder $subQuery, string $alias, string $first, string $operator, string $second, string $type = 'INNER')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder joinRaw(string $raw, array $bindings = [])
+ *
+ * Group/Having/Order
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder groupBy(string ...$columns)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder having(string $column, string $operator, mixed $value)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder havingRaw(string $expression, array $bindings = [])
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder orderBy(string $column, string $direction = 'ASC')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder orderByRaw(string $expression)
+ *
+ * Union
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder union(self|\Radix\Database\QueryBuilder\QueryBuilder $query, bool $all = false)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder unionAll(self|\Radix\Database\QueryBuilder\QueryBuilder $query)
+ *
+ * Subselect
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder selectSub(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $alias)
+ *
+ * Paginering/Sök
+ * @method static array paginate(int $perPage = 10, int $currentPage = 1)
+ * @method static array search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1)
+ *
+ * Aggregatfunktioner (SELECT)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder count(string $column = '*', string $alias = 'count')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder avg(string $column, string $alias = 'average')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder sum(string $column, string $alias = 'sum')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder min(string $column, string $alias = 'min')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder max(string $column, string $alias = 'max')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder concat(array $columns, string $alias)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder addExpression(string $expression)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder round(string $column, int $decimals = 0, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder ceil(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder floor(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder abs(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder upper(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder lower(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder year(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder month(string $column, string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder date(string $column, string $alias = null)
+ *
+ * Mutationer
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder insert(array $data)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder update(array $data)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder delete()
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder insertOrIgnore(array $data)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder upsert(array $data, array $uniqueBy, ?array $update = null)
+ *
+ * Transaktioner
+ * @method static void transaction(callable $callback)
+ *
+ * Soft deletes
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withSoftDeletes()
- * @method static \Radix\Database\QueryBuilder\QueryBuilder getOnlySoftDeleted()()
- * @method static \Radix\Database\QueryBuilder\QueryBuilder distinct(bool $value = true) Markerar att bara unika värden ska hämtas.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder from(string $table) Ställer in vilken tabell som ska användas.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder where(string $column, string $operator, mixed $value, string $boolean = 'AND') Lägg till WHERE-villkor.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereIn(string $column, array $values, string $boolean = 'AND') Lägg till WHERE IN-villkor.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhere(string $column, string $operator, mixed $value) Lägg till OR WHERE-villkor.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNull(string $column, string $boolean = 'AND') Lägg till WHERE IS NULL.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotNull(string $column, string $boolean = 'AND') Lägg till WHERE IS NOT NULL.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhereNotNull(string $column) Lägg till OR WHERE IS NOT NULL.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereLike(string $column, string $value, string $boolean = 'AND') Lägg till WHERE LIKE-villkor.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder orderBy(string $column, string $direction = 'ASC') Lägg till ORDER BY.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder groupBy(string ...$columns) Lägg till GROUP BY-villkor.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder having(string $column, string $operator, mixed $value) Lägg till HAVING-villkor.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder leftJoin(string $table, string $first, string $operator, string $second) Lägg till LEFT JOIN.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder join(string $table, string $first, string $operator, string $second, string $type = 'INNER') Lägg till JOIN.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder fullJoin(string $table, string $first, string $operator, string $second) Lägg till FULL OUTER JOIN.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder joinSub(self|\Radix\Database\QueryBuilder\QueryBuilder $subQuery, string $alias, string $first, string $operator, string $second, string $type = 'INNER') Lägg till JOIN med en subquery.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder union(self|\Radix\Database\QueryBuilder\QueryBuilder $query, bool $all = false) Lägg till UNION.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder limit(int $limit) Ange antalet poster att hämta.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder offset(int $offset) Hoppa över ett visst antal poster.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder paginate(int $perPage = 10, int $currentPage = 1) Returnera paginerade resultat.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1) Returnera search resultat.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder count(string $column = '*', string $alias = 'count') Lägg till COUNT i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder avg(string $column, string $alias = 'average') Lägg till AVG i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder sum(string $column, string $alias = 'sum') Lägg till SUM i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder min(string $column, string $alias = 'min') Lägg till MIN i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder max(string $column, string $alias = 'max') Lägg till MAX i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder concat(array $columns, string $alias) Lägg till CONCAT i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder addExpression(string $expression) Lägg till ett raw uttryck i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder round(string $column, int $decimals = 0, string $alias = null) Lägg till ROUND i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder ceil(string $column, string $alias = null) Lägg till CEIL i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder floor(string $column, string $alias = null) Lägg till FLOOR i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder abs(string $column, string $alias = null) Lägg till ABS i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder upper(string $column, string $alias = null) Lägg till UPPER i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder lower(string $column, string $alias = null) Lägg till LOWER i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder year(string $column, string $alias = null) Lägg till YEAR i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder month(string $column, string $alias = null) Lägg till MONTH i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder date(string $column, string $alias = null) Lägg till DATE i SELECT.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder selectRaw(string $expression) Lägg till ett raw SELECT-uttryck.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder debugSql() Returnerar den aktuella SQL-frågan med bindningsvärden.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder toSql() Returnerar den kompletta SQL-frågan.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder getBindings() Returnerar bindningsvärdena för SQL-frågan.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder insert(array $data) Kör en INSERT-fråga.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder update(array $data) Kör en UPDATE-fråga.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder delete() Kör en DELETE-fråga.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder transaction(callable $callback) Utför en transaktion.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder setConnection(\Radix\Database\Connection $connection) Ställer in en databasanslutning.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder execute() Kör den genererade SQL-frågan.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapColumn(string $column) Testar att wrappa en kolumn.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder testWrapAlias(string $alias) Testar att wrappa ett alias.
- * @method static self forceFill(array $attributes) Tvinga fyllning av attribut oavsett skydd.
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|string[] $relations) Räknar relationer och exponerar {relation}_count.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder getOnlySoftDeleted()
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder onlyTrashed()
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withoutTrashed()
+ *
+ * Eager load/aggregat
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder with(string|string[] $relations)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|string[] $relations)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null)
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withSum(string|string[] $relation, string $column, ?string $alias = null)
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withAvg(string|string[] $relation, string $column, ?string $alias = null)
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withMin(string|string[] $relation, string $column, ?string $alias = null)
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withMax(string|string[] $relation, string $column, ?string $alias = null)
- * @method static \Radix\Database\QueryBuilder\QueryBuilder withAggregate(string|string[] $relation, string $column, string $fn, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withSum(string $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withAvg(string $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withMin(string $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withMax(string $relation, string $column, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withAggregate(string $relation, string $column, string $fn, ?string $alias = null)
  */
-
 abstract class Model implements JsonSerializable
 {
     protected string $primaryKey = 'id'; // Standard primärnyckel

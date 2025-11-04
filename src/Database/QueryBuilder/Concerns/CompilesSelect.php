@@ -54,13 +54,9 @@ trait CompilesSelect
             $this->columns = [];
         }
 
-        if (method_exists($this, 'addSelectBinding')) {
-            // sub->getBindings() hör snarare till select-bucket
-            foreach ($sub->getBindings() as $b) {
-                $this->addSelectBinding($b);
-            }
-        } else {
-            $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        // Lägg subqueryns bindningar i select-bucket (Bindings-trait finns alltid)
+        foreach ($sub->getBindings() as $b) {
+            $this->addSelectBinding($b);
         }
 
         $this->columns[] = '(' . $sub->toSql() . ') AS ' . $this->wrapAlias($alias);
@@ -121,9 +117,7 @@ trait CompilesSelect
             $sql .= ' ' . implode(' ', $this->unions);
         }
 
-        if (method_exists($this, 'compileAllBindings')) {
-            $this->compileAllBindings();
-        }
+        $this->compileAllBindings();
 
         return $sql;
     }

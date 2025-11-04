@@ -8,10 +8,8 @@ trait Bindings
 {
     public function getBindings(): array
     {
-        // Se till att bindings är uppdaterade från buckets
-        if (method_exists($this, 'compileAllBindings')) {
-            $this->compileAllBindings();
-        }
+        // Compila alltid – metoden finns på QueryBuilder
+        $this->compileAllBindings();
         return $this->bindings;
     }
 

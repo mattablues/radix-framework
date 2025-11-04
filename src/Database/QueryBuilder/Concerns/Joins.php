@@ -49,13 +49,8 @@ trait Joins
     public function joinRaw(string $raw, array $bindings = []): self
     {
         $this->joins[] = $raw;
-
-        if (method_exists($this, 'addJoinBindings')) {
-            $this->addJoinBindings($bindings);
-        } else {
-            $this->bindings = array_merge($this->bindings, $bindings);
-        }
-
+        // Lägg direkt i join-bucket (Bindings-trait finns alltid)
+        $this->addJoinBindings($bindings);
         return $this;
     }
 }

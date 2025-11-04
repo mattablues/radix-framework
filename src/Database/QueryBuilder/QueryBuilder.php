@@ -160,7 +160,6 @@ class QueryBuilder extends AbstractQueryBuilder
         ));
     }
 
-    // ... existing code ...
     public function value(string $column): mixed
     {
         $this->limit(1);
@@ -172,5 +171,25 @@ class QueryBuilder extends AbstractQueryBuilder
         // Hämta första nyckeln om alias/namn okänd
         $values = array_values($row);
         return $values[0] ?? null;
+    }
+
+    public function pluck(string $column, ?string $key = null): array
+    {
+        $this->select([$column]);
+        $rows = $this->connection->fetchAll($this->toSql(), $this->getBindings());
+
+        if ($key === null) {
+            return array_map(static function (array $row) {
+                $vals = array_values($row);
+                return $vals[0] ?? null;
+            }, $rows);
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            $vals = array_values($row);
+            $out[$row[$key] ?? null] = $vals[0] ?? null;
+        }
+        return $out;
     }
 }
