@@ -23,6 +23,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder fromRaw(string $raw) Ange FROM som rått uttryck/subquery.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder select(string|string[] $columns = ['*']) Kolumner.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder selectRaw(string $expression) Rå SELECT-uttryck.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder selectSub(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $alias) Subquery i SELECT.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder distinct(bool $value = true) DISTINCT.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder toSql() Generera SQL.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder getBindings() Hämta bindningar.
@@ -31,6 +32,16 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static array                                                pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
  * @method static array                                                get() Hämta resultat (hydreras till modeller).
  * @method static mixed                                                first() Första raden (modell eller null).
+ *
+ * Paginering/Sök
+ * @method static array paginate(int $perPage = 10, int $currentPage = 1)
+ * @method static array simplePaginate(int $perPage = 10, int $currentPage = 1)
+ * @method static array search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1)
+ * @method static bool  exists()
+ *
+ * Limit/Offset
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder limit(int $limit)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder offset(int $offset)
  *
  * Where/Filter
  * @method static \Radix\Database\QueryBuilder\QueryBuilder where(string|\Radix\Database\QueryBuilder\QueryBuilder|\Closure $column, ?string $operator = null, mixed $value = null, string $boolean = 'AND')
@@ -66,13 +77,6 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * Union
  * @method static \Radix\Database\QueryBuilder\QueryBuilder union(self|\Radix\Database\QueryBuilder\QueryBuilder $query, bool $all = false)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder unionAll(self|\Radix\Database\QueryBuilder\QueryBuilder $query)
- *
- * Subselect
- * @method static \Radix\Database\QueryBuilder\QueryBuilder selectSub(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $alias)
- *
- * Paginering/Sök
- * @method static array paginate(int $perPage = 10, int $currentPage = 1)
- * @method static array search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1)
  *
  * Aggregatfunktioner (SELECT)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder count(string $column = '*', string $alias = 'count')
