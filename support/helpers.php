@@ -222,8 +222,20 @@ if (!function_exists('replace_placeholder')) {
 if (!function_exists('thumb')) {
     function thumb(string $path): string
     {
-        extract(pathinfo($path));
-        return "$dirname/$filename.thumb.$extension";
+        $info = pathinfo($path);
+
+        $dir = $info['dirname'] ?? '';
+        $name = $info['filename'] ?? '';
+        $ext = $info['extension'] ?? '';
+
+        // Bygg basnamn "filename.thumb"
+        $thumbBase = $name . '.thumb';
+
+        // Om extension finns, lägg till den; annars utan punkt
+        $thumbName = $ext !== '' ? $thumbBase . '.' . $ext : $thumbBase;
+
+        // Hantera fall där dirname saknas (t.ex. "image.jpg")
+        return ($dir !== '' && $dir !== '.') ? $dir . '/' . $thumbName : $thumbName;
     }
 }
 
