@@ -66,11 +66,23 @@ trait CompilesSelect
     public function toSql(): string
     {
         if ($this->type === 'INSERT' || $this->type === 'UPDATE' || $this->type === 'DELETE') {
-            return $this->compileMutationSql();
+            // Anropa direkt – traits finns alltid
+            $cte = $this->compileCtePrefix();
+            $sql = $this->compileMutationSql();
+            if ($cte !== '') {
+                $sql = $cte . ' ' . $sql;
+            }
+            return $sql;
         }
 
         if ($this->type !== 'SELECT') {
             throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
+        }
+
+        // Window-uttryck (traits finns alltid)
+        $windowExpr = $this->compileWindowSelects();
+        if (!empty($windowExpr)) {
+            $this->columns = array_merge($this->columns, $windowExpr);
         }
 
         $distinct = $this->distinct ? 'DISTINCT ' : '';
@@ -82,7 +94,11 @@ trait CompilesSelect
             return $this->wrapColumn($col);
         }, $this->columns));
 
-        $sql = "SELECT $distinct$columns FROM $this->table";
+        // CTE-prefix direkt
+        $ctePrefix = $this->compileCtePrefix();
+        $prefix = $ctePrefix !== '' ? $ctePrefix . ' ' : '';
+
+        $sql = $prefix . "SELECT $distinct$columns FROM $this->table";
 
         if (!empty($this->joins)) {
             $sql .= ' ' . implode(' ', $this->joins);
@@ -115,6 +131,11 @@ trait CompilesSelect
 
         if (!empty($this->unions)) {
             $sql .= ' ' . implode(' ', $this->unions);
+        }
+
+        // Lås-suffix (trait finns alltid)
+        if ($this->lockMode !== null) {
+            $sql .= $this->compileLockSuffix();
         }
 
         $this->compileAllBindings();

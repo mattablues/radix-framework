@@ -13,15 +13,21 @@ use Radix\Database\QueryBuilder\Concerns\CompilesSelect;
 use Radix\Database\QueryBuilder\Concerns\EagerLoad;
 use Radix\Database\QueryBuilder\Concerns\Functions;
 use Radix\Database\QueryBuilder\Concerns\Joins;
+use Radix\Database\QueryBuilder\Concerns\Locks;
 use Radix\Database\QueryBuilder\Concerns\Ordering;
 use Radix\Database\QueryBuilder\Concerns\Pagination;
 use Radix\Database\QueryBuilder\Concerns\SoftDeletes;
 use Radix\Database\QueryBuilder\Concerns\Transactions;
 use Radix\Database\QueryBuilder\Concerns\Unions;
+use Radix\Database\QueryBuilder\Concerns\Windows;
+use Radix\Database\QueryBuilder\Concerns\WithCtes;
 use Radix\Database\QueryBuilder\Concerns\Wrapping;
 
 class QueryBuilder extends AbstractQueryBuilder
 {
+    use WithCtes;
+    use Locks;
+    use Windows;
     use Wrapping;
     use BuildsWhere;
     use Bindings;
@@ -56,10 +62,10 @@ class QueryBuilder extends AbstractQueryBuilder
     protected bool $withSoftDeletes = false;
     protected array $withCountRelations = [];
     protected array $withAggregateExpressions = [];
-    protected ?array $upsertUnique = null; // för UPSERT
-    protected ?array $upsertUpdate = null;  // för UPSERT
+    protected ?array $upsertUnique = null;
+    protected ?array $upsertUpdate = null;
 
-    // NYTT: separata binding-buckets
+    // Befintliga buckets (behåll namnen)
     protected array $bindingsSelect = [];
     protected array $bindingsWhere = [];
     protected array $bindingsJoin = [];
@@ -146,19 +152,27 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     // Hjälp: sätt samman alla buckets till $this->bindings innan körning
-    protected function compileAllBindings(): void
-    {
-        $this->bindings = array_values(array_merge(
-            // För UPDATE/INSERT/DELETE ska SET/VALUES (mutation) komma före WHERE
-            $this->bindingsMutation,
-            $this->bindingsSelect,
-            $this->bindingsJoin,
-            $this->bindingsWhere,
-            $this->bindingsHaving,
-            $this->bindingsOrder,
-            $this->bindingsUnion
-        ));
-    }
+       protected function compileAllBindings(): void
+        {
+            $bindings = [];
+
+            // CTE-bindningar först (traits finns alltid)
+            $bindings = array_merge($bindings, $this->compileCteBindings());
+
+            // Viktigt: mutation före where (för att få SET-bindningar före WHERE-bindningar)
+            $bindings = array_merge(
+                $bindings,
+                $this->bindingsMutation ?? [],
+                $this->bindingsWhere ?? [],
+                $this->bindingsJoin ?? [],
+                $this->bindingsHaving ?? [],
+                $this->bindingsUnion ?? [],
+                $this->bindingsSelect ?? [],
+                $this->bindingsOrder ?? []
+            );
+
+            $this->bindings = $bindings;
+        }
 
     public function value(string $column): mixed
     {
