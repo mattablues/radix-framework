@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use Radix\Database\QueryBuilder\QueryBuilder;
+
 trait CompilesSelect
 {
     public function select(array|string $columns = ['*']): self
@@ -45,10 +47,20 @@ trait CompilesSelect
         return $this;
     }
 
+    // NYTT: selectSub
+    public function selectSub(QueryBuilder $sub, string $alias): self
+    {
+        if ($this->columns === ['*']) {
+            $this->columns = [];
+        }
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        $this->columns[] = '(' . $sub->toSql() . ') AS ' . $this->wrapAlias($alias);
+        return $this;
+    }
+
     public function toSql(): string
     {
         if ($this->type === 'INSERT' || $this->type === 'UPDATE' || $this->type === 'DELETE') {
-            // Delegera till mutationskompileringen som kommer från CompilesMutations-traitet
             return $this->compileMutationSql();
         }
 
@@ -59,7 +71,7 @@ trait CompilesSelect
         $distinct = $this->distinct ? 'DISTINCT ' : '';
 
         $columns = implode(', ', array_map(function ($col) {
-            if (preg_match('/[A-Z]+\(/i', $col) || str_starts_with($col, 'COUNT') || str_contains($col, 'NOW')) {
+            if (preg_match('/[A-Z]+\(/i', $col) || str_starts_with($col, 'COUNT') || str_contains($col, 'NOW') || str_starts_with($col, '(')) {
                 return $col;
             }
             return $this->wrapColumn($col);
@@ -98,6 +110,10 @@ trait CompilesSelect
 
         if (!empty($this->unions)) {
             $sql .= ' ' . implode(' ', $this->unions);
+        }
+
+        if (method_exists($this, 'compileAllBindings')) {
+            $this->compileAllBindings();
         }
 
         return $sql;

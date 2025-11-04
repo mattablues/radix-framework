@@ -26,6 +26,12 @@ trait Joins
         return $this;
     }
 
+    public function rightJoin(string $table, string $first, string $operator, string $second): self
+    {
+        $this->joins[] = "RIGHT JOIN " . $this->wrapColumn($table) . " ON " . $this->wrapColumn($first) . " $operator " . $this->wrapColumn($second);
+        return $this;
+    }
+
     public function joinSub(
         QueryBuilder $subQuery,
         string $alias,
@@ -35,8 +41,15 @@ trait Joins
         string $type = 'INNER'
     ): self {
         $subQuerySql = '(' . $subQuery->toSql() . ') AS ' . $this->wrapAlias($alias);
-        $this->bindings = array_merge($this->bindings, $subQuery->getBindings());
+        $this->mergeBindings($subQuery);
         $this->joins[] = "$type JOIN $subQuerySql ON " . $this->wrapColumn($first) . " $operator " . $this->wrapColumn($second);
+        return $this;
+    }
+
+    public function joinRaw(string $raw, array $bindings = []): self
+    {
+        $this->joins[] = $raw;
+        $this->addJoinBindings($bindings);
         return $this;
     }
 }

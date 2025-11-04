@@ -24,7 +24,32 @@ trait Ordering
     {
         $formattedColumn = $this->wrapAlias($column);
         $this->having = "$formattedColumn $operator ?";
-        $this->bindings[] = $value;
+        $this->addHavingBinding($value);
+        return $this;
+    }
+
+    public function havingRaw(string $expression, array $bindings = []): self
+    {
+        $this->having = $expression;
+        $this->addHavingBindings($bindings);
+        return $this;
+    }
+
+    public function orderByRaw(string $expression): self
+    {
+        $this->orderBy[] = $expression;
+        return $this;
+    }
+
+    public function orderByNullsLast(string $column, string $direction = 'ASC'): self
+    {
+        $this->orderBy[] = $this->wrapColumn($column) . " $direction NULLS LAST";
+        return $this;
+    }
+
+    public function orderByNullsFirst(string $column, string $direction = 'ASC'): self
+    {
+        $this->orderBy[] = $this->wrapColumn($column) . " $direction NULLS FIRST";
         return $this;
     }
 }

@@ -8,45 +8,95 @@ trait Bindings
 {
     public function getBindings(): array
     {
+        // Se till att bindings är uppdaterade från buckets
+        if (method_exists($this, 'compileAllBindings')) {
+            $this->compileAllBindings();
+        }
         return $this->bindings;
     }
 
-    protected function setBindings(array $data): void
+    public function clearBindings(): void
     {
-        $this->bindings = array_values($data);
+        $this->bindings = [];
+        $this->bindingsSelect = [];
+        $this->bindingsWhere = [];
+        $this->bindingsJoin = [];
+        $this->bindingsHaving = [];
+        $this->bindingsOrder = [];
+        $this->bindingsUnion = [];
+        $this->bindingsMutation = [];
     }
 
-    protected function setWhereBindings(): void
+    public function mergeBindings(self $query): void
     {
-        $whereBindings = $this->extractWhereBindings();
-
-        $this->bindings = array_merge(
-            $this->bindings,
-            array_filter($whereBindings, fn($binding) => !in_array($binding, $this->bindings, true))
-        );
+        // Slå ihop buckets var för sig
+        $this->bindingsSelect = array_merge($this->bindingsSelect, $query->bindingsSelect ?? []);
+        $this->bindingsJoin   = array_merge($this->bindingsJoin,   $query->bindingsJoin   ?? []);
+        $this->bindingsWhere  = array_merge($this->bindingsWhere,  $query->bindingsWhere  ?? []);
+        $this->bindingsHaving = array_merge($this->bindingsHaving, $query->bindingsHaving ?? []);
+        $this->bindingsOrder  = array_merge($this->bindingsOrder,  $query->bindingsOrder  ?? []);
+        $this->bindingsUnion  = array_merge($this->bindingsUnion,  $query->bindingsUnion  ?? []);
+        $this->bindingsMutation = array_merge($this->bindingsMutation, $query->bindingsMutation ?? []);
     }
 
-    protected function getWhereBindings(): array
+    // Hjälpare för att lägga bindings i rätt bucket
+    protected function addSelectBinding(mixed $value): void
     {
-        $whereBindings = [];
-        foreach ($this->where as $condition) {
-            if (isset($condition['value']) && $condition['value'] === '?') {
-                $whereBindings = array_merge($whereBindings, $this->bindings);
-            }
+        $this->bindingsSelect[] = $value;
+    }
+
+    protected function addWhereBinding(mixed $value): void
+    {
+        $this->bindingsWhere[] = $value;
+    }
+
+    protected function addWhereBindings(array $values): void
+    {
+        foreach ($values as $v) {
+            $this->bindingsWhere[] = $v;
         }
-        return $whereBindings;
     }
 
-    protected function extractWhereBindings(): array
+    protected function addJoinBinding(mixed $value): void
     {
-        $bindings = [];
+        $this->bindingsJoin[] = $value;
+    }
 
-        foreach ($this->where as $condition) {
-            if ($condition['type'] === 'basic' && $condition['value'] === '?') {
-                $bindings[] = $this->bindings[count($bindings)] ?? null;
-            }
+    protected function addJoinBindings(array $values): void
+    {
+        foreach ($values as $v) {
+            $this->bindingsJoin[] = $v;
         }
+    }
 
-        return $bindings;
+    protected function addHavingBinding(mixed $value): void
+    {
+        $this->bindingsHaving[] = $value;
+    }
+
+    protected function addHavingBindings(array $values): void
+    {
+        foreach ($values as $v) {
+            $this->bindingsHaving[] = $v;
+        }
+    }
+
+    protected function addOrderBinding(mixed $value): void
+    {
+        $this->bindingsOrder[] = $value;
+    }
+
+    protected function addUnionBindings(array $values): void
+    {
+        foreach ($values as $v) {
+            $this->bindingsUnion[] = $v;
+        }
+    }
+
+    protected function addMutationBindings(array $values): void
+    {
+        foreach ($values as $v) {
+            $this->bindingsMutation[] = $v;
+        }
     }
 }

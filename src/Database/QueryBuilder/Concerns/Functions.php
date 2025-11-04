@@ -184,4 +184,24 @@ trait Functions
         $this->columns[] = "ABS($column) AS `$alias`";
         return $this;
     }
+
+    // Hjälpare: pluck
+    public function pluck(string $column, ?string $key = null): array
+    {
+        $this->select([$column]);
+        $rows = $this->connection->fetchAll($this->toSql(), $this->bindings);
+        if ($key === null) {
+            return array_map(function ($row) {
+                $values = array_values($row);
+                return $values[0] ?? null;
+            }, $rows);
+        }
+        $result = [];
+        foreach ($rows as $row) {
+            $vals = array_values($row);
+            $val = $vals[0] ?? null;
+            $result[$row[$key] ?? null] = $val;
+        }
+        return $result;
+    }
 }

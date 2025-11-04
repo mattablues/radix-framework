@@ -56,6 +56,17 @@ class QueryBuilder extends AbstractQueryBuilder
     protected bool $withSoftDeletes = false;
     protected array $withCountRelations = [];
     protected array $withAggregateExpressions = [];
+    protected ?array $upsertUnique = null; // för UPSERT
+    protected ?array $upsertUpdate = null;  // för UPSERT
+
+    // NYTT: separata binding-buckets
+    protected array $bindingsSelect = [];
+    protected array $bindingsWhere = [];
+    protected array $bindingsJoin = [];
+    protected array $bindingsHaving = [];
+    protected array $bindingsOrder = [];
+    protected array $bindingsUnion = [];
+    protected array $bindingsMutation = [];
 
     public function setModelClass(string $modelClass): self
     {
@@ -132,5 +143,20 @@ class QueryBuilder extends AbstractQueryBuilder
     {
         $this->offset = $offset;
         return $this;
+    }
+
+    // Hjälp: sätt samman alla buckets till $this->bindings innan körning
+    protected function compileAllBindings(): void
+    {
+        $this->bindings = array_values(array_merge(
+            // För UPDATE/INSERT/DELETE ska SET/VALUES (mutation) komma före WHERE
+            $this->bindingsMutation,
+            $this->bindingsSelect,
+            $this->bindingsJoin,
+            $this->bindingsWhere,
+            $this->bindingsHaving,
+            $this->bindingsOrder,
+            $this->bindingsUnion
+        ));
     }
 }

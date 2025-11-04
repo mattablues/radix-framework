@@ -25,6 +25,12 @@ trait Wrapping
         return preg_match('/^`.*`$/', $alias) ? $alias : "`$alias`";
     }
 
+    protected function wrapTable(string $table): string
+    {
+        return $this->wrapAlias($table);
+    }
+
+    // ... existing code ...
     public function testWrapColumn(string $column): string
     {
         return $this->wrapColumn($column);
@@ -33,5 +39,12 @@ trait Wrapping
     public function testWrapAlias(string $alias): string
     {
         return $this->wrapAlias($alias);
+    }
+
+    // Hjälp för att kunna sätta FROM som raw (subquery/cte)
+    public function fromRaw(string $raw): self
+    {
+        $this->table = $raw;
+        return $this;
     }
 }

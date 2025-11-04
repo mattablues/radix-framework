@@ -11,18 +11,16 @@ trait BuildsWhere
     public function where(string|QueryBuilder|\Closure $column, string $operator = null, mixed $value = null, string $boolean = 'AND'): self
     {
         if ($column instanceof \Closure) {
-            // Hanterar Closure som skickas för inkapslade villkor
-            $query = new \Radix\Database\QueryBuilder\QueryBuilder(); // Skapa en ny instans av QueryBuilder
+            $query = new \Radix\Database\QueryBuilder\QueryBuilder();
             $column($query);
 
-            // Kontrollera om några WHERE-betingelser skapades i underfrågan
             if (!empty($query->where)) {
                 $this->where[] = [
                     'type' => 'nested',
                     'query' => $query,
                     'boolean' => $boolean
                 ];
-                $this->bindings = array_merge($this->bindings, $query->getBindings());
+                $this->mergeBindings($query); // istället för array_merge($this->bindings...)
             }
         } else {
             if (empty(trim($column))) {
@@ -34,7 +32,6 @@ trait BuildsWhere
                 throw new \InvalidArgumentException("Invalid operator '$operator' in WHERE clause.");
             }
 
-            // Hantera "IS NULL" och "IS NOT NULL"
             if (strtoupper($operator) === 'IS' || strtoupper($operator) === 'IS NOT') {
                 $this->where[] = [
                     'type' => 'raw',
@@ -44,9 +41,8 @@ trait BuildsWhere
                     'boolean' => $boolean,
                 ];
             } elseif ($value instanceof QueryBuilder) {
-                // Subqueries stöds här
                 $valueSql = '(' . $value->toSql() . ')';
-                $this->bindings = array_merge($this->bindings, $value->getBindings());
+                $this->mergeBindings($value);
                 $this->where[] = [
                     'type' => 'subquery',
                     'column' => $this->wrapColumn($column),
@@ -55,8 +51,7 @@ trait BuildsWhere
                     'boolean' => $boolean,
                 ];
             } else {
-                // Hantera direktvärden
-                $this->bindings[] = $value;
+                $this->addWhereBinding($value);
                 $this->where[] = [
                     'type' => 'raw',
                     'column' => $this->wrapColumn($column),
@@ -86,11 +81,12 @@ trait BuildsWhere
             'boolean' => $boolean,
         ];
 
-        $this->bindings = array_merge($this->bindings, $values);
+        $this->addWhereBindings($values);
 
         return $this;
     }
 
+    // ... existing code ...
     public function orWhere(string $column, string $operator, mixed $value): self
     {
         return $this->where($column, $operator, $value, 'OR');
@@ -151,6 +147,107 @@ trait BuildsWhere
         return $this->whereNotNull($column, 'OR');
     }
 
+    // NYTT: whereNotIn
+    public function whereNotIn(string $column, array $values, string $boolean = 'AND'): self
+    {
+        if (empty($values)) {
+            throw new \InvalidArgumentException("Argumentet 'values' måste innehålla minst ett värde för whereNotIn.");
+        }
+        $placeholders = implode(', ', array_fill(0, count($values), '?'));
+        $this->where[] = [
+            'type' => 'list',
+            'column' => $this->wrapColumn($column),
+            'operator' => 'NOT IN',
+            'value' => "($placeholders)",
+            'boolean' => $boolean,
+        ];
+        $this->bindings = array_merge($this->bindings, $values);
+        return $this;
+    }
+
+    // NYTT: whereBetween / whereNotBetween
+    public function whereBetween(string $column, array $range, string $boolean = 'AND'): self
+    {
+        if (count($range) !== 2) {
+            throw new \InvalidArgumentException('whereBetween kräver exakt två värden.');
+        }
+        $this->where[] = [
+            'type' => 'between',
+            'column' => $this->wrapColumn($column),
+            'operator' => 'BETWEEN',
+            'value' => '? AND ?',
+            'boolean' => $boolean,
+        ];
+        $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
+        return $this;
+    }
+
+    public function whereNotBetween(string $column, array $range, string $boolean = 'AND'): self
+    {
+        if (count($range) !== 2) {
+            throw new \InvalidArgumentException('whereNotBetween kräver exakt två värden.');
+        }
+        $this->where[] = [
+            'type' => 'between',
+            'column' => $this->wrapColumn($column),
+            'operator' => 'NOT BETWEEN',
+            'value' => '? AND ?',
+            'boolean' => $boolean,
+        ];
+        $this->bindings = array_merge($this->bindings, [$range[0], $range[1]]);
+        return $this;
+    }
+
+    // NYTT: whereColumn (kolumn till kolumn)
+    public function whereColumn(string $left, string $operator, string $right, string $boolean = 'AND'): self
+    {
+        $this->where[] = [
+            'type' => 'column',
+            'column' => $this->wrapColumn($left),
+            'operator' => $operator,
+            'value' => $this->wrapColumn($right),
+            'boolean' => $boolean,
+        ];
+        return $this;
+    }
+
+    // NYTT: whereExists / whereNotExists
+    public function whereExists(QueryBuilder $sub, string $boolean = 'AND'): self
+    {
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        $this->where[] = [
+            'type' => 'exists',
+            'operator' => 'EXISTS',
+            'value' => '(' . $sub->toSql() . ')',
+            'boolean' => $boolean,
+        ];
+        return $this;
+    }
+
+    public function whereNotExists(QueryBuilder $sub, string $boolean = 'AND'): self
+    {
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
+        $this->where[] = [
+            'type' => 'exists',
+            'operator' => 'NOT EXISTS',
+            'value' => '(' . $sub->toSql() . ')',
+            'boolean' => $boolean,
+        ];
+        return $this;
+    }
+
+    // NYTT: whereRaw
+    public function whereRaw(string $sql, array $bindings = [], string $boolean = 'AND'): self
+    {
+        $this->where[] = [
+            'type' => 'raw_sql',
+            'sql' => $sql,
+            'boolean' => $boolean,
+        ];
+        $this->bindings = array_merge($this->bindings, $bindings);
+        return $this;
+    }
+
     protected function buildWhere(): string
     {
         if (empty($this->where)) {
@@ -168,6 +265,22 @@ trait BuildsWhere
                     } else {
                         $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");
                     }
+                    break;
+
+                case 'between':
+                    $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");
+                    break;
+
+                case 'column':
+                    $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");
+                    break;
+
+                case 'exists':
+                    $conditions[] = trim("{$condition['boolean']} {$condition['operator']} {$condition['value']}");
+                    break;
+
+                case 'raw_sql':
+                    $conditions[] = trim("{$condition['boolean']} ({$condition['sql']})");
                     break;
 
                 case 'nested':

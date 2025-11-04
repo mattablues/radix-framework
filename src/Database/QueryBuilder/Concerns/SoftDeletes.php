@@ -30,4 +30,15 @@ trait SoftDeletes
     {
         return $this->whereNotNull('deleted_at');
     }
+
+    public function onlyTrashed(): self
+    {
+        return $this->getOnlySoftDeleted();
+    }
+
+    public function withoutTrashed(): self
+    {
+        // default-beteende: se endast ej soft-deletade
+        return $this->whereNull('deleted_at');
+    }
 }

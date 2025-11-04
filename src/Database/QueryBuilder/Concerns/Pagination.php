@@ -13,8 +13,15 @@ trait Pagination
      */
     public function exists(): bool
     {
-        $this->selectRaw('1')->limit(1);
-        $result = $this->connection->fetchOne($this->toSql(), $this->bindings);
+        // Arbeta på klon men låt WHERE + bindningar vara kvar
+        $q = clone $this;
+        $q->columns = [];
+        $q->orderBy = [];
+        $q->limit = 1;
+        $q->offset = null;
+        $q->selectRaw('1');
+
+        $result = $this->connection->fetchOne($q->toSql(), $q->getBindings());
         return $result !== null;
     }
 
@@ -38,7 +45,7 @@ trait Pagination
         $countQuery->selectRaw('COUNT(*) as total');
 
         $countResult = $this->connection->fetchOne($countQuery->toSql(), $countQuery->getBindings());
-        $totalRecords = $countResult['total'] ?? 0;
+        $totalRecords = (int)($countResult['total'] ?? 0);
 
         $lastPage = (int) ceil($totalRecords / $perPage);
 
@@ -110,7 +117,7 @@ trait Pagination
         $countQuery->selectRaw('COUNT(*) as total');
 
         $countResult = $this->connection->fetchOne($countQuery->toSql(), $countQuery->getBindings());
-        $totalRecords = $countResult['total'] ?? 0;
+        $totalRecords = (int)($countResult['total'] ?? 0);
 
         $lastPage = (int) ceil($totalRecords / $perPage);
         if ($currentPage > $lastPage && $lastPage > 0) {
@@ -140,6 +147,7 @@ trait Pagination
      */
     public function debugSql(): string
     {
+        // Återanvänd nuvarande bindings (buckets compilas i toSql/compileAllBindings)
         $query = $this->toSql();
         foreach ($this->bindings as $binding) {
             $replacement = is_string($binding) ? "'" . addslashes($binding) . "'" : $binding;
