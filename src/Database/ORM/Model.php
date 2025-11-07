@@ -33,6 +33,10 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static array                                           get() Hämta resultat (hydreras till modeller).
  * @method static mixed                                           first() Första raden (modell eller null).
  *
+ * Snabba hämtningar
+ * @method static array                                           fetchAllRaw() Hämta alla rader som assoc-arrayer (utan modell-hydrering).
+ * @method static array|null                                      fetchRaw() Hämta första raden som assoc-array(utan modell-hydrering) eller null.
+ *
  * Paginering/Sök
  * @method static array paginate(int $perPage = 10, int $currentPage = 1)
  * @method static array simplePaginate(int $perPage = 10, int $currentPage = 1)
