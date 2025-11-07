@@ -35,4 +35,30 @@ class StringHelper
         // Returnera originalnamnet om inget behöver ändras
         return $tableName;
     }
+
+    /**
+     * Pluralize a word using simple rules + same irregular map.
+     */
+    public static function pluralize(string $word): string
+    {
+        $config = new Config(include dirname(__DIR__, 3) . '/config/pluralization.php');
+        $irregularWords = $config->get('irregular', []);
+
+        $lower = strtolower($word);
+
+        // Om oregelbunden mappning finns (direkt sträng), använd den.
+        if (isset($irregularWords[$lower]) && is_string($irregularWords[$lower])) {
+            // För ord som "status" där singular==plural, returnera värdet.
+            return $irregularWords[$lower];
+        }
+
+        // Enkla regler
+        if (preg_match('/(s|x|z|ch|sh)$/i', $word)) {
+            return $word . 'es';
+        }
+        if (preg_match('/[^aeiou]y$/i', $word)) {
+            return substr($word, 0, -1) . 'ies';
+        }
+        return $word . 's';
+    }
 }
