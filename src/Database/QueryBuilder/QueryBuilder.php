@@ -125,6 +125,30 @@ class QueryBuilder extends AbstractQueryBuilder
         return parent::get();
     }
 
+    /**
+     * Hämta alla rader som assoc-arrayer (utan modell-hydrering).
+     */
+    public function fetchAllRaw(): array
+    {
+        if ($this->connection === null) {
+            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
+        }
+        $sql = $this->toSql();
+        return $this->connection->fetchAll($sql, $this->bindings);
+    }
+
+    /**
+     * Hämta första raden som assoc-array (utan modell-hydrering) eller null.
+     */
+    public function fetchRaw(): ?array
+    {
+        if ($this->connection === null) {
+            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
+        }
+        $sql = $this->toSql();
+        return $this->connection->fetchOne($sql, $this->bindings);
+    }
+
     public function from(string $table): self
     {
         $table = trim($table);
