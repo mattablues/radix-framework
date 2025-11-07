@@ -147,11 +147,27 @@ trait Pagination
      */
     public function debugSql(): string
     {
-        // Återanvänd nuvarande bindings (buckets compilas i toSql/compileAllBindings)
+        // Visa parametriserad SQL (behåll frågetecken)
+        return $this->toSql();
+    }
+
+    public function debugSqlInterpolated(): string
+    {
+        // Visa “prettified” SQL med insatta värden (endast för debug)
         $query = $this->toSql();
-        foreach ($this->bindings as $binding) {
-            $replacement = is_string($binding) ? "'" . addslashes($binding) . "'" : $binding;
-            $query = preg_replace('/\?/', (string)$replacement, $query, 1);
+        foreach ($this->getBindings() as $binding) {
+            if (is_string($binding)) {
+                $replacement = "'" . addslashes($binding) . "'";
+            } elseif (is_null($binding)) {
+                $replacement = 'NULL';
+            } elseif (is_bool($binding)) {
+                $replacement = $binding ? '1' : '0';
+            } elseif ($binding instanceof \DateTimeInterface) {
+                $replacement = "'" . $binding->format('Y-m-d H:i:s') . "'";
+            } else {
+                $replacement = (string)$binding;
+            }
+            $query = preg_replace('/\?/', $replacement, $query, 1);
         }
         return $query;
     }
