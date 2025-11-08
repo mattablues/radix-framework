@@ -222,22 +222,26 @@ class QueryBuilder extends AbstractQueryBuilder
         return $values[0] ?? null;
     }
 
-    public function pluck(string $column, ?string $key = null): array
+    public function pluck(string $valueColumn, ?string $keyColumn = null): array
     {
-        $this->select([$column]);
+        if ($keyColumn === null) {
+            $this->select([$valueColumn]);
+        } else {
+            // Se till att båda kolumnerna hämtas
+            $this->select([$valueColumn, $keyColumn]);
+        }
+
         $rows = $this->connection->fetchAll($this->toSql(), $this->getBindings());
 
-        if ($key === null) {
-            return array_map(static function (array $row) {
-                $vals = array_values($row);
-                return $vals[0] ?? null;
+        if ($keyColumn === null) {
+            return array_map(static function (array $row) use ($valueColumn) {
+                return $row[$valueColumn] ?? null;
             }, $rows);
         }
 
         $out = [];
         foreach ($rows as $row) {
-            $vals = array_values($row);
-            $out[$row[$key] ?? null] = $vals[0] ?? null;
+            $out[$row[$keyColumn] ?? null] = $row[$valueColumn] ?? null;
         }
         return $out;
     }
