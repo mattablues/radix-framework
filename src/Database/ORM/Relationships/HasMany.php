@@ -16,7 +16,7 @@ class HasMany
     private string $foreignKey;
     private string $localKeyName;
     private ?Model $parent = null;
-    private ?QueryBuilder $builder = null; // ny: relationens QB
+    private ?QueryBuilder $builder = null;
 
     public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
     {
@@ -37,7 +37,6 @@ class HasMany
         return $this;
     }
 
-        // Ny: exponera en QueryBuilder med förifyllt WHERE foreignKey = parent.localKey
     public function query(): QueryBuilder
     {
         if ($this->builder instanceof QueryBuilder) {
@@ -53,7 +52,6 @@ class HasMany
             ->setModelClass($this->modelClass)
             ->from($table);
 
-        // Sätt standardvillkor baserat på parent
         if ($this->parent !== null) {
             $value = $this->parent->getAttribute($this->localKeyName);
             if ($value !== null) {
@@ -67,9 +65,9 @@ class HasMany
 
     public function get(): array
     {
-        // Använd builder om query() har anropats (då gäller constraints från with-closure)
         if ($this->builder instanceof QueryBuilder) {
-            return $this->builder->get();
+            $col = $this->builder->get();
+            return $col->toArray();
         }
 
         $modelClass = $this->resolveModelClass($this->modelClass);
@@ -97,7 +95,7 @@ class HasMany
         if (empty($results)) {
             return null;
         }
-        return reset($results);
+        return $results[0];
     }
 
     private function resolveModelClass(string $classOrTable): string

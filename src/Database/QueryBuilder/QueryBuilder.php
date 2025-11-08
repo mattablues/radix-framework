@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder;
 
+use Radix\Collection\Collection;
 use Radix\Database\QueryBuilder\Concerns\Aggregates\WithAggregate;
 use Radix\Database\QueryBuilder\Concerns\Aggregates\WithCount;
 use Radix\Database\QueryBuilder\Concerns\Bindings;
@@ -98,13 +99,13 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         $this->limit(1);
-        $results = $this->get();
+        $results = $this->get(); // alltid Collection
 
-        if (empty($results)) {
+        if ($results->isEmpty()) {
             return null;
         }
 
-        $result = $results[0];
+        $result = $results->first();
 
         if (!$result instanceof $this->modelClass) {
             $modelInstance = new $this->modelClass();
@@ -117,12 +118,14 @@ class QueryBuilder extends AbstractQueryBuilder
         return $result;
     }
 
-    public function get(): array
+    public function get(): Collection
     {
         if (is_null($this->modelClass)) {
             throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
         }
-        return parent::get();
+
+        $rows = parent::get();
+        return $rows instanceof Collection ? $rows : new Collection($rows);
     }
 
     /**

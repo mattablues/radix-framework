@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Database\ORM;
 
 use JsonSerializable;
+use Radix\Collection\Collection;
 use Radix\Database\DatabaseManager;
 use Radix\Database\ORM\Relationships\BelongsTo;
 use Radix\Database\ORM\Relationships\BelongsToMany;
@@ -25,17 +26,17 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder selectRaw(string $expression) Rå SELECT-uttryck.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder selectSub(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $alias) Subquery i SELECT.
  * @method static \Radix\Database\QueryBuilder\QueryBuilder distinct(bool $value = true) DISTINCT.
- * @method static string                                          toSql() Generera SQL.
- * @method static array                                           getBindings() Hämta bindningar.
- * @method static string                                          debugSql() SQL med interpolerade bindningar.
- * @method static mixed                                           value(string $column) Hämta ett enda värde.
- * @method static array                                           pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
- * @method static array                                           get() Hämta resultat (hydreras till modeller).
- * @method static mixed                                           first() Första raden (modell eller null).
+ * @method static string                                    toSql() Generera SQL.
+ * @method static array                                     getBindings() Hämta bindningar.
+ * @method static string                                    debugSql() SQL med interpolerade bindningar.
+ * @method static mixed                                     value(string $column) Hämta ett enda värde.
+ * @method static array                                     pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
+ * @method static array                                     get() Hämta resultat (hydreras till modeller).
+ * @method static mixed                                     first() Första raden (modell eller null).
  *
  * Snabba hämtningar
- * @method static array                                           fetchAllRaw() Hämta alla rader som assoc-arrayer (utan modell-hydrering).
- * @method static array|null                                      fetchRaw() Hämta första raden som assoc-array(utan modell-hydrering) eller null.
+ * @method static array                                     fetchAllRaw() Hämta alla rader som assoc-arrayer (utan modell-hydrering).
+ * @method static array|null                                fetchRaw() Hämta första raden som assoc-array(utan modell-hydrering) eller null.
  *
  * Paginering/Sök
  * @method static array paginate(int $perPage = 10, int $currentPage = 1)
@@ -663,7 +664,7 @@ abstract class Model implements JsonSerializable
     /**
      * Hämta alla rader från tabellen.
      */
-    public static function all(): array
+    public static function all(): Collection
     {
         return self::query()->get();
     }
@@ -1061,15 +1062,20 @@ abstract class Model implements JsonSerializable
     {
         $array = [];
 
-        // Lägg till attribut
         foreach ($this->attributes as $key => $value) {
             $array[$key] = $this->getAttribute($key);
         }
 
-        // Lägg till relationer
         foreach ($this->relations as $relationKey => $relationValue) {
-            if (is_array($relationValue)) {
-                $array[$relationKey] = array_map(fn($item) => $item->toArray(), $relationValue);
+            if ($relationValue instanceof Collection) {
+                $array[$relationKey] = $relationValue->map(
+                    fn($item) => $item instanceof self ? $item->toArray() : $item
+                )->values()->toArray();
+            } elseif (is_array($relationValue)) {
+                $array[$relationKey] = array_map(
+                    fn($item) => $item instanceof self ? $item->toArray() : $item,
+                    $relationValue
+                );
             } elseif ($relationValue instanceof self) {
                 $array[$relationKey] = $relationValue->toArray();
             } else {
@@ -1077,14 +1083,24 @@ abstract class Model implements JsonSerializable
             }
         }
 
-        // Autoladda relationer vid serialisering
         if (!empty($this->autoloadRelations)) {
             foreach ($this->autoloadRelations as $relation) {
                 if (!isset($array[$relation]) && $this->relationExists($relation)) {
                     $relatedData = $this->$relation()->get();
-                    $array[$relation] = is_array($relatedData)
-                        ? array_map(fn($item) => $item->toArray(), $relatedData)
-                        : $relatedData->toArray();
+                    if ($relatedData instanceof Collection) {
+                        $array[$relation] = $relatedData->map(
+                            fn($item) => $item instanceof self ? $item->toArray() : $item
+                        )->values()->toArray();
+                    } elseif (is_array($relatedData)) {
+                        $array[$relation] = array_map(
+                            fn($item) => $item instanceof self ? $item->toArray() : $item,
+                            $relatedData
+                        );
+                    } elseif ($relatedData instanceof self) {
+                        $array[$relation] = $relatedData->toArray();
+                    } else {
+                        $array[$relation] = $relatedData;
+                    }
                 }
             }
         }

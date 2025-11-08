@@ -25,6 +25,39 @@ trait Pagination
         return $result !== null;
     }
 
+        /**
+     * Enkel pagination utan totalräkning (snabbare).
+     *
+     * @param int $perPage
+     * @param int $currentPage
+     * @return array{data: array, pagination: array{per_page:int,current_page:int,has_more:bool,first_page:int}}
+     */
+    public function simplePaginate(int $perPage = 10, int $currentPage = 1): array
+    {
+        $currentPage = ($currentPage > 0) ? $currentPage : 1;
+        $offset = ($currentPage - 1) * $perPage;
+
+        // Hämta en extra rad för att indikera om det finns fler
+        $this->limit($perPage + 1)->offset($offset);
+        $data = $this->get(); // Collection
+        $items = $data->toArray();
+
+        $hasMore = count($items) > $perPage;
+        if ($hasMore) {
+            array_pop($items); // ta bort extra raden
+        }
+
+        return [
+            'data' => $items,
+            'pagination' => [
+                'per_page' => $perPage,
+                'current_page' => $currentPage,
+                'has_more' => $hasMore,
+                'first_page' => 1,
+            ],
+        ];
+    }
+
     /**
      * Paginera resultat.
      *
@@ -70,8 +103,11 @@ trait Pagination
         $this->limit($perPage)->offset($offset);
         $data = $this->get();
 
+        // $data är en Collection enligt QueryBuilder::get()
+        $dataArray = $data->toArray();
+
         return [
-            'data' => $data,
+            'data' => $dataArray,
             'pagination' => [
                 'total' => $totalRecords,
                 'per_page' => $perPage,
@@ -111,7 +147,7 @@ trait Pagination
 
         $countQuery = clone $this;
         $countQuery->columns = [];
-        $countQuery->orderBy = [];
+               $countQuery->orderBy = [];
         $countQuery->limit = null;
         $countQuery->offset = null;
         $countQuery->selectRaw('COUNT(*) as total');
@@ -127,8 +163,11 @@ trait Pagination
         $this->limit($perPage)->offset(($currentPage - 1) * $perPage);
         $data = $this->get();
 
+        // $data är en Collection enligt QueryBuilder::get()
+        $dataArray = $data->toArray();
+
         return [
-            'data' => $data,
+            'data' => $dataArray,
             'search' => [
                 'term' => $term,
                 'total' => $totalRecords,

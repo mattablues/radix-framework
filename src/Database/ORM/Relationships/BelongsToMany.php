@@ -103,11 +103,11 @@ class BelongsToMany
     {
         // 1) Om query()-builder finns (används av eager loading med closure), kör den
         if ($this->builder instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
-            $models = $this->builder->get();
+            $modelsCollection = $this->builder->get(); // Collection
 
             // Mappa pivot_* alias till relation 'pivot'
             if (!empty($this->pivotColumns)) {
-                foreach ($models as $m) {
+                foreach ($modelsCollection as $m) {
                     $pivotData = [];
                     foreach ($this->pivotColumns as $col) {
                         $alias = "pivot_$col";
@@ -124,11 +124,11 @@ class BelongsToMany
                 }
             }
 
-            return $models;
+            // Konvertera till array för att matcha signaturen
+            return $modelsCollection->toArray();
         }
 
         // 2) Fallback: manuell SQL (behåller din tidigare logik)
-        // Parent-flöde
         if ($this->parent !== null) {
             $parentValue = $this->parent->getAttribute($this->parentKeyName);
             if ($parentValue === null) {

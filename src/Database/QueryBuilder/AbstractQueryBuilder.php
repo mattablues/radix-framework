@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder;
 
+use Radix\Collection\Collection;
 use Radix\Database\Connection;
 
 abstract class AbstractQueryBuilder
@@ -36,7 +37,7 @@ abstract class AbstractQueryBuilder
         return $this->connection->execute($sql, $this->bindings);
     }
 
-    public function get(): array
+    public function get() /* Collection i QueryBuilder-override */
     {
         if (is_null($this->modelClass)) {
             throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
@@ -45,14 +46,12 @@ abstract class AbstractQueryBuilder
         $sql = $this->toSql();
         $rows = $this->connection->fetchAll($sql, $this->bindings);
 
-        // Hydrera alltid till Model (även rena aggregat)
         $results = [];
         foreach ($rows as $row) {
             $model = new $this->modelClass();
             $model->hydrateFromDatabase($row);
             $model->markAsExisting();
 
-            // Eager load relationer med ev. constraints
             if (!empty($this->eagerLoadRelations)) {
                 foreach ($this->eagerLoadRelations as $relation) {
                     if (!method_exists($model, $relation)) {
@@ -66,29 +65,27 @@ abstract class AbstractQueryBuilder
                     $relationData = null;
                     $closure = $this->eagerLoadConstraints[$relation] ?? null;
 
-                    // Försök få en QueryBuilder från relationen
                     $qb = null;
                     if (method_exists($relObj, 'query')) {
                         $qb = $relObj->query();
                     }
 
                     if ($closure instanceof \Closure && $qb instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
-                        // Applicera constraints på relationens QB
                         $closure($qb);
-                        // Låt relationen själv hämta (om get() hydrerar korrekt) annars QB->get()
                         $relationData = method_exists($relObj, 'get') ? $relObj->get() : $qb->get();
                     } else {
-                        // Fallback till relationens get()
                         $relationData = method_exists($relObj, 'get') ? $relObj->get() : null;
                     }
 
-                    $model->setRelation($relation, is_array($relationData) ? $relationData : ($relationData ?? null));
+                    // Viktigt: behåll relationens typ (array för many, Model|null för one)
+                    $model->setRelation($relation, $relationData);
                 }
             }
 
             $results[] = $model;
         }
 
+        // Return-typen överstyras i QueryBuilder::get() (Collection)
         return $results;
     }
 
