@@ -215,14 +215,9 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
             return new self(array_filter($this->elements));
         }
 
-        $filtered = [];
-        foreach ($this->elements as $k => $v) {
-            if ($callback($v, $k)) {
-                $filtered[$k] = $v;
-            }
-        }
-
-        return new self($filtered);
+        return new self(array_filter($this->elements, static function ($v, $k) use ($callback) {
+            return $callback($v, $k);
+        }, ARRAY_FILTER_USE_BOTH));
     }
 
     public function reject(Closure $callback): self
@@ -249,6 +244,8 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
 
     /**
      * Plockar ut ett fält från varje element (stödjer array/objekt).
+     * @param  string  $field
+     * @param  string|null  $keyBy
      * @return self
      */
     public function pluck(string $field, ?string $keyBy = null): self
