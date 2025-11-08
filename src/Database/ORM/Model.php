@@ -29,10 +29,13 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static string                                    toSql() Generera SQL.
  * @method static array                                     getBindings() Hämta bindningar.
  * @method static string                                    debugSql() SQL med interpolerade bindningar.
+ * @method static string                                    getRawSql() SQL med insatta värden (debug).
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder dump() Dumpa interpolerad SQL och fortsätt kedjan.
  * @method static mixed                                     value(string $column) Hämta ett enda värde.
  * @method static array                                     pluck(string $column, ?string $key = null) Hämta kolumnlista/assoc.
- * @method static array                                     get() Hämta resultat (hydreras till modeller).
+ * @method static \Radix\Collection\Collection              get() Hämta resultat (hydreras till modeller).
  * @method static mixed                                     first() Första raden (modell eller null).
+ * @method static mixed                                     firstOrFail() Första raden eller exception.
  *
  * Snabba hämtningar
  * @method static array                                     fetchAllRaw() Hämta alla rader som assoc-arrayer (utan modell-hydrering).
@@ -43,6 +46,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static array simplePaginate(int $perPage = 10, int $currentPage = 1)
  * @method static array search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1)
  * @method static bool  exists()
+ * @method static bool  doesntExist()
  *
  * Limit/Offset
  * @method static \Radix\Database\QueryBuilder\QueryBuilder limit(int $limit)
@@ -83,6 +87,9 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder havingRaw(string $expression, array $bindings = [])
  * @method static \Radix\Database\QueryBuilder\QueryBuilder orderBy(string $column, string $direction = 'ASC')
  * @method static \Radix\Database\QueryBuilder\QueryBuilder orderByRaw(string $expression)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder orderByDesc(string $column)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder latest(string $column = 'created_at')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder oldest(string $column = 'created_at')
  *
  * Grouping sets och rollup
  * @method static \Radix\Database\QueryBuilder\QueryBuilder rollup(array $columns)
@@ -158,6 +165,12 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withMin(string $relation, string $column, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withMax(string $relation, string $column, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withAggregate(string $relation, string $column, string $fn, ?string $alias = null)
+ *
+ * Utilities/sugar
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder when(bool $condition, \Closure $then, ?\Closure $else = null) Villkorad chaining.
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder tap(\Closure $callback) Hooka in i kedjan.
+ * @method static \Generator                             lazy(int $size = 1000) Lazy iteration.
+ * @method static void                                   chunk(int $size, \Closure $callback) Hämta i bitar.
  */
 abstract class Model implements JsonSerializable
 {

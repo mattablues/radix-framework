@@ -178,36 +178,4 @@ trait Pagination
             ],
         ];
     }
-
-    /**
-     * Returnera SQL med värden insatta för debug.
-     *
-     * @return string
-     */
-    public function debugSql(): string
-    {
-        // Visa parametriserad SQL (behåll frågetecken)
-        return $this->toSql();
-    }
-
-    public function debugSqlInterpolated(): string
-    {
-        // Visa “prettified” SQL med insatta värden (endast för debug)
-        $query = $this->toSql();
-        foreach ($this->getBindings() as $binding) {
-            if (is_string($binding)) {
-                $replacement = "'" . addslashes($binding) . "'";
-            } elseif (is_null($binding)) {
-                $replacement = 'NULL';
-            } elseif (is_bool($binding)) {
-                $replacement = $binding ? '1' : '0';
-            } elseif ($binding instanceof \DateTimeInterface) {
-                $replacement = "'" . $binding->format('Y-m-d H:i:s') . "'";
-            } else {
-                $replacement = (string)$binding;
-            }
-            $query = preg_replace('/\?/', $replacement, $query, 1);
-        }
-        return $query;
-    }
 }

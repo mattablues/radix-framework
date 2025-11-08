@@ -241,4 +241,140 @@ class QueryBuilder extends AbstractQueryBuilder
         }
         return $out;
     }
+
+    // Hjälpare: finns/inte finns
+    public function doesntExist(): bool
+    {
+        return !$this->exists();
+    }
+
+    // Hjälpare: första eller exception
+    public function firstOrFail(): mixed
+    {
+        $model = $this->first();
+        if ($model === null) {
+            throw new \RuntimeException('No records found for firstOrFail().');
+        }
+        return $model;
+    }
+
+    // Villkorad chaining
+    public function when(bool $condition, \Closure $then, ?\Closure $else = null): self
+    {
+        if ($condition) {
+            $then($this);
+        } elseif ($else !== null) {
+            $else($this);
+        }
+        return $this;
+    }
+
+    // Tap/hook
+    public function tap(\Closure $callback): self
+    {
+        $callback($this);
+        return $this;
+    }
+
+    // Ordering sugar
+    public function orderByDesc(string $column): self
+    {
+        return $this->orderBy($column, 'DESC');
+    }
+
+    public function latest(string $column = 'created_at'): self
+    {
+        return $this->orderByDesc($column);
+    }
+
+    public function oldest(string $column = 'created_at'): self
+    {
+        return $this->orderBy($column, 'ASC');
+    }
+
+    // Chunking: iterera i bitar och skicka Collection till callback
+    public function chunk(int $size, \Closure $callback): void
+    {
+        if ($size <= 0) {
+            throw new \InvalidArgumentException('Chunk size must be greater than 0.');
+        }
+
+        $page = 1;
+        do {
+            $clone = clone $this;
+            $offset = ($page - 1) * $size;
+            $results = $clone->limit($size)->offset($offset)->get();
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $callback($results, $page);
+            $page++;
+        } while ($results->count() === $size);
+    }
+
+    // Lazy: generator som yield:ar modeller (minnesvänligt)
+    public function lazy(int $size = 1000): \Generator
+    {
+        $page = 1;
+        while (true) {
+            $clone = clone $this;
+            $offset = ($page - 1) * $size;
+            $batch = $clone->limit($size)->offset($offset)->get();
+            if ($batch->isEmpty()) {
+                break;
+            }
+            foreach ($batch as $model) {
+                yield $model;
+            }
+            if ($batch->count() < $size) {
+                break;
+            }
+            $page++;
+        }
+    }
+
+    // Rå SQL med interpolerade bindningar för debug
+    public function getRawSql(): string
+    {
+        return $this->debugSqlInterpolated();
+    }
+
+    public function dump(): self
+    {
+        echo $this->debugSqlInterpolated(), PHP_EOL;
+        return $this;
+    }
+
+    /**
+     * Returnera SQL med värden insatta för debug.
+     *
+     * @return string
+     */
+    public function debugSql(): string
+    {
+        // Visa parametriserad SQL (behåll frågetecken)
+        return $this->toSql();
+    }
+
+    public function debugSqlInterpolated(): string
+    {
+        // Visa “prettified” SQL med insatta värden (endast för debug)
+        $query = $this->toSql();
+        foreach ($this->getBindings() as $binding) {
+            if (is_string($binding)) {
+                $replacement = "'" . addslashes($binding) . "'";
+            } elseif (is_null($binding)) {
+                $replacement = 'NULL';
+            } elseif (is_bool($binding)) {
+                $replacement = $binding ? '1' : '0';
+            } elseif ($binding instanceof \DateTimeInterface) {
+                $replacement = "'" . $binding->format('Y-m-d H:i:s') . "'";
+            } else {
+                $replacement = (string)$binding;
+            }
+            $query = preg_replace('/\?/', $replacement, $query, 1);
+        }
+        return $query;
+    }
 }
