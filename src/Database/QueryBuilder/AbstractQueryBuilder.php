@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder;
 
-use Radix\Collection\Collection;
 use Radix\Database\Connection;
 
 abstract class AbstractQueryBuilder
