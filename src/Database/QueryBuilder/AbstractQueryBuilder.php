@@ -37,6 +37,12 @@ abstract class AbstractQueryBuilder
         return $this->connection->execute($sql, $this->bindings);
     }
 
+    /**
+     * Kör SQL och hydrera resultat.
+     *
+     * @return array<int, mixed>|\Radix\Collection\Collection
+     *         (override i QueryBuilder returnerar alltid Collection)
+     */
     public function get() /* Collection i QueryBuilder-override */
     {
         if (is_null($this->modelClass)) {

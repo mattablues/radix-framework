@@ -125,7 +125,12 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         $rows = parent::get();
-        return $rows instanceof Collection ? $rows : new Collection($rows);
+
+        if (is_array($rows)) {
+            return new Collection($rows);
+        }
+
+        return $rows; // är redan Collection
     }
 
     /**
