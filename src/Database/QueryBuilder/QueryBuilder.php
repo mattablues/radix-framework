@@ -355,6 +355,32 @@ class QueryBuilder extends AbstractQueryBuilder
         return $this;
     }
 
+    public function scalar(): mixed
+    {
+        $this->limit(1);
+        $stmt = $this->execute();
+        $row = $stmt->fetch(\PDO::FETCH_NUM);
+        return $row[0] ?? null;
+    }
+
+    public function int(): ?int
+    {
+        $v = $this->scalar();
+        return $v === null ? null : (int)$v;
+    }
+
+    public function float(): ?float
+    {
+        $v = $this->scalar();
+        return $v === null ? null : (float)$v;
+    }
+
+    public function string(): ?string
+    {
+        $v = $this->scalar();
+        return $v === null ? null : (string)$v;
+    }
+
     /**
      * Returnera SQL med värden insatta för debug.
      *

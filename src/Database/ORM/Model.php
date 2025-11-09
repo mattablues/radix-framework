@@ -139,6 +139,12 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder month(string $column, string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder date(string $column, string $alias = null)
  *
+ * Skalära resultat
+ * @method static mixed  scalar() Returnera första kolumnen i första raden.
+ * @method static int|null    int() Returnera scalar som int (eller null).
+ * @method static float|null  float() Returnera scalar som float (eller null).
+ * @method static string|null string() Returnera scalar som string (eller null).
+ *
  * Insert-Select och mutationer
  * @method static \Radix\Database\QueryBuilder\QueryBuilder insertSelect(string $table, array $columns, \Radix\Database\QueryBuilder\QueryBuilder $select)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder insert(array $data)
