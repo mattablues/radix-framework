@@ -155,6 +155,9 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  *
  * Transaktioner
  * @method static void transaction(callable $callback)
+ * @method static void startTransaction()
+ * @method static void commitTransaction()
+ * @method static void rollbackTransaction()
  *
  * Soft deletes
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withSoftDeletes()
