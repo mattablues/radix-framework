@@ -36,6 +36,15 @@ class Request implements RequestInterface
         );
     }
 
+    public function fullUrl(): string
+    {
+        $scheme = (!empty($this->server['HTTPS']) && $this->server['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host   = $this->server['HTTP_HOST'] ?? ($this->server['SERVER_NAME'] ?? 'localhost');
+        $uri    = $this->server['REQUEST_URI'] ?? '/';
+
+        return $scheme . '://' . $host . $uri;
+    }
+
     public function ip(): string
     {
         // Lista över betrodda proxy-klienter
