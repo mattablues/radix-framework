@@ -20,7 +20,11 @@ class RadixErrorHandler
         if (!(error_reporting() & $errno)) {
             return true;
         }
-        error_log("Error [$errno]: $errstr in $errfile on line $errline");
+        // Logga via Logger
+        self::logger()->error(
+            'Error [{code}]: {msg} in {file} on line {line}',
+            ['code' => $errno, 'msg' => $errstr, 'file' => $errfile, 'line' => $errline]
+        );
         throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
     }
 
@@ -36,15 +40,21 @@ class RadixErrorHandler
 
         $statusCode = $exception instanceof HttpException ? $exception->getStatusCode() : 500;
 
-        $logMessage = sprintf(
-            "Exception [%s]: %s in %s on line %d\nStack trace:\n%s",
-            get_class($exception),
-            $exception->getMessage(),
-            $exception->getFile(),
-            $exception->getLine(),
-            $exception->getTraceAsString()
+        // Logga via Logger (inkl. stacktrace)
+        self::logger()->error(
+            'Exception [{class}]: {message} in {file} on line {line}',
+            [
+                'class' => get_class($exception),
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'trace' => $exception->getTraceAsString(),
+                'uri' => $requestUri,
+                'method' => $method,
+                'accept' => $accept,
+                'status' => $statusCode,
+            ]
         );
-        error_log($logMessage);
 
         if ($isApiRequest) {
             $body = [
@@ -72,7 +82,14 @@ class RadixErrorHandler
 
         if ($isDev) {
             ini_set('display_errors', '1');
-            echo '<pre>' . htmlspecialchars($logMessage, ENT_QUOTES, 'UTF-8') . '</pre>';
+            echo '<pre>' . htmlspecialchars(sprintf(
+                "Exception [%s]: %s in %s on line %d\nStack trace:\n%s",
+                get_class($exception),
+                $exception->getMessage(),
+                $exception->getFile(),
+                $exception->getLine(),
+                $exception->getTraceAsString()
+            ), ENT_QUOTES, 'UTF-8') . '</pre>';
         } else {
             ini_set('display_errors', '0');
             ini_set('log_errors', '1');
@@ -93,5 +110,11 @@ class RadixErrorHandler
         }
 
         exit;
+    }
+
+    private static function logger(): \Radix\Support\Logger
+    {
+        // Egen kanal för fel
+        return new \Radix\Support\Logger('error');
     }
 }

@@ -11,6 +11,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
     private string $viewsDirectory;
     private bool $debug = false;
     private array $filters = [];
+    private ?\Radix\Support\Logger $logger = null;
 
     public function __construct(string $viewsDirectory = null)
     {
@@ -37,7 +38,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     public function render(string $template, array $data = [], string $version = ''): string
     {
-        $this->debug("[DEBUG] Attempting to render template: $template");
+        $this->debug("Attempting to render template: $template");
         $data = $this->mergeData($data);
 
         // Rensa gamla cachefiler
@@ -57,13 +58,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $cachedFile = $disableCache ? null : $this->getCachedTemplate($cacheKey);
 
         if ($cachedFile !== null) {
-            $this->debug("[DEBUG] Using cached template: $cachedFile");
+            $this->debug("Using cached template: $cachedFile");
             extract($data, EXTR_SKIP);
 
             ob_start();
             include $cachedFile;
             $output = ob_get_clean();
-            $this->debug("[DEBUG] Output from cached file: " . substr($output, 0, 100));
+            $this->debug("Output from cached file: " . substr($output, 0, 100));
             return $output;
         }
 
@@ -81,7 +82,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
             $this->cacheTemplate($cacheKey, $code);
             $this->debug("Compiled template cached under key: $cacheKey");
         } else {
-            $this->debug("[DEBUG] Cache disabled in development");
+            $this->debug("Cache disabled in development");
         }
 
         return $this->evaluateTemplate($code, $data);
@@ -122,7 +123,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
     public function shared(string $name, mixed $value): void
     {
         $this->globals[$name] = $value;
-        $this->debug("[DEBUG] Registrerad global variabel: $name => " . print_r($value, true));
+        $this->debug("Registrerad global variabel: $name => " . print_r($value, true));
     }
 
     /**
@@ -231,7 +232,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     private function replacePlaceholders(string $code): string
     {
-        $this->debug("[DEBUG] Original kod före placeholder-bearbetning:\n" . htmlspecialchars($code));
+        $this->debug("Original kod före placeholder-bearbetning:\n" . htmlspecialchars($code));
 
         // 1. Hantera komponentinstanser (<x-komponent>)
         $code = preg_replace_callback(
@@ -261,21 +262,21 @@ class RadixTemplateViewer implements TemplateViewerInterface
         // 4. Bearbeta variabler och uttryck (gäller generiska placeholders som `{{ variabel }}`)
         $code = $this->replaceVariableOutput($code);
 
-        $this->debug("[DEBUG] Kod efter placeholder-bearbetning:\n" . htmlspecialchars($code));
+        $this->debug("Kod efter placeholder-bearbetning:\n" . htmlspecialchars($code));
         return $code;
     }
 
     private function renderComponent(string $componentPath, array $attributes, string $slotContent): string
     {
-        $this->debug("[DEBUG] Renderar komponent från path: $componentPath");
-        $this->debug("[DEBUG] Attribut: " . print_r($attributes, true));
-        $this->debug("[DEBUG] SlotInnehåll: " . htmlspecialchars($slotContent));
+        $this->debug("Renderar komponent från path: $componentPath");
+        $this->debug("Attribut: " . print_r($attributes, true));
+        $this->debug("SlotInnehåll: " . htmlspecialchars($slotContent));
 
         $componentFilePath = "{$this->viewsDirectory}components/$componentPath.ratio.php";
 
         if (!file_exists($componentFilePath)) {
             // Lägg till tydligare info vid saknad komponent
-            throw new \RuntimeException("Komponent fil saknas: {$componentFilePath} (komponent: {$componentPath})");
+            throw new \RuntimeException("Komponent fil saknas: $componentFilePath (komponent: $componentPath)");
         }
 
         $componentCode = $this->loadTemplate($componentFilePath);
@@ -292,7 +293,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $processedCode = trim($this->replacePlaceholders($componentCode));
 
         $result = trim($this->evaluateTemplate($processedCode, $this->mergeData($data)));
-        $this->debug("[DEBUG] Renderad komponent ut data:\n" . htmlspecialchars($result));
+        $this->debug("Renderad komponent ut data:\n" . htmlspecialchars($result));
 
         return $result;
     }
@@ -303,7 +304,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     private function extractNamedSlots(string &$slotContent): array
     {
-        $this->debug("[DEBUG] Extraherar slots från innehåll:\n" . htmlspecialchars($slotContent));
+        $this->debug("Extraherar slots från innehåll:\n" . htmlspecialchars($slotContent));
 
         $slots = [];
         preg_match_all('#<x-slot:([\w\-]+)>(.*?)</x-slot:\1>#s', $slotContent, $matches, PREG_SET_ORDER);
@@ -314,13 +315,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
             $slotValue = trim($this->replacePlaceholders($match[2]));
             $slots[$slotName] = $slotValue;
 
-            $this->debug("[DEBUG] Extraherad slot: $slotName, Innehåll:\n" . htmlspecialchars($slotValue));
+            $this->debug("Extraherad slot: $slotName, Innehåll:\n" . htmlspecialchars($slotValue));
 
             // Ta bort matchade <x-slot> från originalinnehållet
             $slotContent = str_replace($match[0], '', $slotContent);
         }
 
-        $this->debug("[DEBUG] Extraherade slots:\n" . print_r($slots, true));
+        $this->debug("Extraherade slots:\n" . print_r($slots, true));
         return $slots;
     }
 
@@ -432,7 +433,7 @@ private function replaceYields(string $code, array $blocks): string
         $output = ob_get_clean();
 
         // Behåll outputen som den är utan normalisering
-        $this->debug("[DEBUG] Evaluations resultat:\n" . htmlspecialchars($output));
+        $this->debug("Evaluations resultat:\n" . htmlspecialchars($output));
 
         return $output;
     }
@@ -442,8 +443,8 @@ private function replaceYields(string $code, array $blocks): string
      */
     private function mergeData(array $data): array
     {
-        $this->debug("[DEBUG] Globala variabler:\n" . print_r($this->globals, true));
-        $this->debug("[DEBUG] Lokala data:\n" . print_r($data, true));
+        $this->debug("Globala variabler:\n" . print_r($this->globals, true));
+        $this->debug("Lokala data:\n" . print_r($data, true));
 
         // Kombinera globala variabler och lokala data
         return array_merge($this->globals, $data);
@@ -454,7 +455,7 @@ private function replaceYields(string $code, array $blocks): string
         $cacheFile = $this->cachePath . $key . '.php';
 
         if (!is_dir($this->cachePath)) {
-            $this->debug("[DEBUG] Cache directory not found. Creating: $this->cachePath");
+            $this->debug("Cache directory not found. Creating: $this->cachePath");
             mkdir($this->cachePath, 0755, true);
         }
 
@@ -462,13 +463,13 @@ private function replaceYields(string $code, array $blocks): string
         $appEnv = strtolower((string) (getenv('APP_ENV') ?: 'production'));
         $codeToWrite = $appEnv === 'production' ? $this->minifyPHP($compiledCode) : $compiledCode;
 
-        $this->debug("[DEBUG] Writing cache file to: $cacheFile (Minify: " . ($appEnv === 'production' ? 'YES' : 'NO') . ")");
+        $this->debug("Writing cache file to: $cacheFile (Minify: " . ($appEnv === 'production' ? 'YES' : 'NO') . ")");
 
         // Skriv ut koden till fil
         if (file_put_contents($cacheFile, $codeToWrite) === false) {
-            $this->debug("[DEBUG] Failed to write cache file to: $cacheFile");
+            $this->debug("Failed to write cache file to: $cacheFile");
         } else {
-            $this->debug("[DEBUG] Cache file successfully written to: $cacheFile");
+            $this->debug("Cache file successfully written to: $cacheFile");
         }
     }
 
@@ -561,9 +562,14 @@ private function replaceYields(string $code, array $blocks): string
      */
     private function debug(string $message): void
     {
-        if ($this->debug) {
-            echo "[DEBUG] $message" . PHP_EOL;
+        if (!$this->debug) {
+            return;
         }
+        // Lazy-init logger med kanal "view"
+        if ($this->logger === null) {
+            $this->logger = new \Radix\Support\Logger('view');
+        }
+        $this->logger->debug($message);
     }
 
     private function applyFilters(array $data): array
