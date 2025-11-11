@@ -235,10 +235,12 @@ final class Reader
     private static function ensureFileReadable(string $path): void
     {
         if (!is_file($path)) {
-            throw new RuntimeException("Filen finns inte: {$path}");
+            $rp = @realpath($path) ?: $path;
+            throw new RuntimeException("Filen finns inte: {$rp}");
         }
         if (!is_readable($path)) {
-            throw new RuntimeException("Filen är inte läsbar: {$path}");
+            $rp = @realpath($path) ?: $path;
+            throw new RuntimeException("Filen är inte läsbar: {$rp}");
         }
     }
 

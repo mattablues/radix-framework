@@ -165,7 +165,7 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         if (preg_match('/\s+AS\s+/i', $table)) {
-            [$tableName, $alias] = preg_split('/\s+AS\s+/i', $table, 2);
+            [$tableName, $alias] = array_map('trim', preg_split('/\s+AS\s+/i', $table, 2));
             $this->table = $this->wrapColumn($tableName) . ' AS ' . $this->wrapAlias($alias);
         } else {
             $this->table = $this->wrapColumn($table);
@@ -396,20 +396,29 @@ class QueryBuilder extends AbstractQueryBuilder
     {
         // Visa “prettified” SQL med insatta värden (endast för debug)
         $query = $this->toSql();
-        foreach ($this->getBindings() as $binding) {
+        $bindings = $this->getBindings();
+
+        // Ersätt första förekomsten av ? i taget utan regex (snabbare och tydligare)
+        foreach ($bindings as $binding) {
             if (is_string($binding)) {
                 $replacement = "'" . addslashes($binding) . "'";
-            } elseif (is_null($binding)) {
+            } elseif ($binding === null) {
                 $replacement = 'NULL';
             } elseif (is_bool($binding)) {
                 $replacement = $binding ? '1' : '0';
             } elseif ($binding instanceof \DateTimeInterface) {
                 $replacement = "'" . $binding->format('Y-m-d H:i:s') . "'";
             } else {
-                $replacement = (string)$binding;
+                $replacement = (string) $binding;
             }
-            $query = preg_replace('/\?/', $replacement, $query, 1);
+
+            $pos = strpos($query, '?');
+            if ($pos === false) {
+                break;
+            }
+            $query = substr($query, 0, $pos) . $replacement . substr($query, $pos + 1);
         }
+
         return $query;
     }
 }

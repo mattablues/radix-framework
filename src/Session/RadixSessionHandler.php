@@ -9,32 +9,32 @@ use SessionHandlerInterface;
 
 class RadixSessionHandler implements SessionHandlerInterface
 {
-    protected string $driver; // Kan vara 'file' eller 'database'
+    protected string $driver;
     protected ?PDO $pdo = null;
-    protected string $filePath;
-    protected string $tableName;
+    protected string $filePath = '';
+    protected string $tableName = 'sessions';
     protected int $lifetime;
 
     public function __construct(array $config, ?PDO $pdo = null)
     {
-        $this->driver = $config['driver'] ?? 'file'; // Default till fil baserad lagring
+        $this->driver = $config['driver'] ?? 'file';
 
         if ($this->driver === 'database') {
-            if (!$pdo) {
+            if ($pdo === null) {
                 throw new \InvalidArgumentException('PDO är krävd för databaslagring av sessioner.');
             }
             $this->pdo = $pdo;
             $this->tableName = $config['table'] ?? 'sessions';
         } elseif ($this->driver === 'file') {
             $this->filePath = $config['path'] ?? sys_get_temp_dir();
-            if (!is_dir($this->filePath) && !mkdir($this->filePath, 0755, true)) {
-                throw new \RuntimeException("Kunde inte skapa katalog för fil baserade sessioner: $this->filePath");
+            if (!is_dir($this->filePath) && !@mkdir($this->filePath, 0755, true) && !is_dir($this->filePath)) {
+                throw new \RuntimeException("Kunde inte skapa katalog för fil baserade sessioner: {$this->filePath}");
             }
         } else {
-            throw new \InvalidArgumentException("Ogiltig driver specifikation: $this->driver");
+            throw new \InvalidArgumentException("Ogiltig driver specifikation: {$this->driver}");
         }
 
-        $this->lifetime = $config['lifetime'] ?? 1440; // Standardlivslängd
+        $this->lifetime = (int) ($config['lifetime'] ?? 1440);
     }
 
     public function open(string $path, string $name): bool
@@ -50,16 +50,18 @@ class RadixSessionHandler implements SessionHandlerInterface
     public function read($id): string
     {
         if ($this->driver === 'file') {
-            $file = "$this->filePath/sess_$id";
+            $file = rtrim($this->filePath, '/\\') . DIRECTORY_SEPARATOR . "sess_{$id}";
             if (is_readable($file)) {
-                return file_get_contents($file) ?: '';
+                $data = file_get_contents($file);
+                return $data === false ? '' : (string) $data;
             }
             return '';
         }
 
-        $stmt = $this->pdo->prepare("SELECT data FROM $this->tableName WHERE id = :id AND expiry > :expiry");
+        $stmt = $this->pdo->prepare("SELECT data FROM {$this->tableName} WHERE id = :id AND expiry > :expiry");
         $stmt->execute([':id' => $id, ':expiry' => time()]);
-        return ($val = $stmt->fetchColumn()) === false || $val === null ? '' : (string) $val;
+        $val = $stmt->fetchColumn();
+        return ($val === false || $val === null) ? '' : (string) $val;
     }
 
     public function write($id, $data): bool
@@ -67,26 +69,33 @@ class RadixSessionHandler implements SessionHandlerInterface
         $expiry = time() + $this->lifetime;
 
         if ($this->driver === 'file') {
-            $file = "$this->filePath/sess_$id";
-            return file_put_contents($file, $data) !== false;
+            if (!is_dir($this->filePath)) {
+                @mkdir($this->filePath, 0755, true);
+            }
+            $file = rtrim($this->filePath, '/\\') . DIRECTORY_SEPARATOR . "sess_{$id}";
+            $ok = file_put_contents($file, (string) $data) !== false;
+            if ($ok) {
+                @chmod($file, 0640); // valfri härdning, påverkar inte funktion
+            }
+            return $ok;
         }
 
         $stmt = $this->pdo->prepare("
-            INSERT INTO $this->tableName (id, data, expiry)
+            INSERT INTO {$this->tableName} (id, data, expiry)
             VALUES (:id, :data, :expiry)
             ON DUPLICATE KEY UPDATE data = :data, expiry = :expiry
         ");
-        return $stmt->execute([':id' => $id, ':data' => $data, ':expiry' => $expiry]);
+        return $stmt->execute([':id' => $id, ':data' => (string) $data, ':expiry' => $expiry]);
     }
 
     public function destroy($id): bool
     {
         if ($this->driver === 'file') {
-            $file = "$this->filePath/sess_$id";
-            return is_file($file) && unlink($file);
+            $file = rtrim($this->filePath, '/\\') . DIRECTORY_SEPARATOR . "sess_{$id}";
+            return is_file($file) ? @unlink($file) : true;
         }
 
-        $stmt = $this->pdo->prepare("DELETE FROM $this->tableName WHERE id = :id");
+        $stmt = $this->pdo->prepare("DELETE FROM {$this->tableName} WHERE id = :id");
         return $stmt->execute([':id' => $id]);
     }
 
@@ -94,17 +103,18 @@ class RadixSessionHandler implements SessionHandlerInterface
     {
         if ($this->driver === 'file') {
             $deleted = 0;
-            foreach (glob("$this->filePath/sess_*") as $file) {
-                if (filemtime($file) + $max_lifetime < time()) {
+            $files = glob(rtrim($this->filePath, '/\\') . DIRECTORY_SEPARATOR . 'sess_*') ?: [];
+            foreach ($files as $file) {
+                if (@filemtime($file) + $max_lifetime < time()) {
                     if (@unlink($file)) {
                         $deleted++;
                     }
                 }
             }
-            return $deleted; // int enligt SessionHandlerInterface
+            return $deleted;
         }
 
-        $stmt = $this->pdo->prepare("DELETE FROM $this->tableName WHERE expiry < :time");
+        $stmt = $this->pdo->prepare("DELETE FROM {$this->tableName} WHERE expiry < :time");
         return $stmt->execute([':time' => time()]) ? $stmt->rowCount() : false;
     }
 }

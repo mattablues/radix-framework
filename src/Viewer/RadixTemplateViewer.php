@@ -15,7 +15,21 @@ class RadixTemplateViewer implements TemplateViewerInterface
     public function __construct(string $viewsDirectory = null)
     {
         $this->viewsDirectory = $viewsDirectory ?? dirname(__DIR__, 3) . '/views/';
-        $this->cachePath = ROOT_PATH . getenv('CACHE_PATH') ?: __DIR__ . '/../cache/views/';
+        $envCachePath = getenv('CACHE_PATH') ?: '';
+        $root = defined('ROOT_PATH') ? (string) ROOT_PATH : (string) dirname(__DIR__, 4);
+        if ($root === '' || $root === DIRECTORY_SEPARATOR) {
+            $root = sys_get_temp_dir();
+        }
+
+        if ($envCachePath !== '') {
+            $isAbsolute = str_starts_with($envCachePath, DIRECTORY_SEPARATOR)
+                || preg_match('#^[A-Za-z]:[\\\\/]#', $envCachePath) === 1;
+            $this->cachePath = $isAbsolute
+                ? rtrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR
+                : rtrim($root, '/\\') . DIRECTORY_SEPARATOR . ltrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR;
+        } else {
+            $this->cachePath = rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+        }
     }
 
     /**
@@ -35,8 +49,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $data = $this->applyFilters($data);
 
         // Disable cache i development
-        $appEnv = getenv('APP_ENV') ?: 'production';
-        $disableCache = ($appEnv === 'development');
+        $appEnv = strtolower((string) (getenv('APP_ENV') ?: 'production'));
+        $disableCache = in_array($appEnv, ['dev', 'development'], true);
 
         // Generera unik cache-nyckel baserat på data och version
         $cacheKey = $this->generateCacheKey($templatePath, $data, $version);
@@ -260,7 +274,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $componentFilePath = "{$this->viewsDirectory}components/$componentPath.ratio.php";
 
         if (!file_exists($componentFilePath)) {
-            throw new \RuntimeException("Komponent fil saknas: $componentFilePath");
+            // Lägg till tydligare info vid saknad komponent
+            throw new \RuntimeException("Komponent fil saknas: {$componentFilePath} (komponent: {$componentPath})");
         }
 
         $componentCode = $this->loadTemplate($componentFilePath);
@@ -373,12 +388,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Replace `{% yield %}` directives with corresponding block content.
      */
-    private function replaceYields(string $code, array $blocks): string
+private function replaceYields(string $code, array $blocks): string
     {
         // Hantera block-yield med fallback:
         // {% yield name %} ...fallback... {% endyield name %}
         $code = preg_replace_callback(
-            "#{% yield (?<name>\w+) %}(?<fallback>.*?){% endyield \k<name> %}#s",
+            "#{%\s*yield\s+(?<name>\w+)\s*%}(?<fallback>.*?){%\s*endyield\s+\k<name>\s*%}#s",
             function (array $m) use ($blocks): string {
                 $name = $m['name'];
                 $fallback = (string)$m['fallback'];
@@ -388,7 +403,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         );
 
         // Hantera enkla yield-taggar utan fallback: {% yield name %}
-        preg_match_all("#{% yield (?<name>\\w+) %}#", $code, $matches, PREG_SET_ORDER);
+        preg_match_all("#{%\s*yield\s+(?<name>\\w+)\s*%}#", $code, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             $yieldName = $match['name'];
@@ -407,7 +422,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
         extract($data, EXTR_SKIP);
 
         ob_start();
-        eval('?>' . $code);
+        try {
+            eval('?>' . $code);
+        } catch (\Throwable $e) {
+            // Behåll tydlig felhantering utan att påverka lyckade körningar
+            ob_end_clean();
+            throw new \RuntimeException('Template evaluation failed: ' . $e->getMessage(), 0, $e);
+        }
         $output = ob_get_clean();
 
         // Behåll outputen som den är utan normalisering
@@ -438,7 +459,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         }
 
         // Kontrollera miljön från APP_ENV: Minifiera endast i production
-        $appEnv = getenv('APP_ENV') ?: 'production';
+        $appEnv = strtolower((string) (getenv('APP_ENV') ?: 'production'));
         $codeToWrite = $appEnv === 'production' ? $this->minifyPHP($compiledCode) : $compiledCode;
 
         $this->debug("[DEBUG] Writing cache file to: $cacheFile (Minify: " . ($appEnv === 'production' ? 'YES' : 'NO') . ")");
@@ -547,6 +568,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     private function applyFilters(array $data): array
     {
+        if ($this->filters === []) {
+            return $data;
+        }
+
         foreach ($data as $key => $value) {
             foreach ($this->filters as $filter) {
                 $expectedType = $filter['type'];

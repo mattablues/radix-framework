@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Radix\DateTime;
 
-use DateTime;
-use DateTimeImmutable;
 use DateInterval;
 use DatePeriod;
+use DateTime;
+use DateTimeImmutable;
 use DateTimeZone;
 use Radix\Config\Config;
 
@@ -20,11 +20,9 @@ class RadixDateTime
     public function __construct(Config $config)
     {
         $this->config = $config;
-        $this->datetimeConfig = $this->config->get('datetime', []); // Cacha datetime-konfigurationen
-
-        // Hämta tidszonen från appkonfigurationen
-        $timezone = $this->config->get('app.timezone', 'UTC'); // Standardvärde 'UTC'
-        $this->timezone = new DateTimeZone($timezone); // Skapa en tidszonsinstans
+        $this->datetimeConfig = $this->config->get('datetime', []);
+        $timezone = $this->config->get('app.timezone', 'UTC');
+        $this->timezone = new DateTimeZone($timezone);
     }
 
     public function dateTime(string $date_time = ''): DateTime
@@ -42,12 +40,10 @@ class RadixDateTime
         if (!$this->validateDate($date_time)) {
             throw new \InvalidArgumentException('Ogiltigt datumformat: ' . $date_time);
         }
+        $start = $this->dateTimeImmutable($date_time);
+        $end = $this->dateTimeImmutable('now');
+        $interval = $start->diff($end);
 
-        $start = $this->dateTimeImmutable($date_time); // Tid för post
-        $end = $this->dateTimeImmutable('now'); // Aktuell tid
-        $interval = $start->diff($end); // Skapa tidsintervall
-
-        // Refaktorering av jämförelseflödet via switch
         switch (true) {
             case $interval->y >= 1:
                 return $interval->y . ' ' . ($interval->y === 1 ? $this->datetimeConfig['year'] : $this->datetimeConfig['years']);
@@ -73,15 +69,13 @@ class RadixDateTime
         }
 
         $range = [];
-        $interval = new DateInterval('P1D');
+        $interval = new \DateInterval('P1D');
         $endDateTime = $this->dateTimeImmutable($end)->add($interval);
-
-        $period = new DatePeriod($this->dateTimeImmutable($start), $interval, $endDateTime);
+        $period = new \DatePeriod($this->dateTimeImmutable($start), $interval, $endDateTime);
 
         foreach ($period as $date) {
             $range[] = $date->format($format);
         }
-
         return $range;
     }
 
@@ -90,11 +84,9 @@ class RadixDateTime
         if (!$this->validateDate($start) || !$this->validateDate($end)) {
             throw new \InvalidArgumentException('Ogiltigt datumformat i diffDate-metoden.');
         }
-
         $startDateTime = $this->dateTimeImmutable($start);
         $endDateTime = $this->dateTimeImmutable($end);
         $interval = $startDateTime->diff($endDateTime);
-
         return $interval->format($format);
     }
 
@@ -103,17 +95,19 @@ class RadixDateTime
         if (!$this->validateDate($start) || !$this->validateDate($end)) {
             throw new \InvalidArgumentException('Ogiltigt datumformat i diffHours-metoden.');
         }
-
         $startDateTime = $this->dateTimeImmutable($start);
         $endDateTime = $this->dateTimeImmutable($end);
-        $interval = $endDateTime->getTimestamp() - $startDateTime->getTimestamp();
-
-        return round($interval / 3600, 1, PHP_ROUND_HALF_UP); // Konvertera sekunder till timmar
+        $seconds = $endDateTime->getTimestamp() - $startDateTime->getTimestamp();
+        return round($seconds / 3600, 1, PHP_ROUND_HALF_UP);
     }
 
-    // Hjälpfunktion för att kontrollera giltiga datum
     private function validateDate(string $date_time): bool
     {
-        return \DateTime::createFromFormat('Y-m-d H:i:s', $date_time) !== false;
+        $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $date_time, $this->timezone);
+        if ($dt === false) {
+            return false;
+        }
+        $errors = \DateTime::getLastErrors();
+        return ($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0;
     }
 }
