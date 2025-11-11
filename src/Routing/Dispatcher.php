@@ -56,9 +56,9 @@ readonly class Dispatcher
         $params = $this->router->match($path, $request->method);
 
         $method = $request->method;
-        if ($method === 'HEAD') {
-            error_log("Converting method HEAD to GET");
-            $method = 'GET'; // Omvandla till GET för att matcha rutter
+        if (in_array($method, ['HEAD', 'OPTIONS'], true)) {
+            error_log("Converting method {$method} to GET");
+            $method = 'GET'; // Omvandla HEAD/OPTIONS till GET för att matcha rutter
         }
 
         if ($params === false) {
