@@ -32,6 +32,14 @@ readonly class Dispatcher
     {
         $path = $this->path($request->uri);
 
+        // Kortslut favicon-requests: returnera 204 och cachea för att minska brus
+        if (in_array($request->method, ['GET', 'HEAD'], true) && $path === '/favicon.ico') {
+            $res = new \Radix\Http\Response();
+            $res->setStatusCode(204);
+            $res->setHeader('Cache-Control', 'public, max-age=86400, immutable');
+            return $res;
+        }
+
         // Kontrollera om detta är ett API-anrop med felaktigt mönster
         if (str_starts_with($path, '/api/') && !preg_match('#^/api/v\d+(/|$)#', $path)) {
             $body = [
