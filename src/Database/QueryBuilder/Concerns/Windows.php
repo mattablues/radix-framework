@@ -9,24 +9,40 @@ trait Windows
     /** @var string[] */
     protected array $windowExpressions = [];
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function rowNumber(string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $this->windowExpressions[] = $this->buildWindowExpr('ROW_NUMBER()', $partitionBy, $orderBy, $alias);
         return $this;
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function rank(string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $this->windowExpressions[] = $this->buildWindowExpr('RANK()', $partitionBy, $orderBy, $alias);
         return $this;
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function denseRank(string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $this->windowExpressions[] = $this->buildWindowExpr('DENSE_RANK()', $partitionBy, $orderBy, $alias);
         return $this;
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function sumOver(string $column, string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $func = 'SUM(' . $this->wrapColumn($column) . ')';
@@ -34,6 +50,10 @@ trait Windows
         return $this;
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function avgOver(string $column, string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $func = 'AVG(' . $this->wrapColumn($column) . ')';
@@ -41,6 +61,10 @@ trait Windows
         return $this;
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function minOver(string $column, string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $func = 'MIN(' . $this->wrapColumn($column) . ')';
@@ -48,6 +72,10 @@ trait Windows
         return $this;
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     public function maxOver(string $column, string $alias, array $partitionBy = [], array $orderBy = []): self
     {
         $func = 'MAX(' . $this->wrapColumn($column) . ')';
@@ -63,11 +91,18 @@ trait Windows
         return $this;
     }
 
+    /**
+     * @return array<int, string>
+     */
     protected function compileWindowSelects(): array
     {
         return $this->windowExpressions ?? [];
     }
 
+    /**
+     * @param array<int, string> $partitionBy
+     * @param array<int, string|array{0:string,1:string}> $orderBy
+     */
     private function buildWindowExpr(string $fn, array $partitionBy, array $orderBy, string $alias): string
     {
         $parts = [];

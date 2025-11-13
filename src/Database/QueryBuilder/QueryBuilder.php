@@ -54,33 +54,52 @@ class QueryBuilder extends AbstractQueryBuilder
     use GroupingSets;
 
     protected string $type = 'SELECT';
+    /** @var array<int, string> */
     protected array $columns = ['*'];
     protected ?string $table = null;
+    /** @var array<int, mixed> */
     protected array $joins = [];
+    /** @var array<int, mixed> */
     protected array $where = [];
+    /** @var array<int, string> */
     protected array $groupBy = [];
+    /** @var array<int, mixed> */
     protected array $orderBy = [];
     protected ?string $having = null;
     protected ?int $limit = null;
     protected ?int $offset = null;
+    /** @var array<int, mixed> */
     protected array $bindings = [];
+    /** @var array<int, mixed> */
     protected array $unions = [];
     protected bool $distinct = false;
     protected ?string $modelClass = null;
+    /** @var array<int, string> */
     protected array $eagerLoadRelations = [];
     protected bool $withSoftDeletes = false;
+    /** @var array<int, string> */
     protected array $withCountRelations = [];
+    /** @var array<int, string> */
     protected array $withAggregateExpressions = [];
+    /** @var array<int, mixed>|null */
     protected ?array $upsertUnique = null;
+    /** @var array<string, mixed>|null */
     protected ?array $upsertUpdate = null;
 
     // Befintliga buckets (behåll namnen)
+    /** @var array<int, mixed> */
     protected array $bindingsSelect = [];
+    /** @var array<int, mixed> */
     protected array $bindingsWhere = [];
+    /** @var array<int, mixed> */
     protected array $bindingsJoin = [];
+    /** @var array<int, mixed> */
     protected array $bindingsHaving = [];
+    /** @var array<int, mixed> */
     protected array $bindingsOrder = [];
+    /** @var array<int, mixed> */
     protected array $bindingsUnion = [];
+    /** @var array<int, mixed> */
     protected array $bindingsMutation = [];
 
     public function setModelClass(string $modelClass): self
@@ -92,6 +111,9 @@ class QueryBuilder extends AbstractQueryBuilder
         return $this;
     }
 
+    /**
+     * @return object|null
+     */
     public function first()
     {
         if (is_null($this->modelClass)) {
@@ -135,6 +157,8 @@ class QueryBuilder extends AbstractQueryBuilder
 
     /**
      * Hämta alla rader som assoc-arrayer (utan modell-hydrering).
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function fetchAllRaw(): array
     {
@@ -147,6 +171,8 @@ class QueryBuilder extends AbstractQueryBuilder
 
     /**
      * Hämta första raden som assoc-array (utan modell-hydrering) eller null.
+     *
+     * @return array<int, mixed>
      */
     public function fetchRaw(): ?array
     {
@@ -227,6 +253,9 @@ class QueryBuilder extends AbstractQueryBuilder
         return $values[0] ?? null;
     }
 
+    /**
+     * @return array<int, mixed>
+     */
     public function pluck(string $valueColumn, ?string $keyColumn = null): array
     {
         if ($keyColumn === null) {

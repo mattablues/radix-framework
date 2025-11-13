@@ -8,7 +8,18 @@ use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait WithCtes
 {
-    /** @var array<int, array{name:string, sql:string, bindings:array, recursive:bool, columns:array}> */
+    /**
+     * @var array<
+     *     int,
+     *     array{
+     *         name: string,
+     *         sql: string,
+     *         bindings: array<int, mixed>,
+     *         recursive: bool,
+     *         columns: array<int, string>
+     *     }
+     * >
+     */
     protected array $ctes = [];
 
     // Bytt namn för att undvika kollision med EagerLoad::with()
@@ -24,7 +35,11 @@ trait WithCtes
         return $this;
     }
 
-    // Bytt namn för symmetri
+    /**
+     * Bytt namn för symmetri
+     *
+     * @param array<int, mixed> $bindings
+     */
     public function withCteRaw(string $raw, array $bindings = []): self
     {
         $this->ctes[] = [
@@ -37,6 +52,9 @@ trait WithCtes
         return $this;
     }
 
+    /**
+     * @param array<int, string> $columns
+     */
     public function withRecursive(string $name, QueryBuilder $anchor, QueryBuilder $recursive, array $columns = []): self
     {
         $union = $anchor->toSql() . ' UNION ALL ' . $recursive->toSql();
@@ -77,6 +95,9 @@ trait WithCtes
         return $prefix;
     }
 
+    /**
+     * @return array<int, mixed>
+     */
     protected function compileCteBindings(): array
     {
         if (empty($this->ctes)) {
