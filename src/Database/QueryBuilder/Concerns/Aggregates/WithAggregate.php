@@ -57,7 +57,7 @@ trait WithAggregate
         }
 
         $rel = $parent->$relation();
-        $aggAlias = $alias ?: "{$relation}_" . strtolower($fn);
+        $aggAlias = $alias ?: (strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation) . '_' . strtolower($fn));
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             $relatedModelClass = (new \ReflectionClass($rel))->getProperty('modelClass');
@@ -77,24 +77,19 @@ trait WithAggregate
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
@@ -116,24 +111,19 @@ trait WithAggregate
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {

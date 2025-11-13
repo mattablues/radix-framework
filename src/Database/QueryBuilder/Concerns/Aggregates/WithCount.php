@@ -32,6 +32,9 @@ trait WithCount
             throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
         }
 
+        // snake_case alias av relationsnamnet
+        $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation);
+
         $rel = $parent->$relation();
         $relatedTableGuess = $relation;
 
@@ -52,31 +55,26 @@ trait WithCount
             $fkProp->setAccessible(true);
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
@@ -91,31 +89,26 @@ trait WithCount
             $throughTable = $resolveTable($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `{$relation}_count`";
+                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
@@ -130,14 +123,14 @@ trait WithCount
             $throughTable = $resolveTable($throughClassOrTable);
 
             $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
+                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
             $pivotTable = $rel->getPivotTable();
             $foreignPivotKey = $rel->getForeignPivotKey();
-            $this->columns[] = "(SELECT COUNT(*) FROM `$pivotTable` WHERE `$pivotTable`.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$pivotTable` WHERE `$pivotTable`.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
@@ -152,7 +145,7 @@ trait WithCount
             $relatedInstance = new $modelClass();
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
@@ -169,7 +162,7 @@ trait WithCount
             $tableProp->setAccessible(true);
             $relatedTable = $tableProp->getValue($rel);
 
-            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `{$relation}_count`";
+            $this->columns[] = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `{$snake}_count`";
             return;
         }
 
@@ -192,8 +185,9 @@ trait WithCount
         }
 
         $rel = $parent->$relation();
-        $aggAlias = $alias ?: "{$relation}_count_$value";
+        $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation);
         $valSql = is_int($value) || is_float($value) ? (string)$value : ("'".addslashes((string)$value)."'");
+        $aggAlias = $alias ?: "{$snake}_count_" . (is_scalar($value) ? (string)$value : 'value');
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             $relatedModelClassProp = (new \ReflectionClass($rel))->getProperty('modelClass');
@@ -215,24 +209,19 @@ trait WithCount
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolve = function (string $classOrTable): string {
@@ -255,24 +244,19 @@ trait WithCount
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolve = function (string $classOrTable): string {
