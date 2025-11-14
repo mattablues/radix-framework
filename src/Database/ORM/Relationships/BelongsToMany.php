@@ -191,14 +191,13 @@ class BelongsToMany
     /**
      * Attach relaterade ids till pivot-tabellen.
      *
-     * @param  int|array<int, int|array<string, mixed>>  $ids
+     * @param  int|string|array<int, int|array<string, mixed>>  $ids
      *        - 5
      *        - [1, 2, 3]
      *        - [1 => ['extra' => 'x'], 2 => ['extra' => 'y']]
-     * @param array<string, mixed> $attributes   Extra attribut som appliceras på alla ids vid "platt" lista
+     * @param  array<string, mixed>  $attributes
      */
-    public function attach(array|int $ids, array $attributes = [], bool $ignoreDuplicates = true): void
-    {
+    public function attach(int|string|array $ids, array $attributes = [], bool $ignoreDuplicates = true): void    {
         $parentId = $this->requireParentId();
         $rows = $this->normalizeAttachInput($ids, $attributes);
 
@@ -372,11 +371,11 @@ class BelongsToMany
     }
 
     /**
-     * @param  int|array<int, int|array<string, mixed>>  $ids
-     * @param array<string, mixed>                     $attributes
+     * @param int|string|array<int, int|array<string, mixed>> $ids
+     * @param array<string, mixed> $attributes
      * @return array<int, array<string, mixed>>
      */
-    private function normalizeAttachInput(array|int $ids, array $attributes = []): array
+    private function normalizeAttachInput(int|string|array $ids, array $attributes = []): array
     {
         if (!is_array($ids)) {
             return [(int)$ids => $attributes];
