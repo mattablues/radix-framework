@@ -63,6 +63,9 @@ class HasMany
         return $this->builder;
     }
 
+    /**
+     * @return array<int, Model>
+     */
     public function get(): array
     {
         if ($this->builder instanceof QueryBuilder) {
@@ -89,6 +92,7 @@ class HasMany
         return array_map(fn($data) => $this->createModelInstance($data, $modelClass), $results);
     }
 
+
     public function first(): ?Model
     {
         $results = $this->get();
@@ -112,6 +116,9 @@ class HasMany
         throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);

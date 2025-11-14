@@ -71,6 +71,9 @@ trait Functions
         return $this;
     }
 
+    /**
+     * @param array<int, string> $columns
+     */
     public function concat(array $columns, string $alias): self
     {
         if ($this->columns === ['*']) {

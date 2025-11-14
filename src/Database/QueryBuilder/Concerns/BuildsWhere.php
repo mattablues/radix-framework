@@ -65,6 +65,9 @@ trait BuildsWhere
         return $this;
     }
 
+    /**
+     * @param array<int, string|int|float|bool> $values
+     */
     public function whereIn(string $column, array $values, string $boolean = 'AND'): self
     {
         if (empty($values)) {
@@ -146,7 +149,9 @@ trait BuildsWhere
         return $this->whereNotNull($column, 'OR');
     }
 
-    // NYTT: whereNotIn
+    /**
+     * @param array<int, mixed> $values
+     */
     public function whereNotIn(string $column, array $values, string $boolean = 'AND'): self
     {
         if (empty($values)) {
@@ -167,7 +172,9 @@ trait BuildsWhere
         return $this;
     }
 
-    // NYTT: whereBetween / whereNotBetween
+    /**
+     * @param array{0: mixed, 1: mixed} $range
+     */
     public function whereBetween(string $column, array $range, string $boolean = 'AND'): self
     {
         if (count($range) !== 2) {
@@ -186,6 +193,9 @@ trait BuildsWhere
         return $this;
     }
 
+    /**
+     * @param array{0: mixed, 1: mixed} $range
+     */
     public function whereNotBetween(string $column, array $range, string $boolean = 'AND'): self
     {
         if (count($range) !== 2) {
@@ -244,7 +254,9 @@ trait BuildsWhere
         return $this;
     }
 
-    // NYTT: whereRaw
+    /**
+     * @param array<int, mixed> $bindings
+     */
     public function whereRaw(string $sql, array $bindings = [], string $boolean = 'AND'): self
     {
         $this->where[] = [

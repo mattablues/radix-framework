@@ -28,6 +28,9 @@ trait Ordering
         return $this;
     }
 
+    /**
+     * @param array<int, mixed> $bindings
+     */
     public function havingRaw(string $expression, array $bindings = []): self
     {
         $this->having = $expression;

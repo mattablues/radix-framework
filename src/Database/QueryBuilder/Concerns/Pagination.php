@@ -25,12 +25,20 @@ trait Pagination
         return $result !== null;
     }
 
-        /**
+    /**
      * Enkel pagination utan totalräkning (snabbare).
      *
      * @param int $perPage
      * @param int $currentPage
-     * @return array{data: array, pagination: array{per_page:int,current_page:int,has_more:bool,first_page:int}}
+     * @return array{
+     *     data: array<int, mixed>,
+     *     pagination: array{
+     *         per_page: int,
+     *         current_page: int,
+     *         has_more: bool,
+     *         first_page: int
+     *     }
+     * }
      */
     public function simplePaginate(int $perPage = 10, int $currentPage = 1): array
     {
@@ -63,7 +71,16 @@ trait Pagination
      *
      * @param int $perPage
      * @param int $currentPage
-     * @return array{data: array, pagination: array{total:int,per_page:int,current_page:int,last_page:int,first_page:int}}
+     * @return array{
+     *     data: array<int, mixed>,
+     *     pagination: array{
+     *         total: int,
+     *         per_page: int,
+     *         current_page: int,
+     *         last_page: int,
+     *         first_page: int
+     *     }
+     * }
      */
     public function paginate(int $perPage = 10, int $currentPage = 1): array
     {
@@ -125,7 +142,7 @@ trait Pagination
      * @param array<int,string> $searchColumns
      * @param int $perPage
      * @param int $currentPage
-     * @return array{data: array, search: array{term:string,total:int,per_page:int,current_page:int,last_page:int,first_page:int}}
+     * @return array{data: array<int, mixed>, search: array{term:string,total:int,per_page:int,current_page:int,last_page:int,first_page:int}}
      */
     public function search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1): array
     {

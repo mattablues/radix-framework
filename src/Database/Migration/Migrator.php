@@ -65,6 +65,8 @@ class Migrator
 
     /**
      * Hämta alla migreringar som redan har körts.
+     *
+     * @return array<int,string>
      */
     private function getExecutedMigrations(): array
     {
@@ -82,6 +84,8 @@ class Migrator
 
     /**
      * Rulla tillbaka den senaste körda migreringen.
+     *
+     * @return array<int,string>
      */
     public function rollback(?string $partialName = null): array
     {
@@ -146,6 +150,8 @@ class Migrator
 
     /**
      * Hämta migrationer som matchar del av namnet.
+     *
+     * @return array<int,string>
      */
     private function getMatchingMigrations(string $partialName): array
     {

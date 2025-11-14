@@ -16,7 +16,9 @@ class HasOne
     private string $localKeyName;
     private ?Model $parent = null;
     private bool $useDefault = false;
-    /** @var null|array|callable */
+    /**
+     * @var null|array<string, mixed>|callable
+     */
     private $defaultAttributes = null;
 
     public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
@@ -38,6 +40,9 @@ class HasOne
         return $this;
     }
 
+    /**
+     * @param array<string, mixed>|callable|null $attributes
+     */
     public function withDefault(null|array|callable $attributes = null): self
     {
         $this->useDefault = true;
@@ -99,6 +104,9 @@ class HasOne
         return $model;
     }
 
+    /**
+     * @param array<string, mixed> $data  Rad från databasen (kolumn => värde)
+     */
     private function createModelInstance(array $data): Model
     {
         $model = new $this->modelClass();

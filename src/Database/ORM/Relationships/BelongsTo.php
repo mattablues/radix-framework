@@ -16,7 +16,7 @@ class BelongsTo
     private string $ownerKey;
     private Model $parentModel;
     private bool $useDefault = false;
-    /** @var null|array|callable */
+    /** @var array<string, mixed>|callable|null */
     private $defaultAttributes = null;
 
     public function __construct(
@@ -33,6 +33,9 @@ class BelongsTo
         $this->parentModel = $parentModel;
     }
 
+    /**
+     * @param array<string, mixed>|callable|null $attributes
+     */
     public function withDefault(null|array|callable $attributes = null): self
     {
         $this->useDefault = true;
@@ -116,6 +119,9 @@ class BelongsTo
         throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);

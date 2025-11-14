@@ -6,6 +6,9 @@ namespace Radix\Database\QueryBuilder\Concerns\Aggregates;
 
 trait WithCount
 {
+    /**
+     * @param string|array<int, string> $relations
+     */
     public function withCount(string|array $relations): self
     {
         if ($this->modelClass === null) {

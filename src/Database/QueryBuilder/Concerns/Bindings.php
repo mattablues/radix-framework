@@ -6,6 +6,9 @@ namespace Radix\Database\QueryBuilder\Concerns;
 
 trait Bindings
 {
+    /**
+     * @return array<int, mixed>
+     */
     public function getBindings(): array
     {
         // Compila alltid – metoden finns på QueryBuilder
@@ -48,6 +51,9 @@ trait Bindings
         $this->bindingsWhere[] = $value;
     }
 
+    /**
+     * @param array<int, mixed> $values
+     */
     protected function addWhereBindings(array $values): void
     {
         foreach ($values as $v) {
@@ -60,6 +66,9 @@ trait Bindings
         $this->bindingsJoin[] = $value;
     }
 
+    /**
+     * @param array<int, mixed> $values
+     */
     protected function addJoinBindings(array $values): void
     {
         foreach ($values as $v) {
@@ -72,6 +81,9 @@ trait Bindings
         $this->bindingsHaving[] = $value;
     }
 
+    /**
+     * @param array<int, mixed> $values
+     */
     protected function addHavingBindings(array $values): void
     {
         foreach ($values as $v) {
@@ -84,6 +96,9 @@ trait Bindings
         $this->bindingsOrder[] = $value;
     }
 
+    /**
+     * @param array<int, mixed> $values
+     */
     protected function addUnionBindings(array $values): void
     {
         foreach ($values as $v) {
@@ -91,6 +106,9 @@ trait Bindings
         }
     }
 
+    /**
+     * @param array<int, mixed> $values
+     */
     protected function addMutationBindings(array $values): void
     {
         foreach ($values as $v) {

@@ -72,6 +72,9 @@ class HasManyThrough
         return $this;
     }
 
+    /**
+     * @return array<int,Model>
+     */
     public function get(): array
     {
         if ($this->parent === null) {
@@ -122,6 +125,9 @@ class HasManyThrough
         throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);

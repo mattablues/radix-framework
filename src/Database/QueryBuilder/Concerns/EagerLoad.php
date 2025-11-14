@@ -6,6 +6,9 @@ namespace Radix\Database\QueryBuilder\Concerns;
 
 trait EagerLoad
 {
+    /**
+     * @param array<int, string> $relations
+     */
     public function with(array|string $relations): self
     {
         if (!$this->modelClass) {

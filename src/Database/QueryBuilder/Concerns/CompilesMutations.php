@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use Radix\Database\QueryBuilder\QueryBuilder;
+
 trait CompilesMutations
 {
     protected array $withAggregateExpressions = [];
@@ -81,6 +83,9 @@ trait CompilesMutations
         throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
     }
 
+    /**
+     * @param array<string, mixed> $data Data för INSERT (kolumn => värde)
+     */
     public function insert(array $data): self
     {
         if (empty($data)) {
@@ -94,6 +99,9 @@ trait CompilesMutations
         return $this;
     }
 
+    /**
+     * @param array<string, mixed> $data Data för UPDATE (kolumn => värde)
+     */
     public function update(array $data): self
     {
         $this->type = 'UPDATE';
@@ -114,6 +122,9 @@ trait CompilesMutations
         return $this;
     }
 
+    /**
+     * @param array<string, mixed> $data Data för INSERT OR IGNORE (kolumn => värde)
+     */
     public function insertOrIgnore(array $data): self
     {
         if (empty($data)) {
@@ -125,6 +136,11 @@ trait CompilesMutations
         return $this;
     }
 
+  /**
+     * @param array<string, mixed>  $data     Rad att upserta (kolumn => värde)
+     * @param array<int, string>    $uniqueBy Kolumner/nycklar som definierar unikhet
+     * @param array<string, mixed>|null $update Kolumner att uppdatera vid konflikt (null = alla kolumner)
+     */
     public function upsert(array $data, array $uniqueBy, ?array $update = null): self
     {
         if (empty($data) || empty($uniqueBy)) {

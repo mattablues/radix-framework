@@ -7,10 +7,15 @@ namespace Radix\Database\Migration;
 class Blueprint
 {
     private string $table;
+    /** @var array<int,string> */
     private array $columns = [];
+    /** @var array<int,string> */
     private array $alterOperations = [];
+    /** @var array<int,string> */
     private array $keys = [];
+    /** @var array<int,string> */
     private array $constraints = [];
+    /** @var array<string,mixed> */
     private array $tableOptions = [];
     private bool $isAlter;
 
@@ -21,7 +26,9 @@ class Blueprint
     }
 
     /**
-     * Lägg till en generell kolumn med attribut.
+     * Lägg till en kolumn på tabellen.
+     *
+     * @param array<string,mixed> $options
      */
     public function addColumn(string $type, string $name, array $options = []): self
     {
@@ -131,7 +138,9 @@ class Blueprint
     }
 
     /**
-     * Batch-ta bort flera kolumner.
+     * Ta bort flera kolumner.
+     *
+     * @param array<int,string> $columns
      */
     public function dropColumns(array $columns): self
     {
@@ -149,70 +158,136 @@ class Blueprint
         ])->primary([$name]);
     }
 
+    /**
+     * Lägg till en VARCHAR‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function string(string $name, int $length = 255, array $options = []): self
     {
         return $this->addColumn("VARCHAR($length)", $name, $options);
     }
 
+    /**
+     * Lägg till en TEXT‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function text(string $name, array $options = []): self
     {
         return $this->addColumn('TEXT', $name, $options);
     }
 
+    /**
+     * Lägg till en INT‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function integer(string $name, bool $unsigned = false, array $options = []): self
     {
         $type = $unsigned ? 'INT UNSIGNED' : 'INT';
         return $this->addColumn($type, $name, $options);
     }
 
+    /**
+     * Lägg till en TINYINT‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function tinyInteger(string $name, bool $unsigned = false, array $options = []): self
     {
         $type = $unsigned ? 'TINYINT UNSIGNED' : 'TINYINT';
         return $this->addColumn($type, $name, $options);
     }
 
+    /**
+     * Lägg till en BIGINT‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function bigInteger(string $name, bool $unsigned = false, array $options = []): self
     {
         $type = $unsigned ? 'BIGINT UNSIGNED' : 'BIGINT';
         return $this->addColumn($type, $name, $options);
     }
 
+    /**
+     * Lägg till en BOOLEAN‑kolumn (TINYINT(1)).
+     *
+     * @param array<string,mixed> $options
+     */
     public function boolean(string $name, array $options = []): self
     {
         return $this->addColumn('TINYINT(1)', $name, $options);
     }
 
+    /**
+     * Lägg till en FLOAT‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function float(string $name, int $total = 8, int $places = 2, array $options = []): self
     {
         return $this->addColumn("FLOAT($total, $places)", $name, $options);
     }
 
+    /**
+     * Lägg till en DECIMAL‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function decimal(string $name, int $total = 8, int $places = 2, array $options = []): self
     {
         return $this->addColumn("DECIMAL($total, $places)", $name, $options);
     }
 
+    /**
+     * Lägg till en DATETIME‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function datetime(string $name, array $options = []): self
     {
         return $this->addColumn('DATETIME', $name, $options);
     }
 
+    /**
+     * Lägg till en TIME‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function time(string $name, array $options = []): self
     {
         return $this->addColumn('TIME', $name, $options);
     }
 
+    /**
+     * Lägg till en JSON‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
     public function json(string $name, array $options = []): self
     {
         return $this->addColumn('JSON', $name, $options);
     }
 
+    /**
+     * Lägg till en ENUM‑kolumn.
+     *
+     * @param array<int,string>   $allowed Lista av tillåtna värden.
+     * @param array<string,mixed> $options Ytterligare kolumn‑optioner.
+     */
     public function enum(string $name, array $allowed, array $options = []): self
     {
         $values = "'" . implode("', '", $allowed) . "'";
         return $this->addColumn("ENUM($values)", $name, $options);
     }
 
+    /**
+     * Lägg till en UUID‑kolumn (CHAR(36)).
+     *
+     * @param array<string,mixed> $options
+     */
     public function uuid(string $name, array $options = []): self
     {
         return $this->addColumn('CHAR(36)', $name, $options);
@@ -236,12 +311,22 @@ class Blueprint
         return $this->datetime('deleted_at', ['nullable' => true]);
     }
 
+    /**
+     * Sätt primärnyckel på de angivna kolumnerna.
+     *
+     * @param array<int,string> $columns
+     */
     public function primary(array $columns): self
     {
         $this->keys[] = 'PRIMARY KEY (' . $this->formatColumnList($columns) . ')';
         return $this;
     }
 
+    /**
+     * Skapa ett unikt index på de angivna kolumnerna.
+     *
+     * @param array<int,string> $columns
+     */
     public function unique(array $columns, string $name = null): self
     {
         $indexName = $name ?: 'unique_' . implode('_', $columns);
@@ -249,6 +334,11 @@ class Blueprint
         return $this;
     }
 
+    /**
+     * Skapa ett (icke-unikt) index på de angivna kolumnerna.
+     *
+     * @param array<int,string> $columns
+     */
     public function index(array $columns, string $name = null): self
     {
         $indexName = $name ?: 'index_' . implode('_', $columns);
@@ -269,6 +359,11 @@ class Blueprint
         return $this;
     }
 
+    /**
+     * Ändra primärnyckeln till de angivna kolumnerna.
+     *
+     * @param array<int,string> $columns
+     */
     public function modifyPrimary(array $columns): self
     {
         if (!$this->isAlter) {
@@ -304,6 +399,11 @@ class Blueprint
         return 'CREATE TABLE `' . $this->table . '` (' . implode(', ', $definitions) . ')' . $options . ' DEFAULT CHARSET=utf8mb4;';
     }
 
+    /**
+     * Generera SQL‑satser för ALTER‑operationerna.
+     *
+     * @return array<int,string> Lista av SQL‑strängar.
+     */
     public function toAlterSql(): array
     {
         return array_map(
@@ -312,6 +412,11 @@ class Blueprint
         );
     }
 
+    /**
+     * Generera SQL‑satser för att rulla tillbaka blueprintens ändringar.
+     *
+     * @return array<int,string> Lista av SQL‑strängar.
+     */
     public function toRollbackSql(): array
     {
         if (empty($this->alterOperations)) {
@@ -355,7 +460,9 @@ class Blueprint
         return null;
     }
 
-
+    /**
+     * @param array<int,string> $columns
+     */
     private function formatColumnList(array $columns): string
     {
         return implode(', ', array_map(fn($column) => "`$column`", $columns));

@@ -10,6 +10,9 @@ trait GroupingSets
     /** @var array<int, array<int, string>> */
     protected array $groupingSets = [];
 
+    /**
+     * @param array<int, string> $groupBy
+     */
     public function rollup(array $groupBy): self
     {
         // För MySQL: GROUP BY cols WITH ROLLUP
@@ -18,6 +21,9 @@ trait GroupingSets
         return $this;
     }
 
+    /**
+     * @param array<int, array<int, string>> $sets  // lista av listor av kolumnnamn
+     */
     public function groupingSets(array $sets): self
     {
         // För Postgres (framtid). Vi sparar sets; rendering kan vara no-op i MySQL/SQLite.

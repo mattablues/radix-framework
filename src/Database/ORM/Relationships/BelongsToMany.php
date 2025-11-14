@@ -17,6 +17,7 @@ class BelongsToMany
     private string $relatedPivotKey;
     private string $parentKeyName;
     private ?Model $parent = null;
+    /** @var array<int, string> */
     private array $pivotColumns = []; // nya: extra kolumner att hämta från pivot
     private ?\Radix\Database\QueryBuilder\QueryBuilder $builder = null; // ny: relationens QB
 
@@ -99,6 +100,11 @@ class BelongsToMany
         return $this;
     }
 
+    /**
+     * Hämta relaterade modeller.
+     *
+     * @return array<int, Model>
+     */
     public function get(): array
     {
         // 1) Om query()-builder finns (används av eager loading med closure), kör den
@@ -182,7 +188,16 @@ class BelongsToMany
         return $models;
     }
 
-    public function attach($ids, array $attributes = [], bool $ignoreDuplicates = true): void
+    /**
+     * Attach relaterade ids till pivot-tabellen.
+     *
+     * @param  int|array<int, int|array<string, mixed>>  $ids
+     *        - 5
+     *        - [1, 2, 3]
+     *        - [1 => ['extra' => 'x'], 2 => ['extra' => 'y']]
+     * @param array<string, mixed> $attributes   Extra attribut som appliceras på alla ids vid "platt" lista
+     */
+    public function attach(array|int $ids, array $attributes = [], bool $ignoreDuplicates = true): void
     {
         $parentId = $this->requireParentId();
         $rows = $this->normalizeAttachInput($ids, $attributes);
@@ -216,7 +231,16 @@ class BelongsToMany
         }
     }
 
-    public function detach($ids = null): void
+    /**
+     * Detach relaterade ids från pivot-tabellen.
+     *
+     * @param  int|array<int, int|array<string, mixed>>|null  $ids
+     *        - null  => ta bort alla för parent
+     *        - 5     => ta bort en
+     *        - [1,2] => ta bort flera
+     *        - [1 => ['ignored']] är tillåtet för backcompat, värdena används inte
+     */
+    public function detach(array|int $ids = null): void
     {
         $parentId = $this->requireParentId();
 
@@ -241,6 +265,9 @@ class BelongsToMany
         $this->connection->execute($sql, array_merge([$parentId], $normalized));
     }
 
+    /**
+     * @param array<int, int|array<string, mixed>> $idsWithAttributes
+     */
     public function sync(array $idsWithAttributes, bool $detaching = true): void
     {
         $parentId = $this->requireParentId();
@@ -317,6 +344,9 @@ class BelongsToMany
         throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);
@@ -341,7 +371,12 @@ class BelongsToMany
         return (int)$id;
     }
 
-    private function normalizeAttachInput($ids, array $attributes = []): array
+    /**
+     * @param  int|array<int, int|array<string, mixed>>  $ids
+     * @param array<string, mixed>                     $attributes
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeAttachInput(array|int $ids, array $attributes = []): array
     {
         if (!is_array($ids)) {
             return [(int)$ids => $attributes];
@@ -369,6 +404,9 @@ class BelongsToMany
         return $row !== null;
     }
 
+    /**
+     * @return array<int, int>
+     */
     private function getExistingRelatedIds(int $parentId): array
     {
         $sql = "SELECT `$this->relatedPivotKey` AS rid FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ?";

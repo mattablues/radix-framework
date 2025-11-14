@@ -21,11 +21,9 @@ class Connection
     }
 
     /**
-     * Kör en SQL-fråga via PDO.
+     * Kör ett statement och returnera PDOStatement.
      *
-     * @param  string  $query  SQL-frågan som ska köras.
-     * @param  array  $params  Parametrar som ska bindas.
-     * @return PDOStatement Returnerar true om operationen lyckades, false annars.
+     * @param array<int,mixed> $params
      */
     public function execute(string $query, array $params = []): PDOStatement
     {
@@ -34,12 +32,12 @@ class Connection
 
         return $statement; // Returnera statement istället för bool
     }
+
     /**
-     * Hämta alla rader från en fråga.
+     * Hämta alla rader som assoc‑arrayer.
      *
-     * @param string $query
-     * @param array $params
-     * @return array
+     * @param array<int,mixed> $params
+     * @return array<int,array<string,mixed>>
      */
     public function fetchAll(string $query, array $params = []): array
     {
@@ -49,12 +47,10 @@ class Connection
     }
 
     /**
-     * Hämta alla rader från en fråga som en viss klass.
+     * Hämta alla rader som objekt eller assoc‑arrayer.
      *
-     * @param string $query SQL-frågan som ska köras.
-     * @param array $params Parametrar som ska bindas.
-     * @param string|null $className Namnet på klassen som raderna ska mappas till.
-     * @return array|object[]
+     * @param array<int,mixed> $params
+     * @return array<int,object>|array<int,array<string,mixed>>
      */
     public function fetchAllAsClass(string $query, array $params = [], ?string $className = null): array
     {
@@ -69,7 +65,9 @@ class Connection
     }
 
     /**
-     * Hämta en enskild rad från en fråga som en viss klass.
+     * Hämta första raden som objekt (klass eller standard).
+     *
+     * @param array<int,mixed> $params
      */
     public function fetchOneAsClass(string $query, array $params = [], ?string $className = null): ?object
     {
@@ -85,11 +83,10 @@ class Connection
     }
 
     /**
-     * Hämta en enskild rad från en fråga.
+     * Hämta första raden som assoc‑array (eller null).
      *
-     * @param string $query SQL-frågan som ska köras.
-     * @param array $params Parametrar som ska bindas.
-     * @return array|null Returnerar raden som en array eller null om ingen rad hittades.
+     * @param array<int,mixed> $params
+     * @return array<string,mixed>|null
      */
     public function fetchOne(string $query, array $params = []): ?array
     {
@@ -100,11 +97,9 @@ class Connection
     }
 
     /**
-     * Hämta antalet påverkade rader från den senaste operationen.
+     * Kör ett statement och returnera antal påverkade rader.
      *
-     * @param string $query SQL-frågan som ska köras.
-     * @param array $params Parametrar som ska bindas.
-     * @return int Antalet påverkade rader.
+     * @param array<int,mixed> $params
      */
     public function fetchAffected(string $query, array $params = []): int
     {

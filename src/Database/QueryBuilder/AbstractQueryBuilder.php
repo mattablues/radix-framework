@@ -8,6 +8,7 @@ use Radix\Database\Connection;
 
 abstract class AbstractQueryBuilder
 {
+    /** @var array<int, mixed> */
     protected array $bindings = [];
     protected ?Connection $connection = null;
     /** @var array<string, callable> */

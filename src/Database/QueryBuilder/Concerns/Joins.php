@@ -46,6 +46,9 @@ trait Joins
         return $this;
     }
 
+    /**
+     * @param array<int, mixed> $bindings
+     */
     public function joinRaw(string $raw, array $bindings = []): self
     {
         $this->joins[] = $raw;

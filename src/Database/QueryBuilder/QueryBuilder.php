@@ -54,7 +54,9 @@ class QueryBuilder extends AbstractQueryBuilder
     use GroupingSets;
 
     protected string $type = 'SELECT';
-    /** @var array<int, string> */
+    /**
+     * @var array<int, string>|array<string, mixed>
+     */
     protected array $columns = ['*'];
     protected ?string $table = null;
     /** @var array<int, mixed> */
@@ -170,9 +172,9 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     /**
-     * Hämta första raden som assoc-array (utan modell-hydrering) eller null.
+     * Hämta första raden som assoc‑array (utan modell‑hydrering) eller null.
      *
-     * @return array<int, mixed>
+     * @return array<string,mixed>|null
      */
     public function fetchRaw(): ?array
     {

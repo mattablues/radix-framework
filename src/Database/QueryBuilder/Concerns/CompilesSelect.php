@@ -8,6 +8,9 @@ use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait CompilesSelect
 {
+    /**
+     * @param array<int, string> $columns
+     */
     public function select(array|string $columns = ['*']): self
     {
         $this->type = 'SELECT';

@@ -8,6 +8,9 @@ use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait InsertSelect
 {
+    /**
+     * @param array<int, string> $columns
+     */
     public function insertSelect(string $table, array $columns, QueryBuilder $select): self
     {
         if (empty($table) || empty($columns)) {
