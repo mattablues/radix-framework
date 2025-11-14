@@ -10,13 +10,32 @@ use Radix\Container\Exception\ContainerDependencyInjectionException;
 use Radix\Container\Exception\ContainerNotFoundException;
 use ReflectionClass;
 
+/**
+ * @implements \ArrayAccess<string, object>
+ */
 class Container implements ContainerInterface, ArrayAccess
 {
+    /**
+     * @var array<string, string>
+     */
     private array $aliases = [];
+    /**
+     * @var array<string, Definition>
+     */
     private array $definitions = [];
+    /**
+     * @var array<string, object>
+     */
     private array $instances = [];
     private Parameter $parameters;
     private Resolver $resolver;
+    /**
+     * @var array{
+     *     share: bool,
+     *     autowire: bool,
+     *     autoregister: bool
+     * }
+     */
     private array $defaults = [
         'share' => false,
         'autowire' => true,
@@ -94,6 +113,11 @@ class Container implements ContainerInterface, ArrayAccess
         return $this->definitions[$id] = $definition;
     }
 
+    /**
+     * Lägg till flera definitioner i containern.
+     *
+     * @param array<string, Definition> $definitions
+     */
     public function addDefinitions(array $definitions): void
     {
         foreach ($definitions as $id => $definition) {
@@ -101,6 +125,11 @@ class Container implements ContainerInterface, ArrayAccess
         }
     }
 
+    /**
+     * Ersätt alla definitioner i containern.
+     *
+     * @param array<string, Definition> $definitions
+     */
     public function setDefinitions(array $definitions): void
     {
         $this->definitions = [];
@@ -175,6 +204,11 @@ class Container implements ContainerInterface, ArrayAccess
         return $instance;
     }
 
+    /**
+     * Lägg till en tagg på en registrerad tjänst.
+     *
+     * @param array<string, mixed> $parameters Attribut för taggen.
+     */
     public function addTag(string $serviceId, string $tag, array $parameters = []): void
     {
         if (!$this->has($serviceId)) {
@@ -215,6 +249,7 @@ class Container implements ContainerInterface, ArrayAccess
      *         }
      *     }
      *
+     * @return array<string, array<int, array<string, mixed>>>
      */
     public function findTaggedServiceIds(string $name): array
     {
@@ -228,16 +263,31 @@ class Container implements ContainerInterface, ArrayAccess
         return $tags;
     }
 
+    /**
+     * Hämta alla container-parametrar.
+     *
+     * @return array<string, mixed>
+     */
     public function getParameters(): array
     {
         return $this->parameters->toArray();
     }
 
+    /**
+     * Ersätt alla container-parametrar.
+     *
+     * @param array<string, mixed> $parameterStore
+     */
     public function setParameters(array $parameterStore): void
     {
         $this->parameters->setParameters($parameterStore);
     }
 
+    /**
+     * Lägg till flera container-parametrar.
+     *
+     * @param array<string, mixed> $parameters
+     */
     public function addParameters(array $parameters): void
     {
         $this->parameters->addParameters($parameters);
@@ -258,6 +308,11 @@ class Container implements ContainerInterface, ArrayAccess
         return $this->defaults[$option] ?? null;
     }
 
+    /**
+     * Sätt container-defaults (merging med befintliga).
+     *
+     * @param array<string, mixed> $defaults
+     */
     public function setDefaults(array $defaults): void
     {
         $this->defaults = array_merge($this->defaults, $defaults);

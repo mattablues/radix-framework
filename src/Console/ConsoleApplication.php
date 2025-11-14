@@ -8,13 +8,10 @@ namespace Radix\Console;
 
 class ConsoleApplication
 {
+    /**
+     * @var array<string, callable>
+     */
     private array $commands = [];
-//    private ContainerInterface $container;
-
-//    public function __construct(ContainerInterface $container)
-//    {
-//        $this->container = $container;
-//    }
 
     /**
      * Lägg till ett nytt kommando med dess namn och callable.
@@ -25,7 +22,9 @@ class ConsoleApplication
     }
 
     /**
-     * Kör konsolapplikationen.
+     * Kör CLI-applikationen.
+     *
+     * @param array<int, string> $argv Lista av argument (vanligtvis från $argv).
      */
     public function run(array $argv): void
     {

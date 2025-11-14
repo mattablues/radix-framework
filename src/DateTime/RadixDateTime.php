@@ -14,6 +14,9 @@ use Radix\Config\Config;
 class RadixDateTime
 {
     private Config $config;
+    /**
+     * @var array<string, mixed>
+     */
     private array $datetimeConfig;
     private DateTimeZone $timezone;
 
@@ -62,6 +65,11 @@ class RadixDateTime
         }
     }
 
+    /**
+     * Skapa en lista av datumsträngar mellan två datum (inklusive båda).
+     *
+     * @return array<int, string>
+     */
     public function fromRange(string $start, string $end, string $format = 'Y-m-d'): array
     {
         if (!$this->validateDate($start) || !$this->validateDate($end)) {

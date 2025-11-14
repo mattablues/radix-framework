@@ -10,10 +10,7 @@ use Radix\Container\Exception\ContainerInvalidArgumentException;
 class ArrayArgument extends LiteralArgument
 {
     /**
-     * ArrayArgument constructor.
-     *
-     * @param array $value Arrayvärde.
-     * @throws ContainerInvalidArgumentException Om värdet inte är giltigt.
+     * @param array<int|string, mixed> $value
      */
     public function __construct(array $value)
     {
@@ -26,10 +23,9 @@ class ArrayArgument extends LiteralArgument
     }
 
     /**
-     * Validerar arrayen.
+     * Validera att given array uppfyller samlingens krav.
      *
-     * @param  array  $value
-     * @throws ContainerInvalidArgumentException
+     * @param array<int|string, mixed> $value
      */
     private function validateArray(array $value): void
     {
@@ -40,10 +36,9 @@ class ArrayArgument extends LiteralArgument
     }
 
     /**
-     * Lägger till ett värde till arrayen.
+     * Lägg till ett värde i samlingen och returnera den uppdaterade arrayen.
      *
-     * @param mixed $value
-     * @return array
+     * @return array<int|string, mixed>
      */
     public function addValue(mixed $value): array
     {
@@ -53,10 +48,9 @@ class ArrayArgument extends LiteralArgument
     }
 
     /**
-     * Tar bort ett värde från arrayen om det finns.
+     * Ta bort alla förekomster av ett visst värde och returnera den uppdaterade arrayen.
      *
-     * @param mixed $value
-     * @return array
+     * @return array<int|string, mixed>
      */
     public function removeValue(mixed $value): array
     {
@@ -71,10 +65,12 @@ class ArrayArgument extends LiteralArgument
     }
 
     /**
-     * Sorterar arrayen efter en callback-funktion.
+     * Sortera samlingens värden och returnera en ny array.
      *
-     * @param callable|null $callback
-     * @return array
+     * Om $callback är satt används den som jämförelsefunktion (samma signatur som i usort).
+     *
+     * @param callable(mixed, mixed): int|null $callback
+     * @return array<int|string, mixed>
      */
     public function sort(?callable $callback = null): array
     {

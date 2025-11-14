@@ -8,8 +8,16 @@ use Dflydev\DotAccessData\Data;
 
 final class Parameter extends Data
 {
+    /**
+     * @var array<string, mixed>
+     */
     protected array $parameters = [];
 
+    /**
+     * Ersätt alla container-parametrar.
+     *
+     * @param array<string, mixed> $parameters
+     */
     public function setParameters(array $parameters): void
     {
         $this->parameters = []; // Rensar tidigare parametrar
@@ -23,6 +31,11 @@ final class Parameter extends Data
         }
     }
 
+    /**
+     * Lägg till flera container-parametrar.
+     *
+     * @param array<string, mixed> $parameters
+     */
     public function addParameters(array $parameters): void
     {
         foreach ($parameters as $key => $value) {
@@ -57,12 +70,11 @@ final class Parameter extends Data
         return $this->parameters[$name];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
-        return array_filter(
-            $this->parameters,
-            static fn($key) => is_string($key),
-            ARRAY_FILTER_USE_KEY
-        );
+        return $this->parameters;
     }
 }

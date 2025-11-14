@@ -15,11 +15,21 @@ class MakeControllerCommand extends BaseCommand
         $this->templatePath = $templatePath;
     }
 
+    /**
+     * Kör kommandot med givna argument.
+     *
+     * @param array<int, string> $args
+     */
     public function execute(array $args): void
     {
         $this->__invoke($args);
     }
 
+    /**
+     * Gör objektet anropbart som ett kommando.
+     *
+     * @param array<int, string> $args
+     */
     public function __invoke(array $args): void
     {
         // Visa hjälp om ingen input ges

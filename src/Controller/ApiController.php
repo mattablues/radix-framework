@@ -11,7 +11,9 @@ use Radix\Support\Validator;
 abstract class ApiController extends AbstractController
 {
     /**
-     * Returnera JSON-svar.
+     * Skapa ett JsonResponse‑objekt från en array.
+     *
+     * @param array<string, mixed> $data
      */
     protected function json(array $data, int $status = 200): JsonResponse
     {
@@ -24,8 +26,11 @@ abstract class ApiController extends AbstractController
     }
 
     /**
-     * Kontrollera och hämta JSON från förfrågan.
-     * Returnerar en korrekt parsad JSON-array eller kastar ett fel.
+     * Hämta och dekoda JSON‑body som assoc‑array.
+     *
+     * Returnerar tom array för GET/HEAD/DELETE.
+     *
+     * @return array<string, mixed>
      */
     protected function getJsonPayload(): array
     {
@@ -45,7 +50,9 @@ abstract class ApiController extends AbstractController
     }
 
     /**
-     * Validera inkommande förfrågan med regler och API-token.
+     * Validera inkommande request mot givna regler och API-token.
+     *
+     * @param array<string, mixed> $rules
      */
     protected function validateRequest(array $rules = []): void
     {
@@ -127,7 +134,9 @@ abstract class ApiController extends AbstractController
     }
 
     /**
-     * Returnera fel.
+     * Skicka validerings-/API-fel som standardiserat JSON-svar.
+     *
+     * @param array<string, string|array<int, string>> $errors
      */
     protected function respondWithErrors(array $errors, int $status = 422): void
     {

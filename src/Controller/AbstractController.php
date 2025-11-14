@@ -31,6 +31,11 @@ abstract class AbstractController
         $this->viewer = $viewer;
     }
 
+    /**
+     * Rendera en vy och returnera ett Response-objekt.
+     *
+     * @param array<string, mixed> $data
+     */
     protected function view(string $template, array $data = []): Response
     {
         // Kontrollera om det finns en `filters()`-metod i den aktuella kontrollern
@@ -52,7 +57,14 @@ abstract class AbstractController
         return $this->response;
     }
 
-    // Registrera filter och iterera över de som skickas in
+    /**
+     * Registrera template-filters i viewern.
+     *
+     * @param array<string, array{
+     *     callback: callable,
+     *     type?: string
+     * }> $filters
+     */
     protected function registerFilters(array $filters): void
     {
         foreach ($filters as $name => $callback) {
@@ -76,6 +88,11 @@ abstract class AbstractController
         // Ytterligare valideringar kan placeras här, t.ex. Autentisering
     }
 
+    /**
+     * Validera inkommande request mot givna regler och API-token.
+     *
+     * @param array<string, mixed> $rules  Valideringsregler per fält.
+     */
     protected function validateRequest(array $rules = []): void
     {
         $formToken = $this->request->getCsrfToken();

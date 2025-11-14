@@ -137,6 +137,14 @@ class Image
         $this->imageResized = $baseImage;
     }
 
+    /**
+     * @return array{
+     *     width: int,
+     *     height: int,
+     *     resizedWidth: int|null,
+     *     resizedHeight: int|null
+     * }
+     */
     public function getImageInfo(): array
     {
         return [
@@ -190,6 +198,14 @@ class Image
         return $img;
     }
 
+    /**
+     * Beräkna mål-dimensioner baserat på valt alternativ.
+     *
+     * @return array{
+     *     optimalWidth: int,
+     *     optimalHeight: int
+     * }
+     */
     protected function getDimensions(int $newWidth, int $newHeight, string $option): array
     {
         return match ($option) {
@@ -213,6 +229,14 @@ class Image
         return (int)round($targetDimension * ($primaryDimension / $secondaryDimension));
     }
 
+    /**
+     * Beräkna optimal storlek med bibehållen aspect ratio.
+     *
+     * @return array{
+     *     optimalWidth: int,
+     *     optimalHeight: int
+     * }
+     */
     protected function getSizeByAuto(int $newWidth, int $newHeight): array
     {
         if ($this->width > $this->height) {
@@ -237,6 +261,14 @@ class Image
         ];
     }
 
+    /**
+     * Beräkna optimala beskärningsdimensioner.
+     *
+     * @return array{
+     *     optimalWidth: int,
+     *     optimalHeight: int
+     * }
+     */
     protected function getOptimalCrop(int $newWidth, int $newHeight): array
     {
         $widthRatio = $this->width / $newWidth;

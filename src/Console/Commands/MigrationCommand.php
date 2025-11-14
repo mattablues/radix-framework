@@ -15,11 +15,21 @@ class MigrationCommand extends BaseCommand
         $this->migrator = $migrator;
     }
 
+    /**
+     * Kör kommandot med givna argument.
+     *
+     * @param array<int, string> $args
+     */
     public function execute(array $args): void
     {
         $this->__invoke($args); // Anropa __invoke-logiken
     }
 
+    /**
+     * Gör objektet anropbart som ett kommando.
+     *
+     * @param array<int, string> $args
+     */
     public function __invoke(array $args): void
     {
         // Hämta vilket kommando som körs

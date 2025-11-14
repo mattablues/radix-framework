@@ -12,7 +12,11 @@ use Radix\Container\Exception\ContainerDependencyInjectionException;
 
 class Resolver
 {
+    /**
+     * @var array<string, mixed>
+     */
     private array $resolvedDependenciesCache = [];
+
     public function __construct(private readonly Container $container)
     {
     }
@@ -105,8 +109,14 @@ class Resolver
         return $reflection->newInstanceArgs($arguments);
     }
 
-    private function createFromFactory(Definition $definition)
-    {
+    /**
+     * Skapa en instans via en factory som definierats på Definition-objektet.
+     *
+     * @param  Definition  $definition
+     * @return mixed
+     */
+    private function createFromFactory(Definition $definition): mixed
+        {
         $factory = $definition->getFactory();
 
         if (is_array($factory) && count($factory) === 2 && is_string($factory[0]) && is_string($factory[1])) {
@@ -146,6 +156,13 @@ class Resolver
         }
     }
 
+    /**
+     * Lös parametrar för en reflektions-lista utifrån givna argument och container.
+     *
+     * @param array<int, \ReflectionParameter> $dependencies
+     * @param array<int|string, mixed>         $arguments
+     * @return array<int, mixed>
+     */
     private function resolveDependencies(array $dependencies, array $arguments): array
     {
         $solved = [];
@@ -161,16 +178,21 @@ class Resolver
                 $solved[] = $arguments[$dependency->getPosition()];
             } elseif (isset($arguments[$dependency->getName()])) {
                 $solved[] = $arguments[$dependency->getName()];
-            } elseif (($type = $dependency->getType()) && !$type->isBuiltin()) {
-                $solved[] = $this->container->get($type->getName());
-            } elseif ($dependency->isDefaultValueAvailable()) {
-                $solved[] = $dependency->getDefaultValue();
             } else {
-                throw new ContainerDependencyInjectionException(sprintf(
-                    'Unresolvable dependency for "%s" in class "%s".',
-                    $dependency->name,
-                    $dependency->getDeclaringClass()->getName()
-                ));
+                $type = $dependency->getType();
+
+                if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+                    $className = $type->getName();
+                    $solved[] = $this->container->get($className);
+                } elseif ($dependency->isDefaultValueAvailable()) {
+                    $solved[] = $dependency->getDefaultValue();
+                } else {
+                    throw new ContainerDependencyInjectionException(sprintf(
+                        'Unresolvable dependency for "%s" in class "%s".',
+                        $dependency->name,
+                        $dependency->getDeclaringClass()->getName()
+                    ));
+                }
             }
 
             $this->resolvedDependenciesCache[$cacheKey] = end($solved);
@@ -178,6 +200,12 @@ class Resolver
         return $solved;
     }
 
+    /**
+     * Ersätt Reference-objekt med faktiska beroenden från containern.
+     *
+     * @param array<int|string, mixed> $arguments
+     * @return array<int|string, mixed>
+     */
     private function resolveArguments(array $arguments): array
     {
         foreach ($arguments as &$argument) {

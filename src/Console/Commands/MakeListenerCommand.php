@@ -15,11 +15,21 @@ class MakeListenerCommand extends BaseCommand
         $this->templatePath = $templatePath;
     }
 
+    /**
+     * Kör kommandot med givna argument.
+     *
+     * @param array<int, string> $args
+     */
     public function execute(array $args): void
     {
         $this->__invoke($args); // Anropa __invoke-logiken
     }
 
+    /**
+     * Gör objektet anropbart som ett kommando.
+     *
+     * @param array<int, string> $args
+     */
     public function __invoke(array $args): void
     {
         // Hantera hjälpinformation

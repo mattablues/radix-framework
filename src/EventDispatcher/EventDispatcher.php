@@ -9,6 +9,9 @@ use Psr\EventDispatcher\StoppableEventInterface;
 
 class EventDispatcher implements EventDispatcherInterface
 {
+    /**
+     * @var array<string, array<int, callable>>
+     */
     private iterable $listeners = [];
 
     public function dispatch(object $event): object

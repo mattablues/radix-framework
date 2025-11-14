@@ -7,12 +7,16 @@ namespace Radix\Console\Commands;
 abstract class BaseCommand
 {
     /**
-     * Kör kommandot med argument.
+     * Kör kommandot med givna argument.
+     *
+     * @param array<int, string> $args
      */
     abstract public function execute(array $args): void;
 
     /**
-     * Visa hjälp för ett specifikt kommando.
+     * Visa hjälptext för ett kommando.
+     *
+     * @param array<string, string> $options  Nyckel = flagga, värde = beskrivning.
      */
     protected function displayHelp(string $usage, array $options): void
     {
@@ -28,6 +32,12 @@ abstract class BaseCommand
         }
     }
 
+    /**
+     * Hantera --help/-h-flaggan för ett kommando.
+     *
+     * @param array<int, string>   $args    Råa argv-argument.
+     * @param array<string, string> $options Nyckel = flagga, värde = beskrivning.
+     */
     public function handleHelpFlag(array $args, string $usage, array $options): bool
     {
         // Kontrollera om --help flaggan finns bland argumenten
@@ -41,7 +51,9 @@ abstract class BaseCommand
 
 
     /**
-     * Hämta värde för en flagga (t.ex. --name=value).
+     * Hämta värdet för en flagga/option från argv-listan.
+     *
+     * @param array<int, string> $options
      */
     protected function getOptionValue(array $options, string $key): ?string
     {

@@ -39,4 +39,9 @@ interface SessionInterface
      * @return array<string,mixed>|null
      */
     public function flashMessage(): ?array;
+
+    /**
+     * Kontrollera om sessionen är giltig (t.ex. IP, user-agent, timeout etc.).
+     */
+    public function isValid(): bool;
 }

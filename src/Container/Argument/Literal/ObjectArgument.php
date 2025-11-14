@@ -46,7 +46,12 @@ class ObjectArgument extends LiteralArgument
         return $json;
     }
 
-    public function callMethod(string $method, array $arguments = [])
+    /**
+     * Anropa en metod på det underliggande objektet.
+     *
+     * @param array<int, mixed> $arguments
+     */
+    public function callMethod(string $method, array $arguments = []): mixed
     {
         $object = $this->getValue();
 

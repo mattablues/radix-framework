@@ -28,17 +28,30 @@ final class Reader
         return $content;
     }
 
+    /**
+     * Läs JSON-fil.
+     *
+     * När $assoc = true returneras en assoc‑array.
+     * När $assoc = false returneras ett stdClass‑objekt.
+     *
+     * @phpstan-return ($assoc is true ? array<string, mixed> : object)
+     */
     public static function json(string $path, bool $assoc = true, ?string $encoding = null): array|object
     {
         $content = self::text($path, $encoding);
         return json_decode($content, $assoc, 512, JSON_THROW_ON_ERROR);
     }
 
-        /**
+    /**
      * Läs XML.
      * - assoc=true returnerar array (konverterad från SimpleXMLElement).
      * - assoc=false returnerar SimpleXMLElement.
      * - $encoding: konverterar inläst råtext till UTF-8 innan parse.
+     *
+     * När $assoc = true returneras en assoc‑array (rekursivt).
+     * När $assoc = false returneras en SimpleXMLElement.
+     *
+     * @phpstan-return ($assoc is true ? array<string, mixed> : \SimpleXMLElement)
      */
     public static function xml(string $path, bool $assoc = true, ?string $encoding = null): array|\SimpleXMLElement
     {
@@ -66,6 +79,11 @@ final class Reader
         return $assoc ? self::xmlToArray($xml) : $xml;
     }
 
+    /**
+     * Läs en CSV-fil till en array av rader.
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public static function csv(
         string $path,
         ?string $delimiter = null,
@@ -81,6 +99,11 @@ final class Reader
         return $rows;
     }
 
+    /**
+     * Läs CSV och returnera JSON‑vänlig struktur (array av assoc‑arrayer).
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public static function csvToJson(
         string $path,
         ?string $delimiter = null,
@@ -272,10 +295,13 @@ final class Reader
         return $best ?? ',';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private static function xmlToArray(\SimpleXMLElement $xml): array
     {
         $json = json_encode($xml, JSON_THROW_ON_ERROR);
-        /** @var array $arr */
+        /** @var array<string, mixed> $arr */
         $arr = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         return $arr;
     }
