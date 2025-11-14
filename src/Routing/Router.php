@@ -9,13 +9,23 @@ use InvalidArgumentException;
 
 class Router
 {
+            /** @var array<int,array<string,mixed>> */
+
     private array $routes = [];
     private ?string $path = null;
+    /** @var array<int,string> */
     private array $methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+    /** @var array<string,string> */
     private static array $routeNames = [];
     private int $index = 0;
+    /** @var array<string,array<int,string>> */
     private array $middlewareGroups = [];
 
+    /**
+     * Matcha en path och ev. metod mot definierade routes.
+     *
+     * @return array<int|string,mixed>|false
+     */
     public function match(string $path, string $method = null): array|bool
     {
         $path = urldecode($path);
@@ -49,6 +59,9 @@ class Router
         return false;
     }
 
+    /**
+     * @param array<string,mixed> $options
+     */
     public function group(array $options, Closure $routes): void
     {
         $currentPath = $this->path ?? ''; // Spara nuvarande path
@@ -86,6 +99,9 @@ class Router
         $this->path = $currentPath;
     }
 
+    /**
+     * @param array<int,mixed> $data
+     */
     public static function routePathByName(string $routeName, array $data = []): string
     {
         if (!array_key_exists($routeName, self::$routeNames)) {
@@ -115,6 +131,9 @@ class Router
         return $this;
     }
 
+    /**
+     * @param array<int,string>|string $middleware
+     */
     public function middleware(array|string $middleware): Router
     {
         if (is_string($middleware)) {
@@ -134,41 +153,65 @@ class Router
         return $this;
     }
 
+    /**
+     * @return array<string,string>
+     */
     public static function routeNames(): array
     {
         return self::$routeNames;
     }
 
+    /**
+     * @return array<int,array<string,mixed>>
+     */
     public function routes(): array
     {
         return $this->routes;
     }
 
+    /**
+     * @param array<int|string,mixed>|Closure $handler
+     */
     public function get(string $path, Closure|array $handler): Router
     {
         return $this->addRoute('GET', $path, $handler);
     }
 
+    /**
+     * @param array<int|string,mixed>|Closure $handler
+     */
     public function post(string $path, Closure|array $handler): Router
     {
         return $this->addRoute('POST', $path, $handler);
     }
 
+    /**
+     * @param array<int|string,mixed>|Closure $handler
+     */
     public function put(string $path, Closure|array $handler): Router
     {
         return $this->addRoute('PUT', $path, $handler);
     }
 
+    /**
+     * @param array<int|string,mixed>|Closure $handler
+     */
     public function patch(string $path, Closure|array $handler): Router
     {
         return $this->addRoute('PATCH', $path, $handler);
     }
 
+    /**
+     * @param array<int|string,mixed>|Closure $handler
+     */
     public function delete(string $path, Closure|array $handler): Router
     {
         return $this->addRoute('DELETE', $path, $handler);
     }
 
+    /**
+     * @param array<string,mixed> $params
+     */
     private function add(string $path, array $params = []): void
     {
         // Om gruppens prefix är definierat, lägg till det innan det nya path sätts
@@ -187,6 +230,9 @@ class Router
         $this->index = array_key_last($this->routes);
     }
 
+   /**
+     * @param array<int|string,mixed>|Closure $handler
+     */
     private function addRoute(string $method, string $path, Closure|array $handler): Router
     {
         $method = mb_strtoupper($method);
@@ -219,6 +265,9 @@ class Router
         return $this;
     }
 
+    /**
+     * @param array<int,mixed> $data
+     */
     private static function extractRoute(string $url, array $data): string
     {
         if ($data) {

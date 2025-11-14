@@ -10,10 +10,15 @@ use RuntimeException;
 class Upload
 {
     // Egenskaper för att hantera uppladdningen
+    /** @var array<string,mixed> */
     protected array $file;
+    /** @var array<string,array<int,string>> */
     protected array $errors = [];
     protected string $uploadDirectory;
 
+    /**
+     * @param array<string,mixed> $file
+     */
     public function __construct(array $file, string $uploadDirectory)
     {
         $this->file = $file;
@@ -28,7 +33,7 @@ class Upload
     /**
      * Validera uppladdad fil med given regeluppsättning.
      *
-     * @param array $rules
+     * @param  array<string,string|array<int,string>>  $rules
      * @return bool
      */
     public function validate(array $rules): bool
@@ -97,7 +102,7 @@ class Upload
     /**
      * Hämta eventuella valideringsfel.
      *
-     * @return array
+     * @return array<string,array<int,string>>
      */
     public function getErrors(): array
     {

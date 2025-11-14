@@ -20,12 +20,23 @@ use UnexpectedValueException;
 
 readonly class Dispatcher
 {
-    public function __construct (
-        private Router    $router,
-        private ContainerInterface $container,
-        private array     $middlewareClasses
-    )
-    {
+    private Router $router;
+    private ContainerInterface $container;
+
+    /** @var array<string,string> */
+    private array $middlewareClasses;
+
+    /**
+     * @param array<string,string> $middlewareClasses Map alias => middleware‑klassnamn.
+     */
+    public function __construct(
+        Router $router,
+        ContainerInterface $container,
+        array $middlewareClasses
+    ) {
+        $this->router = $router;
+        $this->container = $container;
+        $this->middlewareClasses = $middlewareClasses;
     }
 
     public function handle(Request $request): Response
@@ -139,6 +150,10 @@ readonly class Dispatcher
         return $response;
     }
 
+    /**
+     * @param array<int|string,mixed> $params
+     * @return array<int,mixed>
+     */
     private function middlewares(array $params): array
     {
         if (!array_key_exists('middlewares', $params)) {
@@ -159,6 +174,12 @@ readonly class Dispatcher
         return $middlewares;
     }
 
+    /**
+     * Bygg argumentlista till en controller‑action baserat på route‑parametrar.
+     *
+     * @param array<string,mixed> $params
+     * @return array<string,mixed>
+     */
     private function actionArguments(string $controller, string $action, array $params): array
     {
         $args = [];

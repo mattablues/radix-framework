@@ -31,26 +31,41 @@ final class Logger
         $this->retentionDays = $retentionDays ?? 14;
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     public function info(string $message, array $context = []): void
     {
         $this->write('INFO', $message, $context);
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     public function error(string $message, array $context = []): void
     {
         $this->write('ERROR', $message, $context);
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     public function warning(string $message, array $context = []): void
     {
         $this->write('WARNING', $message, $context);
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     public function debug(string $message, array $context = []): void
     {
         $this->write('DEBUG', $message, $context);
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     private function write(string $level, string $message, array $context): void
     {
         $this->cleanupOldLogs(); // enkel daglig städning
@@ -118,6 +133,9 @@ final class Logger
         }
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     private function interpolate(string $message, array $context): string
     {
         $replace = [];
@@ -129,18 +147,18 @@ final class Logger
         return strtr($message, $replace);
     }
 
+    /**
+     * @param array<string,mixed> $context
+     */
     private function contextToString(array $context): string
     {
         if ($context === []) {
             return '';
         }
         // Ta bort värden som redan interpolerats
-        $rest = [];
-        foreach ($context as $k => $v) {
-            if (strpos($this->interpolate('{'.$k.'}', $context), '{'.$k.'}') !== false) {
-                $rest[$k] = $v;
-            }
-        }
+        $rest = array_filter($context, function ($k) use ($context) {
+            return str_contains($this->interpolate('{'.$k.'}', $context), '{'.$k.'}');
+        }, ARRAY_FILTER_USE_KEY);
         if ($rest === []) {
             return '';
         }

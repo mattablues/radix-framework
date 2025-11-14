@@ -10,6 +10,9 @@ class GeoLocator
 {
     private string $baseUrl = 'http://ip-api.com/json'; // Ny URL till IP-API
 
+    /**
+     * @return array<string,mixed>
+     */
     public function getLocation(?string $ip = null): array
     {
         $ip = $ip ?? $_SERVER['REMOTE_ADDR'];

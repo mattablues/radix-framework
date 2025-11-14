@@ -6,10 +6,14 @@ namespace Radix\Viewer;
 
 class RadixTemplateViewer implements TemplateViewerInterface
 {
+    /** @var array<string,mixed> */
     private array $globals = [];
     private string $cachePath;
     private string $viewsDirectory;
     private bool $debug = false;
+    /**
+     * @var array<string,array{callback:callable,type:string,identifier:string}>
+     */
     private array $filters = [];
     private ?\Radix\Support\Logger $logger = null;
 
@@ -208,6 +212,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     /**
      * Convert placeholders like `{% %}` and `{{ }}` to PHP code.
+     *
+     * @return array<string,string>  Attributnamn => värde
      */
     private function parseAttributes(string $attributeString): array
     {
@@ -266,6 +272,9 @@ class RadixTemplateViewer implements TemplateViewerInterface
         return $code;
     }
 
+    /**
+     * @param array<string,string> $attributes
+     */
     private function renderComponent(string $componentPath, array $attributes, string $slotContent): string
     {
         $this->debug("Renderar komponent från path: $componentPath");
@@ -301,6 +310,9 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Extracts named slots from the given slotContent.
      * Supports syntax like `<x-slot:name>content</x-slot:name>`.
+     *
+     * @param string $slotContent
+     * @return array<string,string>  Slotnamn => slotinnehåll
      */
     private function extractNamedSlots(string &$slotContent): array
     {
@@ -370,6 +382,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     /**
      * Extract blocks from a given template string.
+     *
+     * @return array<string,string>  Blocknamn => blockinnehåll
      */
     private function getBlocks(string $code): array
     {
@@ -385,11 +399,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     /**
      * Replace `{% yield %}` directives with corresponding block content.
+     *
+     * @param array<string,string> $blocks
      */
-    /**
-     * Replace `{% yield %}` directives with corresponding block content.
-     */
-private function replaceYields(string $code, array $blocks): string
+    private function replaceYields(string $code, array $blocks): string
     {
         // Hantera block-yield med fallback:
         // {% yield name %} ...fallback... {% endyield name %}
@@ -416,7 +429,7 @@ private function replaceYields(string $code, array $blocks): string
     }
 
     /**
-     * Safely evaluate the processed template code with extracted data.
+     * @param array<string,mixed> $data
      */
     private function evaluateTemplate(string $code, array $data): string
     {
@@ -439,7 +452,8 @@ private function replaceYields(string $code, array $blocks): string
     }
 
     /**
-     * Merge globals and provided template data.
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
      */
     private function mergeData(array $data): array
     {
@@ -503,6 +517,9 @@ private function replaceYields(string $code, array $blocks): string
         return trim($code);
     }
 
+    /**
+     * @param array<string,mixed> $data
+     */
     private function generateCacheKey(string $templatePath, array $data, string $version = ''): string
     {
         // Skapa en liten representation av relevanta delar
@@ -526,6 +543,10 @@ private function replaceYields(string $code, array $blocks): string
         return md5(serialize($relevantParts) . serialize($additionalHashes));
     }
 
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
     private function getSearchKey(array $data): array
     {
         // Isolera söktermer och relevant data från "search"
@@ -539,6 +560,10 @@ private function replaceYields(string $code, array $blocks): string
         return [];
     }
 
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,int>
+     */
     private function getPaginationKey(array $data): array
     {
         // Isolera endast pagineringen
@@ -572,6 +597,10 @@ private function replaceYields(string $code, array $blocks): string
         $this->logger->debug($message);
     }
 
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
     private function applyFilters(array $data): array
     {
         if ($this->filters === []) {

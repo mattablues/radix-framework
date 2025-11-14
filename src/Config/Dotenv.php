@@ -8,6 +8,7 @@ class Dotenv
 {
     private string $path;
     private ?string $basePath;
+    /** @var array<int,string> */
     private array $pathKeys = ['LOG_FILE', 'CACHE_DIR']; // Nycklar som representerar faktiska sökvägar
 
     public function __construct(string $path, ?string $basePath = null)

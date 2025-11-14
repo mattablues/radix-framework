@@ -8,10 +8,13 @@ use InvalidArgumentException;
 
 class Validator
 {
+    /** @var array<string,mixed> */
     protected array $data;
+    /** @var array<string,string|array<int,string>> */
     protected array $rules;
+    /** @var array<string,array<int,string>> */
     protected array $errors = [];
-
+    /** @var array<string,string> */
     protected array $fieldTranslations = [
         'name' => 'namn',
         'first_name' => 'förnamn',
@@ -25,6 +28,10 @@ class Validator
         'description' => 'beskrivning',
     ];
 
+    /**
+     * @param array<string,mixed>                           $data
+     * @param array<string,string|array<int,string>>        $rules
+     */
     public function __construct(array $data, array $rules)
     {
         $this->data = $data;
@@ -56,6 +63,7 @@ class Validator
 
     /**
      * Hämta alla valideringsfel.
+     * @return array<string,array<int,string>>
      */
     public function errors(): array
     {
@@ -145,12 +153,6 @@ class Validator
 
             return "Fältet $translatedField måste matcha fältet $translatedParameter.";
         }
-
-                // Hantering för "file_type" med tydligare meddelande
-//        if ($rule === 'file_type') {
-//            return "Fältet $translatedField måste vara av typen: $parameter.";
-//        }
-
 
         // Översätt parameterfältet, t.ex. password i regeln 'confirmed'
         $translatedParameter = $parameter ? ($this->fieldTranslations[$parameter] ?? $parameter) : $parameter;
@@ -596,7 +598,7 @@ class Validator
         return $value['size'] <= $maxBytes;
     }
 
-    protected function getValueForDotNotation(string $field)
+    protected function getValueForDotNotation(string $field): mixed
     {
         // Om fältet inte innehåller en punkt (.), returnera direkt från `$this->data`
         if (!str_contains($field, '.')) {

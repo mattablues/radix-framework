@@ -18,19 +18,25 @@ interface SessionInterface
 
     public function remove(string $key): void;
 
-    public function isAuthenticated(): bool;
-
-    public function clear();
-
     public function destroy(): void;
 
-    public function isValid(): bool;
+    public function clear(): void;
+
+    public function isAuthenticated(): bool;
 
     public function setCsrfToken(): string;
 
+    public function csrf(): string;
+
     public function validateCsrfToken(?string $token): void;
 
+    /**
+     * @param array<string,mixed> $params
+     */
     public function setFlashMessage(string $message, string $type = 'success', array $params = []): void;
 
+    /**
+     * @return array<string,mixed>|null
+     */
     public function flashMessage(): ?array;
 }

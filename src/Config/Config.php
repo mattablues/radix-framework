@@ -8,10 +8,13 @@ use Closure;
 
 class Config
 {
+    /** @var array<string,mixed> */
     private array $config;
 
     /**
      * Konstruera `Config` med fördefinierade värden.
+     *
+     * @param array<string,mixed> $config
      */
     public function __construct(array $config = [])
     {
@@ -53,6 +56,8 @@ class Config
 
     /**
      * Ladda flera nyckelvärden i konfigurationslagret.
+     *
+     * @param array<string,mixed> $additionalConfig
      */
     public function load(array $additionalConfig): void
     {

@@ -17,6 +17,9 @@ class MailManager
         $this->mailer = $mailer;
     }
 
+    /**
+     * @param array<string,mixed> $options
+     */
     public function send(string $to, string $subject, string $body, array $options = []): bool
     {
         // Om `From` skickas med, validera den

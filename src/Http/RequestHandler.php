@@ -11,6 +11,9 @@ use Radix\Http\Event\ResponseEvent;
 
 readonly class RequestHandler implements RequestHandlerInterface
 {
+    /**
+     * @param array<string,mixed> $args
+     */
     public function __construct(
         private Closure|AbstractController $handler,
         private EventDispatcher $eventDispatcher,

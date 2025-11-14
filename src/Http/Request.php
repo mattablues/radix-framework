@@ -6,11 +6,19 @@ namespace Radix\Http;
 
 use Radix\Session\SessionInterface;
 use Radix\Viewer\RadixTemplateViewer;
+use Radix\Viewer\TemplateViewerInterface;
 
 class Request implements RequestInterface
 {
     private SessionInterface $session;
 
+    /**
+     * @param array<string,mixed> $get
+     * @param array<string,mixed> $post
+     * @param array<string,mixed> $files
+     * @param array<string,mixed> $cookie
+     * @param array<string,mixed> $server
+     */
     public function __construct(
         public string $uri,
         public string $method,
@@ -75,7 +83,8 @@ class Request implements RequestInterface
         return '0.0.0.0';
     }
 
-    public function setSession($session): void
+    /** @param  SessionInterface  $session */
+    public function setSession(SessionInterface $session): void
     {
         $this->session = $session;
     }
@@ -95,11 +104,21 @@ class Request implements RequestInterface
         return $this->session;
     }
 
-    public function viewer()
+    /**
+     * @return TemplateViewerInterface
+     */
+    public function viewer(): TemplateViewerInterface
     {
         return app(RadixTemplateViewer::class);
     }
 
+    /**
+     * Filtrera bort vissa fält (t.ex. CSRF, honeypot) ur en data‑array.
+     *
+     * @param array<string,mixed> $data
+     * @param array<int,string>   $excludeKeys
+     * @return array<string,mixed>
+     */
     public function filterFields(array $data, array $excludeKeys = ['csrf_token', 'password_confirmation', 'honeypot']): array
     {
         // Använd array_diff_key för att ta bort specificerade nycklar

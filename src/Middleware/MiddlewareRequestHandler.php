@@ -11,6 +11,9 @@ use Radix\Http\Response;
 
 class MiddlewareRequestHandler implements RequestHandlerInterface
 {
+    /**
+     * @param array<int,object> $middlewares
+     */
     public function __construct(
         private array $middlewares,
         private readonly RequestHandler $requestHandler

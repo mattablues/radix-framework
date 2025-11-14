@@ -30,6 +30,8 @@ final class Writer
     /**
      * Skriv JSON med valfria JSON-flaggor.
      * $pretty=true för läsbar formatering.
+     *
+     * @param array<string,mixed>|object $data
      */
     public static function json(string $path, array|object $data, bool $pretty = true, int $flags = 0, ?string $targetEncoding = null): void
     {
@@ -41,15 +43,15 @@ final class Writer
         self::text($path, $encoded . PHP_EOL, $targetEncoding);
     }
 
-
-
-
     /**
      * Skriv CSV.
      * - $rows: listor eller assoc-arrayer.
      * - $headers: null => genereras vid assoc.
      * - $delimiter: ',', ';', "\t" (TSV), '|'
      * - $targetEncoding: t.ex. 'ISO-8859-1'
+     *
+     * @param array<int,array<int|string,mixed>> $rows
+     * @param array<int,string>|null             $headers
      */
     public static function csv(
         string $path,
@@ -110,6 +112,8 @@ final class Writer
     /**
      * Streama skrivning av CSV. Anropa $writeRow med varje rad (array).
      * Om du anger $headers så skrivs header-rad först.
+     *
+     * @param array<int,string>|null $headers
      */
     public static function csvStream(
         string $path,
@@ -151,7 +155,10 @@ final class Writer
     }
 
     /**
-     * Konvertera JSON-data (array av rader) till CSV och skriv.
+     * Konvertera JSON‑liknande data (array) till CSV‑fil.
+     *
+     * @param array<int,array<string,mixed>>      $data
+     * @param array<int,string>|null              $headers
      */
     public static function jsonToCsv(
         string $path,
@@ -206,6 +213,9 @@ final class Writer
         }
     }
 
+    /**
+     * @param array<int,mixed> $rows
+     */
     private static function rowsAreAssoc(array $rows): bool
     {
         foreach ($rows as $r) {
@@ -216,6 +226,10 @@ final class Writer
         return false;
     }
 
+    /**
+     * @param array<int,mixed> $rows
+     * @return array<int,string>
+     */
     private static function collectHeaders(array $rows): array
     {
         $headers = [];
@@ -242,6 +256,10 @@ final class Writer
      * ]
      * Returnerar normaliserade rader. Kastar RuntimeException vid fel om $onError === 'throw',
      * annars hoppar över felaktiga rader om $onError === 'skip'.
+     *
+     * @param array<int,array<string,mixed>> $rows
+     * @param array<string,mixed>            $schema
+     * @return array<int,array<string,mixed>>
      */
     public static function validateRows(array $rows, array $schema, string $onError = 'throw'): array
     {
@@ -323,6 +341,8 @@ final class Writer
      * Skriv XML från array|object.
      * - $rootName: rotnodens namn.
      * - $targetEncoding: konvertering från UTF-8 till målencoding om satt.
+     *
+     * @param array<string,mixed>|object $data
      */
     public static function xml(string $path, array|object $data, string $rootName = 'root', ?string $targetEncoding = null): void
     {
@@ -356,6 +376,9 @@ final class Writer
         }
     }
 
+    /**
+     * @param array<string,mixed> $data
+     */
     private static function arrayToXml(array $data, \SimpleXMLElement $xml): void
     {
         foreach ($data as $key => $value) {

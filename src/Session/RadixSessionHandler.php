@@ -15,6 +15,9 @@ class RadixSessionHandler implements SessionHandlerInterface
     protected string $tableName = 'sessions';
     protected int $lifetime;
 
+    /**
+     * @param array<string,mixed> $config
+     */
     public function __construct(array $config, ?PDO $pdo = null)
     {
         $this->driver = $config['driver'] ?? 'file';

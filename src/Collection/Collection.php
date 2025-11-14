@@ -11,6 +11,10 @@ use Countable;
 use IteratorAggregate;
 use Traversable;
 
+/**
+ * @implements \ArrayAccess<int|string,mixed>
+ * @implements \IteratorAggregate<int|string,mixed>
+ */
 class Collection implements IteratorAggregate, Countable, ArrayAccess
 {
     /**

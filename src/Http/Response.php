@@ -7,6 +7,7 @@ namespace Radix\Http;
 class Response
 {
     private string $body = '';
+    /** @var array<string,string> */
     private array $headers = [];
     private  int $status_code = 200;
 
@@ -51,11 +52,17 @@ class Response
         ob_end_flush();
     }
 
+    /**
+     * @return array<string,string>
+     */
     public function headers(): array
     {
         return $this->headers;
     }
 
+    /**
+     * @return array<string,string>
+     */
     public function header(string $header): array
     {
         // Säkerställ att header alltid returnerar en array
@@ -70,7 +77,9 @@ class Response
         return $this->status_code;
     }
 
-    // Getter för headers
+    /**
+     * @return array<string,string>
+     */
     public function getHeaders(): array
     {
         return $this->headers;
