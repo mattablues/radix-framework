@@ -682,7 +682,6 @@ abstract class Model implements JsonSerializable
     public static function find(int|string $id, bool $withTrashed = false): ?static
     {
         $modelClass = static::class;
-        /** @var static $instance */
         $instance = new $modelClass();
 
         $query = (new QueryBuilder())
@@ -920,6 +919,61 @@ abstract class Model implements JsonSerializable
     {
         $queryBuilderClass = QueryBuilder::class;
         return get_class_methods($queryBuilderClass);
+    }
+
+    /**
+     * @return array<int, array{
+     *     name: string,
+     *     parameters: array<int, array{name: string, hasDefault: bool}>,
+     *     returnsSelf: bool
+     * }>
+     */
+    public static function describeQueryBuilderMethods(): array
+    {
+        $queryBuilderClass = \Radix\Database\QueryBuilder\QueryBuilder::class;
+        $ref = new \ReflectionClass($queryBuilderClass);
+
+        /** @var array<int, array{
+         *     name: string,
+         *     parameters: array<int, array{name: string, hasDefault: bool}>,
+         *     returnsSelf: bool
+         * }> $out
+         */
+        $out = [];
+
+        foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            if (
+                $method->isConstructor()
+                || $method->getDeclaringClass()->getName() !== $queryBuilderClass
+            ) {
+                continue;
+            }
+
+            /** @var array<int, array{name: string, hasDefault: bool}> $params */
+            $params = [];
+            foreach ($method->getParameters() as $p) {
+                $params[] = [
+                    'name' => '$' . $p->getName(),
+                    'hasDefault' => $p->isDefaultValueAvailable(),
+                ];
+            }
+
+            $returnType = $method->getReturnType();
+
+            $out[] = [
+                'name' => $method->getName(),
+                'parameters' => $params,
+                'returnsSelf' =>
+                    $returnType instanceof \ReflectionNamedType
+                    && in_array(
+                        $returnType->getName(),
+                        ['self', 'static', $queryBuilderClass],
+                        true
+                    ),
+            ];
+        }
+
+        return $out;
     }
 
     /**
