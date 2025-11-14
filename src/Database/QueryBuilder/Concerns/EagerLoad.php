@@ -7,7 +7,7 @@ namespace Radix\Database\QueryBuilder\Concerns;
 trait EagerLoad
 {
     /**
-     * @param array<int, string> $relations
+     * @param string|array<int,string>|array<string,\Closure(\Radix\Database\QueryBuilder\QueryBuilder):void> $relations
      */
     public function with(array|string $relations): self
     {

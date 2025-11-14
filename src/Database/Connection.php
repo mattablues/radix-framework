@@ -23,7 +23,7 @@ class Connection
     /**
      * Kör ett statement och returnera PDOStatement.
      *
-     * @param array<int,mixed> $params
+     * @param array<int|string,mixed> $params
      */
     public function execute(string $query, array $params = []): PDOStatement
     {
@@ -36,7 +36,7 @@ class Connection
     /**
      * Hämta alla rader som assoc‑arrayer.
      *
-     * @param array<int,mixed> $params
+     * @param array<int|string,mixed> $params
      * @return array<int,array<string,mixed>>
      */
     public function fetchAll(string $query, array $params = []): array
@@ -49,7 +49,7 @@ class Connection
     /**
      * Hämta alla rader som objekt eller assoc‑arrayer.
      *
-     * @param array<int,mixed> $params
+     * @param array<int|string,mixed> $params
      * @return array<int,object>|array<int,array<string,mixed>>
      */
     public function fetchAllAsClass(string $query, array $params = [], ?string $className = null): array
@@ -67,7 +67,7 @@ class Connection
     /**
      * Hämta första raden som objekt (klass eller standard).
      *
-     * @param array<int,mixed> $params
+     * @param array<int|string,mixed> $params
      */
     public function fetchOneAsClass(string $query, array $params = [], ?string $className = null): ?object
     {
@@ -85,7 +85,7 @@ class Connection
     /**
      * Hämta första raden som assoc‑array (eller null).
      *
-     * @param array<int,mixed> $params
+     * @param array<int|string,mixed> $params
      * @return array<string,mixed>|null
      */
     public function fetchOne(string $query, array $params = []): ?array
@@ -99,7 +99,7 @@ class Connection
     /**
      * Kör ett statement och returnera antal påverkade rader.
      *
-     * @param array<int,mixed> $params
+     * @param array<int|string,mixed> $params
      */
     public function fetchAffected(string $query, array $params = []): int
     {
