@@ -67,7 +67,7 @@ readonly class Dispatcher
             $response
                 ->setStatusCode(400)
                 ->setHeader('Content-Type', 'application/json')
-                ->setBody(json_encode($body));
+                ->setBody(json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
             return $response;
         }
@@ -84,20 +84,30 @@ readonly class Dispatcher
             throw new PageNotFoundException("No route matched for '$path' with method '$request->method'");
         }
 
-        if(is_callable($params[0])) {
+        if (is_callable($params[0])) {
             $action = null;
             $handler = $params[0];
             unset($params[0]);
 
-            $reflection = new ReflectionFunction($handler);
-            $arguments  = $reflection->getParameters();
+            if (is_array($handler) && count($handler) === 2) {
+                // [$object, 'method'] eller [ClassName::class, 'method']
+                $reflection = new ReflectionMethod($handler[0], $handler[1]);
+            } elseif ($handler instanceof \Closure || is_string($handler)) {
+                // Funktionsnamn eller anonym funktion
+                $reflection = new ReflectionFunction($handler);
+            } else {
+                // Någon annan callable-variant vi inte stödjer explicit
+                throw new UnexpectedValueException('Unsupported callable type for route handler.');
+            }
+
+            $arguments = $reflection->getParameters();
 
             foreach ($arguments as $argument) {
-                if($argument->getName() === 'request') {
+                if ($argument->getName() === 'request') {
                     $params['request'] = $request;
                 }
 
-                if($argument->getName() === 'response') {
+                if ($argument->getName() === 'response') {
                     $params['response'] = $this->container->get(Response::class);
                 }
             }
@@ -114,7 +124,7 @@ readonly class Dispatcher
                 }
             }
 
-            if(count($args) !== count($arguments)) {
+            if (count($args) !== count($arguments)) {
                 throw new PageNotFoundException("Function argument(s) missing in query string");
             }
 
@@ -128,7 +138,6 @@ readonly class Dispatcher
 
             try {
                 $args = $this->actionArguments($controller, $action, $params);
-
             } catch (Exception) {
                 throw new PageNotFoundException("Controller method '$action' does not exist.'");
             }

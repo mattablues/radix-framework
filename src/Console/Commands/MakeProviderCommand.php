@@ -81,7 +81,12 @@ class MakeProviderCommand extends BaseCommand
         }
 
         $template = file_get_contents($templateFile);
+        if ($template === false) {
+            $this->coloredOutput("Error: Failed to read provider template at $templateFile.", "red");
+            return;
+        }
 
+        /** @var string $template */
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[ProviderName]', '[Namespace]'],

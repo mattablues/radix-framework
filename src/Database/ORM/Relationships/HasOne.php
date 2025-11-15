@@ -29,6 +29,7 @@ class HasOne
         }
 
         $this->connection = $connection;
+        /** @var class-string<Model> $resolvedClass */
         $this->modelClass = $resolvedClass;
         $this->foreignKey = $foreignKey;
         $this->localKeyName = $localKeyName;
@@ -63,14 +64,18 @@ class HasOne
             $localValue = $this->localKeyName;
         }
 
-        $modelInstance = new $this->modelClass();
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $this->modelClass;
+        $modelInstance = new $modelClass();
+        /** @var Model $modelInstance */
         $table = $modelInstance->getTable();
 
         $query = "SELECT * FROM `$table` WHERE `$this->foreignKey` = ? LIMIT 1";
         $result = $this->connection->fetchOne($query, [$localValue]);
 
         if ($result !== null) {
-            return $this->createModelInstance($result);
+            /** @var array<string, mixed> $result */
+            return $this->createModelInstance($result, $this->modelClass);
         }
 
         return $this->returnDefaultOrNull();
@@ -87,12 +92,13 @@ class HasOne
             return null;
         }
 
-        $model = new $this->modelClass();
+        /** @var class-string<Model> $class */
+        $class = $this->modelClass;
+        $model = new $class();
+        /** @var Model $model */
 
         // Applicera default
         if (is_array($this->defaultAttributes)) {
-            // Försök fill först; om attribut ej är fillable kan projektet välja forceFill utanför,
-            // men vi ger en smidig fallback:
             $model->forceFill($this->defaultAttributes);
         } elseif (is_callable($this->defaultAttributes)) {
             ($this->defaultAttributes)($model);
@@ -105,14 +111,23 @@ class HasOne
     }
 
     /**
-     * @param array<string, mixed> $data  Rad från databasen (kolumn => värde)
+     * @param array<string, mixed> $data
      */
-    private function createModelInstance(array $data): Model
+    private function createModelInstance(array $data, string $classOrTable): Model
     {
-        $model = new $this->modelClass();
-        $model->hydrateFromDatabase($data); // Fyll modellen, 'exists' exkluderas här
-        $model->markAsExisting(); // Använd metod för att explicit sätta flaggan
+        $modelClass = $this->resolveModelClass($classOrTable);
 
+        if (!is_subclass_of($modelClass, Model::class)) {
+            throw new \LogicException(
+                "HasOne relation resolved model class '$modelClass' must extend " . Model::class . "."
+            );
+        }
+
+        /** @var class-string<Model> $modelClass */
+        $model = new $modelClass();
+        /** @var Model $model */
+        $model->hydrateFromDatabase($data);
+        $model->markAsExisting();
         return $model;
     }
 

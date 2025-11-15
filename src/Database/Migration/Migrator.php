@@ -35,7 +35,9 @@ class Migrator
      */
     public function run(): int
     {
-        $migrations = glob($this->migrationsPath . "/*.php");
+        $migrations = glob($this->migrationsPath . "/*.php") ?: [];
+        /** @var array<int, string> $migrations */
+
         $executedMigrations = $this->getExecutedMigrations();
 
         $executedCount = 0;
@@ -44,15 +46,19 @@ class Migrator
             $className = pathinfo($migrationFile, PATHINFO_FILENAME);
 
             if (!in_array($className, $executedMigrations, true)) {
+                /** @var object $migration */
                 $migration = require_once $migrationFile;
                 $schema = new Schema($this->connection);
 
                 // Kör migrationen
-                if (is_object($migration)) {
+                if (method_exists($migration, 'up')) {
                     $migration->up($schema);
                 } elseif (class_exists($className)) {
+                    /** @var object $migrationInstance */
                     $migrationInstance = new $className();
-                    $migrationInstance->up($schema);
+                    if (method_exists($migrationInstance, 'up')) {
+                        $migrationInstance->up($schema);
+                    }
                 }
 
                 $this->markAsExecuted($className);
@@ -173,16 +179,19 @@ class Migrator
         $migrationFile = $this->migrationsPath . "/$migrationName.php";
 
         if (file_exists($migrationFile)) {
+            /** @var object $migration */
             $migration = require_once $migrationFile;
 
-            // Skapa en Schema-instans och skicka den till migrationen
             $schema = new Schema($this->connection);
 
-            if (is_object($migration)) {
-                $migration->down($schema); // Skicka Schema som argument
+            if (method_exists($migration, 'down')) {
+                $migration->down($schema);
             } elseif (class_exists($migrationName)) {
+                /** @var object $migrationInstance */
                 $migrationInstance = new $migrationName();
-                $migrationInstance->down($schema); // Skicka Schema som argument
+                if (method_exists($migrationInstance, 'down')) {
+                    $migrationInstance->down($schema);
+                }
             }
 
             $this->connection->execute(
@@ -190,11 +199,9 @@ class Migrator
                 [$migrationName]
             );
 
-            // Returnera ett meddelande istället för att skriva ut
             return "Rolled back migration: $migrationName";
         }
 
-        // Returnera ett felmeddelande om filen inte hittas
         return "Migration file for $migrationName not found.";
     }
 }

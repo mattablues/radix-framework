@@ -84,6 +84,7 @@ class MakeMigrationCommand extends BaseCommand
         // Generera rätt tabellnamn
         $generatedTableName = ($operation === 'create') ? strtolower($tableName) : $tableName;
 
+        /** @var string $template */
         // Byt ut placeholders i stub-filen
         $content = str_replace(
             ['[TableName]', '[OperationType]'],

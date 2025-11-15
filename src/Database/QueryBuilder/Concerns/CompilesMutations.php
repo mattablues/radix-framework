@@ -20,15 +20,25 @@ trait CompilesMutations
     protected function compileMutationSql(): string
     {
         if ($this->type === 'INSERT') {
-            $columns = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->columns));
+            $columns = implode(
+                ', ',
+                array_map(
+                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    $this->columns
+                )
+            );
             $placeholders = implode(', ', array_fill(0, count($this->columns), '?'));
             $this->compileAllBindings();
             return "INSERT INTO $this->table ($columns) VALUES ($placeholders)";
         }
 
         if ($this->type === 'UPDATE') {
-            $setClause = implode(', ',
-                array_map(fn($col) => "{$this->wrapColumn($col)} = ?", array_keys($this->columns))
+            $setClause = implode(
+                ', ',
+                array_map(
+                    fn (int|string $col): string => $this->wrapColumn((string) $col) . ' = ?',
+                    array_keys($this->columns)
+                )
             );
 
             $sql = "UPDATE $this->table SET $setClause";
@@ -55,7 +65,13 @@ trait CompilesMutations
         }
 
         if ($this->type === 'INSERT_IGNORE') {
-            $columns = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->columns));
+            $columns = implode(
+                ', ',
+                array_map(
+                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    $this->columns
+                )
+            );
             $placeholders = implode(', ', array_fill(0, count($this->columns), '?'));
             $this->compileAllBindings();
             return "INSERT OR IGNORE INTO $this->table ($columns) VALUES ($placeholders)";
@@ -65,17 +81,38 @@ trait CompilesMutations
             if (empty($this->upsertUnique)) {
                 throw new \RuntimeException('Upsert kräver unika kolumner.');
             }
-            $columns = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->columns));
+
+            $columns = implode(
+                ', ',
+                array_map(
+                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    $this->columns
+                )
+            );
             $placeholders = implode(', ', array_fill(0, count($this->columns), '?'));
-            $conflict = implode(', ', array_map(fn($col) => $this->wrapColumn($col), $this->upsertUnique));
+
+            $conflict = implode(
+                ', ',
+                array_map(
+                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    $this->upsertUnique
+                )
+            );
+
             $updates = $this->upsertUpdate;
             if ($updates === null || $updates === []) {
                 $updates = array_combine($this->columns, array_fill(0, count($this->columns), null));
             }
-            $updateSql = implode(', ', array_map(
-                fn($col) => $this->wrapColumn($col) . ' = EXCLUDED.' . $this->wrapColumn($col),
-                array_keys($updates)
-            ));
+
+            $updateSql = implode(
+                ', ',
+                array_map(
+                    fn (int|string $col): string =>
+                        $this->wrapColumn((string) $col) . ' = EXCLUDED.' . $this->wrapColumn((string) $col),
+                    array_keys($updates)
+                )
+            );
+
             $this->compileAllBindings();
             return "INSERT INTO $this->table ($columns) VALUES ($placeholders) ON CONFLICT ($conflict) DO UPDATE SET $updateSql";
         }

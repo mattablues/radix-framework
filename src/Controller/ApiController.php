@@ -18,9 +18,16 @@ abstract class ApiController extends AbstractController
     protected function json(array $data, int $status = 200): JsonResponse
     {
         $response = new JsonResponse();
+
+        $body = json_encode($data);
+        if ($body === false) {
+            // Här kan du logga felet om du vill
+            throw new \RuntimeException('Failed to encode response body to JSON.');
+        }
+
         $response->setStatusCode($status)
             ->setHeader('Content-Type', 'application/json')
-            ->setBody(json_encode($data));
+            ->setBody($body);
 
         return $response;
     }
@@ -39,7 +46,15 @@ abstract class ApiController extends AbstractController
             return [];
         }
 
-        $inputData = json_decode(file_get_contents('php://input'), true);
+        $rawBody = file_get_contents('php://input');
+
+        if ($rawBody === false) {
+            $this->respondWithBadRequest('Unable to read request body.');
+            return []; // För statisk analys – körs aldrig efter respondWithBadRequest()
+        }
+
+        /** @var string $rawBody */
+        $inputData = json_decode($rawBody, true);
 
         // Om JSON är ogiltig, skicka ett 400-fel
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($inputData)) {
@@ -108,6 +123,7 @@ abstract class ApiController extends AbstractController
         }
 
         // Kontrollera token i databasen
+        /** @var \App\Models\Token|null $existingToken */
         $existingToken = Token::query()->where('value', '=', $token)->first();
 
         if (!$existingToken || strtotime($existingToken->expires_at) < time()) {

@@ -8,7 +8,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait BuildsWhere
 {
-    public function where(string|QueryBuilder|\Closure $column, string $operator = null, mixed $value = null, string $boolean = 'AND'): self
+    public function where(string|\Closure $column, string $operator = null, mixed $value = null, string $boolean = 'AND'): self
     {
         if ($column instanceof \Closure) {
             $query = new \Radix\Database\QueryBuilder\QueryBuilder();
@@ -20,7 +20,7 @@ trait BuildsWhere
                     'query' => $query,
                     'boolean' => $boolean
                 ];
-                $this->mergeBindings($query); // istället för array_merge($this->bindings...)
+                $this->mergeBindings($query);
             }
         } else {
             if (empty(trim($column))) {

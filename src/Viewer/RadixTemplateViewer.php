@@ -67,7 +67,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
             ob_start();
             include $cachedFile;
+
+
             $output = ob_get_clean();
+
+            if ($output === false) {
+                throw new \RuntimeException("Failed to get output from cached file: $cachedFile");
+            }
+
             $this->debug("Output from cached file: " . substr($output, 0, 100));
             return $output;
         }
@@ -164,7 +171,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
             throw new \RuntimeException("Template file not found: $filePath. Check if the directory and file exist.");
         }
 
-        return file_get_contents($filePath);
+        $content = file_get_contents($filePath);
+        if ($content === false) {
+            throw new \RuntimeException("Failed to read template file: $filePath");
+        }
+
+        return $content;
     }
 
     /**
@@ -444,6 +456,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
             throw new \RuntimeException('Template evaluation failed: ' . $e->getMessage(), 0, $e);
         }
         $output = ob_get_clean();
+
+        if ($output === false) {
+            // Ingen output producerades (eller något gick fel med output-buffer),
+            // men vi vill fortfarande returnera en sträng enligt signaturen.
+            $output = '';
+        }
 
         // Behåll outputen som den är utan normalisering
         $this->debug("Evaluations resultat:\n" . htmlspecialchars($output));

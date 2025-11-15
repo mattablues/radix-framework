@@ -902,6 +902,14 @@ abstract class Model implements JsonSerializable
 
         $relatedInstance = new $relatedModel();
 
+        if (!$relatedInstance instanceof self) {
+            throw new \LogicException(
+                "belongsTo-relaterad klass '$relatedModel' måste ärva " . self::class . "."
+            );
+        }
+
+        /** @var self $relatedInstance */
+
         // Skicka den aktuella instansen (`$this`) som parent-modellen
         return new BelongsTo(
             $this->getConnection(),
@@ -990,17 +998,27 @@ abstract class Model implements JsonSerializable
 
         foreach ($relations as $key => $constraint) {
             // Stöd både 'rel' och 'rel' => closure
-            $name = is_int($key) ? $constraint : $key;
-            $closure = is_int($key) ? null : $constraint;
+            if (is_int($key)) {
+                // numeriska nycklar: värdet ÄR relationsnamnet och ska vara string
+                if (!is_string($constraint)) {
+                    throw new \InvalidArgumentException('Relation name must be a string for numeric keys.');
+                }
+                $name = $constraint;
+                $closure = null;
+            } else {
+                // assoc: nyckeln är relationsnamn, värdet är \Closure
+                $name = $key;
+                $closure = $constraint;
+            }
 
             if (!$this->relationExists($name)) {
-                throw new \InvalidArgumentException("Relation '$name' är inte definierad i modellen ".static::class.".");
+                throw new \InvalidArgumentException("Relation '$name' är inte definierad i modellen " . static::class . ".");
             }
 
             $relObj = $this->$name();
 
             // Sätt parent om möjligt
-            if (method_exists($relObj, 'setParent')) {
+            if (is_object($relObj) && method_exists($relObj, 'setParent')) {
                 $relObj->setParent($this);
             }
 
@@ -1035,9 +1053,9 @@ abstract class Model implements JsonSerializable
 
                 // Försök extrahera QueryBuilder (om relationen har en)
                 $query = null;
-                if (method_exists($relObj, 'getQuery')) {
+                if (is_object($relObj) && method_exists($relObj, 'getQuery')) {
                     $query = $relObj->getQuery();
-                } elseif (method_exists($relObj, 'query')) {
+                } elseif (is_object($relObj) && method_exists($relObj, 'query')) {
                     $query = $relObj->query();
                 }
 
@@ -1046,85 +1064,113 @@ abstract class Model implements JsonSerializable
                         // Ge closuren relationens QueryBuilder
                         $closure($query);
                         // Låt relationen hämta enligt sin get()
-                        $relatedData = method_exists($relObj, 'get')
-                            ? $relObj->get()
-                            : $query->get();
+                        if (is_object($relObj) && method_exists($relObj, 'get')) {
+                            $relatedData = $relObj->get();
+                        } else {
+                            $relatedData = $query->get();
+                        }
                     } else {
                         // Skapa en fristående QB som verkar mot relaterade tabellen
                         $relatedTable = null;
                         $relatedModelClass = null;
 
                         // HasMany/HasOne: har 'modelClass'
-                        if (property_exists($relObj, 'modelClass')) {
+                        if (is_object($relObj) && property_exists($relObj, 'modelClass')) {
                             $rc = new \ReflectionClass($relObj);
                             if ($rc->hasProperty('modelClass')) {
-                                $p = $rc->getProperty('modelClass'); $p->setAccessible(true);
+                                $p = $rc->getProperty('modelClass');
+                                $p->setAccessible(true);
                                 $relatedModelClass = $p->getValue($relObj);
                             }
                         }
                         // BelongsTo: har 'relatedTable'
-                        if (!$relatedModelClass && property_exists($relObj, 'relatedTable')) {
+                        if ($relatedModelClass === null && is_object($relObj) && property_exists($relObj, 'relatedTable')) {
                             $rc = new \ReflectionClass($relObj);
                             if ($rc->hasProperty('relatedTable')) {
-                                $p = $rc->getProperty('relatedTable'); $p->setAccessible(true);
+                                $p = $rc->getProperty('relatedTable');
+                                $p->setAccessible(true);
                                 $relatedTable = $p->getValue($relObj);
                             }
                         }
-                        if ($relatedModelClass && class_exists($relatedModelClass)) {
+
+                        if (is_string($relatedModelClass) && class_exists($relatedModelClass)) {
                             $tmpModel = new $relatedModelClass();
-                            $relatedTable = $tmpModel->getTable();
+                            if ($tmpModel instanceof self) {
+                                /** @var self $tmpModel */
+                                $relatedTable = $tmpModel->getTable();
+                            }
                         }
 
                         $qb = (new QueryBuilder())
-                                ->setConnection($this->getConnection())
-                                ->setModelClass($relatedModelClass ?? static::class)
-                                ->from($relatedTable ?? $name);
+                            ->setConnection($this->getConnection())
+                            ->setModelClass(is_string($relatedModelClass) ? $relatedModelClass : static::class)
+                            ->from($relatedTable ?? $name);
 
-                            // Applicera foreign key-filter om möjligt (för HasMany/HasOne)
-                            try {
+                        // Applicera foreign key-filter om möjligt (för HasMany/HasOne)
+                        try {
+                            if (is_object($relObj)) {
                                 $rc = new \ReflectionClass($relObj);
                                 if ($rc->hasProperty('foreignKey') && $rc->hasProperty('localKeyName')) {
-                                    $pfk = $rc->getProperty('foreignKey'); $pfk->setAccessible(true);
-                                    $plk = $rc->getProperty('localKeyName'); $plk->setAccessible(true);
+                                    $pfk = $rc->getProperty('foreignKey');
+                                    $pfk->setAccessible(true);
+                                    $plk = $rc->getProperty('localKeyName');
+                                    $plk->setAccessible(true);
                                     $foreignKey = $pfk->getValue($relObj);
                                     $localKeyName = $plk->getValue($relObj);
-                                    $localValue = $this->getAttribute($localKeyName);
+                                    $localValue = $this->getAttribute((string)$localKeyName);
                                     if ($localValue !== null) {
-                                        $qb->where($foreignKey, '=', $localValue);
+                                        $qb->where((string)$foreignKey, '=', $localValue);
                                     }
                                 }
-                            } catch (\Throwable) {
-                                // ignoreras
                             }
+                        } catch (\Throwable) {
+                            // ignoreras
+                        }
 
-                            $closure($qb);
-                            $relatedData = $qb->get();
-                        }
-                    } elseif (
-                        $paramType === null
-                        || str_starts_with((string)$paramType, 'Radix\\Database\\ORM\\Relationships\\')
-                    ) {
-                        // Skicka relationsobjektet (withDefault m.m.)
-                        $closure($relObj);
-                        $relatedData = method_exists($relObj, 'get')
-                            ? $relObj->get()
-                            : ($query instanceof QueryBuilder ? $query->get() : null);
+                        $closure($qb);
+                        $relatedData = $qb->get();
+                    }
+                } elseif (
+                    $paramType === null
+                    || (is_string($paramType) && str_starts_with($paramType, 'Radix\\Database\\ORM\\Relationships\\'))
+                ) {
+                    // Skicka relationsobjektet (withDefault m.m.)
+                    $closure($relObj);
+                    if (is_object($relObj) && method_exists($relObj, 'get')) {
+                        $relatedData = $relObj->get();
+                    } elseif ($query instanceof QueryBuilder) {
+                        $relatedData = $query->get();
                     } else {
-                        // Okänd typ: försök QB, annars relation
-                        if ($query instanceof QueryBuilder) {
-                            $closure($query);
-                            $relatedData = method_exists($relObj, 'get') ? $relObj->get() : $query->get();
-                        } else {
-                            $closure($relObj);
-                            $relatedData = method_exists($relObj, 'get') ? $relObj->get() : null;
-                        }
+                        $relatedData = null;
                     }
                 } else {
-                    // Ingen constraint
-                    $relatedData = $relObj->get();
+                    // Okänd typ: försök QB, annars relation
+                    if ($query instanceof QueryBuilder) {
+                        $closure($query);
+                        if (is_object($relObj) && method_exists($relObj, 'get')) {
+                            $relatedData = $relObj->get();
+                        } else {
+                            $relatedData = $query->get();
+                        }
+                    } else {
+                        $closure($relObj);
+                        if (is_object($relObj) && method_exists($relObj, 'get')) {
+                            $relatedData = $relObj->get();
+                        } else {
+                            $relatedData = null;
+                        }
+                    }
                 }
+            } else {
+                // Ingen constraint: hämta via relationens get()
+                if (is_object($relObj) && method_exists($relObj, 'get')) {
+                    $relatedData = $relObj->get();
+                } else {
+                    $relatedData = null;
+                }
+            }
 
-                $this->setRelation($name, is_array($relatedData) ? $relatedData : ($relatedData ?? null));
+            $this->setRelation($name, is_array($relatedData) ? $relatedData : ($relatedData ?? null));
         }
 
         return $this;
@@ -1144,7 +1190,16 @@ abstract class Model implements JsonSerializable
         $relations = is_array($relations) ? $relations : [$relations];
 
         foreach ($relations as $key => $constraint) {
-            $name = is_int($key) ? $constraint : $key;
+            if (is_int($key)) {
+                if (!is_string($constraint)) {
+                    // enligt signaturen ska värdet här vara string; hoppa annars
+                    continue;
+                }
+                $name = $constraint;
+            } else {
+                $name = $key;
+            }
+
             if (array_key_exists($name, $this->relations)) {
                 continue; // redan laddad
             }
@@ -1153,7 +1208,15 @@ abstract class Model implements JsonSerializable
         // Kör load() med full uppsättning, men filtrera bort redan laddade
         $toLoad = [];
         foreach ($relations as $key => $constraint) {
-            $name = is_int($key) ? $constraint : $key;
+            if (is_int($key)) {
+                if (!is_string($constraint)) {
+                    continue;
+                }
+                $name = $constraint;
+            } else {
+                $name = $key;
+            }
+
             if (!array_key_exists($name, $this->relations)) {
                 $toLoad[$key] = $constraint;
             }

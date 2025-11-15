@@ -9,7 +9,7 @@ class Response
     private string $body = '';
     /** @var array<string,string> */
     private array $headers = [];
-    private  int $status_code = 200;
+    private int $status_code = 200;
 
     public function setStatusCode(int $code): Response
     {
@@ -20,7 +20,8 @@ class Response
 
     public function setHeader(string $key, mixed $value): Response
     {
-        $this->headers[$key] = $value;
+        // Säkerställ att alla header-värden lagras som strängar
+        $this->headers[$key] = (string) $value;
 
         return $this;
     }
@@ -61,14 +62,19 @@ class Response
     }
 
     /**
-     * @return array<string,string>
+     * @return list<string>
      */
     public function header(string $header): array
     {
-        // Säkerställ att header alltid returnerar en array
-        $value = $this->headers[$header] ?? [];
+        // Säkerställ att header alltid returnerar en lista av strängar
+        if (!array_key_exists($header, $this->headers)) {
+            return [];
+        }
 
-        return is_array($value) ? $value : [$value];
+        $value = $this->headers[$header];
+
+        // Om du någon gång vill stödja flera värden per header kan du utöka detta
+        return [$value];
     }
 
     // Getter för statuskod

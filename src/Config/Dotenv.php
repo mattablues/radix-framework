@@ -25,6 +25,11 @@ class Dotenv
     {
         $lines = file($this->path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
+        if ($lines === false) {
+            throw new \RuntimeException("Failed to read .env file at: {$this->path}");
+        }
+
+        /** @var list<string> $lines */
         foreach ($lines as $line) {
             // Hoppa över kommentar-rader eller tomma rader
             $line = trim($line);

@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns\Aggregates;
 
+use Radix\Database\ORM\Model;
+use Radix\Database\ORM\Relationships\BelongsTo;
+use Radix\Database\ORM\Relationships\HasManyThrough;
+use Radix\Database\ORM\Relationships\HasOne;
+use Radix\Database\ORM\Relationships\HasOneThrough;
+
 trait WithAggregate
 {
     public function withSum(string $relation, string $column, ?string $alias = null): self
@@ -47,7 +53,7 @@ trait WithAggregate
 
     protected function addRelationAggregateSelect(string $relation, string $column, string $fn, ?string $alias = null): void
     {
-        /** @var \Radix\Database\ORM\Model $parent */
+        /** @var Model $parent */
         $parent = new $this->modelClass();
         $parentTable = trim($this->table, '`');
         $parentPk = $parent::getPrimaryKey();
@@ -60,41 +66,57 @@ trait WithAggregate
         $aggAlias = $alias ?: (strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation) . '_' . strtolower($fn));
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
-            $relatedModelClass = (new \ReflectionClass($rel))->getProperty('modelClass');
-            $relatedModelClass->setAccessible(true);
-            $relatedClass = $relatedModelClass->getValue($rel);
-            $relatedInstance = class_exists($relatedClass) ? new $relatedClass() : null;
+            /** @var \Radix\Database\ORM\Relationships\HasMany $rel */
+            $ref = new \ReflectionClass($rel);
+            $relatedModelClassProp = $ref->getProperty('modelClass');
+            $relatedModelClassProp->setAccessible(true);
+            $relatedClass = $relatedModelClassProp->getValue($rel);
+
+            $relatedInstance = (class_exists($relatedClass) && is_subclass_of($relatedClass, Model::class))
+                ? new $relatedClass()
+                : null;
+
+            /** @var Model|null $relatedInstance */
             $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
 
-            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
+            $this->columns[] =
+                "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
+            /** @var HasOneThrough $rel */
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey');
+            $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey');
+            $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal');
+            $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
-                if (class_exists($classOrTable)) {
+                if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
+                    /** @var class-string<Model> $classOrTable */
                     $m = new $classOrTable();
+                    /** @var Model $m */
                     return $m->getTable();
                 }
                 return $classOrTable;
@@ -109,26 +131,34 @@ trait WithAggregate
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
+            /** @var HasManyThrough $rel */
             $ref = new \ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related'); $relatedProp->setAccessible(true);
+            $relatedProp = $ref->getProperty('related');
+            $relatedProp->setAccessible(true);
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
-            $throughProp = $ref->getProperty('through'); $throughProp->setAccessible(true);
+            $throughProp = $ref->getProperty('through');
+            $throughProp->setAccessible(true);
             $throughClassOrTable = $throughProp->getValue($rel);
 
-            $firstKeyProp = $ref->getProperty('firstKey'); $firstKeyProp->setAccessible(true);
+            $firstKeyProp = $ref->getProperty('firstKey');
+            $firstKeyProp->setAccessible(true);
             $firstKey = $firstKeyProp->getValue($rel);
 
-            $secondKeyProp = $ref->getProperty('secondKey'); $secondKeyProp->setAccessible(true);
+            $secondKeyProp = $ref->getProperty('secondKey');
+            $secondKeyProp->setAccessible(true);
             $secondKey = $secondKeyProp->getValue($rel);
 
-            $secondLocalProp = $ref->getProperty('secondLocal'); $secondLocalProp->setAccessible(true);
+            $secondLocalProp = $ref->getProperty('secondLocal');
+            $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
-                if (class_exists($classOrTable)) {
+                if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
+                    /** @var class-string<Model> $classOrTable */
                     $m = new $classOrTable();
+                    /** @var Model $m */
                     return $m->getTable();
                 }
                 return $classOrTable;
@@ -143,34 +173,51 @@ trait WithAggregate
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
-            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            /** @var HasOne $rel */
+            $ref = new \ReflectionClass($rel);
+
+            $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
             $foreignKey = $fkProp->getValue($rel);
 
-            $mcProp = (new \ReflectionClass($rel))->getProperty('modelClass');
+            $mcProp = $ref->getProperty('modelClass');
             $mcProp->setAccessible(true);
             $modelClass = $mcProp->getValue($rel);
+
+            if (!is_string($modelClass) || !is_subclass_of($modelClass, Model::class)) {
+                throw new \LogicException(
+                    "HasOne relation modelClass '$modelClass' must extend " . Model::class . " for withAggregate()."
+                );
+            }
+
+            /** @var class-string<Model> $modelClass */
             $relatedInstance = new $modelClass();
+            /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
+            $this->columns[] =
+                "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
-            $ownerKeyProp = (new \ReflectionClass($rel))->getProperty('ownerKey');
+            /** @var BelongsTo $rel */
+            $ref = new \ReflectionClass($rel);
+
+            $ownerKeyProp = $ref->getProperty('ownerKey');
             $ownerKeyProp->setAccessible(true);
             $ownerKey = $ownerKeyProp->getValue($rel);
 
-            $fkProp = (new \ReflectionClass($rel))->getProperty('foreignKey');
+            $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
             $parentForeignKey = $fkProp->getValue($rel);
 
-            $tableProp = (new \ReflectionClass($rel))->getProperty('relatedTable');
+            $tableProp = $ref->getProperty('relatedTable');
             $tableProp->setAccessible(true);
             $relatedTable = $tableProp->getValue($rel);
 
-            $this->columns[] = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `$aggAlias`";
+            $this->columns[] =
+                "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `$aggAlias`";
             return;
         }
 
@@ -179,8 +226,16 @@ trait WithAggregate
             $foreignPivotKey = $rel->getForeignPivotKey();
 
             $relatedClass = $rel->getRelatedModelClass();
-            /** @var \Radix\Database\ORM\Model $relatedInstance */
+
+            if (!is_subclass_of($relatedClass, Model::class)) {
+                throw new \LogicException(
+                    "Related model class '$relatedClass' must extend " . Model::class . " for withAggregate()."
+                );
+            }
+
+            /** @var class-string<Model> $relatedClass */
             $relatedInstance = new $relatedClass();
+            /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
             $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');

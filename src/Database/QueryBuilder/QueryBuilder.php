@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Database\QueryBuilder;
 
 use Radix\Collection\Collection;
+use Radix\Database\ORM\Model;
 use Radix\Database\QueryBuilder\Concerns\Aggregates\WithAggregate;
 use Radix\Database\QueryBuilder\Concerns\Aggregates\WithCount;
 use Radix\Database\QueryBuilder\Concerns\Bindings;
@@ -75,6 +76,9 @@ class QueryBuilder extends AbstractQueryBuilder
     /** @var array<int, mixed> */
     protected array $unions = [];
     protected bool $distinct = false;
+    /**
+     * @var class-string<Model>|null
+     */
     protected ?string $modelClass = null;
     /** @var array<int, string> */
     protected array $eagerLoadRelations = [];
@@ -109,42 +113,51 @@ class QueryBuilder extends AbstractQueryBuilder
         if (!class_exists($modelClass)) {
             throw new \InvalidArgumentException("Model class '$modelClass' does not exist.");
         }
+        if (!is_subclass_of($modelClass, Model::class)) {
+            throw new \InvalidArgumentException("Model class '$modelClass' must extend " . Model::class . ".");
+        }
         $this->modelClass = $modelClass;
         return $this;
     }
 
     /**
-     * @return object|null
+     * @return Model|null
      */
-    public function first()
+    public function first(): ?Model
     {
-        if (is_null($this->modelClass)) {
+        if ($this->modelClass === null) {
             throw new \LogicException("Model class is not set. Use setModelClass() before calling first().");
         }
 
         $this->limit(1);
-        $results = $this->get(); // alltid Collection
+
+        /** @var Collection $results */
+        $results = $this->get(); // alltid Collection av modeller
 
         if ($results->isEmpty()) {
             return null;
         }
 
+        /** @var mixed $result */
         $result = $results->first();
 
-        if (!$result instanceof $this->modelClass) {
-            $modelInstance = new $this->modelClass();
-            $modelInstance->fill($result);
-            $modelInstance->markAsExisting();
-            return $modelInstance;
+        // I praktiken ska detta alltid vara en Model, eftersom AbstractQueryBuilder::get()
+        // hydratiserar till $this->modelClass som är en subklass av Model.
+        if (!$result instanceof Model) {
+            throw new \LogicException('QueryBuilder::first() expected instance of Model from Collection.');
         }
 
+        /** @var Model $result */
         $result->markAsExisting();
         return $result;
     }
 
+    /**
+     * @return Collection<Model>
+     */
     public function get(): Collection
     {
-        if (is_null($this->modelClass)) {
+        if ($this->modelClass === null) {
             throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
         }
 
@@ -193,7 +206,13 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         if (preg_match('/\s+AS\s+/i', $table)) {
-            [$tableName, $alias] = array_map('trim', preg_split('/\s+AS\s+/i', $table, 2));
+            $parts = preg_split('/\s+AS\s+/i', $table, 2);
+            if ($parts === false) {
+                throw new \RuntimeException("Failed to parse table alias from '{$table}'.");
+            }
+
+            [$tableName, $alias] = array_map('trim', $parts);
+
             $this->table = $this->wrapColumn($tableName) . ' AS ' . $this->wrapAlias($alias);
         } else {
             $this->table = $this->wrapColumn($table);

@@ -87,6 +87,8 @@ class HasManyThrough
         $relatedModel = new $relatedClass();
         $throughModel = new $throughClass();
 
+        /** @var Model $relatedModel */
+        /** @var Model $throughModel */
         $relatedTable = $relatedModel->getTable();
         $throughTable = $throughModel->getTable();
 
@@ -131,6 +133,7 @@ class HasManyThrough
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);
+        /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
         $model->hydrateFromDatabase($data);
         $model->markAsExisting();

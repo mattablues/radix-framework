@@ -311,10 +311,19 @@ class Container implements ContainerInterface, ArrayAccess
     /**
      * Sätt container-defaults (merging med befintliga).
      *
-     * @param array<string, mixed> $defaults
+     * @param array{
+     *     share?: bool,
+     *     autowire?: bool,
+     *     autoregister?: bool
+     * } $defaults
      */
     public function setDefaults(array $defaults): void
     {
-        $this->defaults = array_merge($this->defaults, $defaults);
+        foreach ($defaults as $key => $value) {
+            if (array_key_exists($key, $this->defaults)) {
+                // Typ-säkert: alla defaults är bool
+                $this->defaults[$key] = (bool) $value;
+            }
+        }
     }
 }

@@ -24,7 +24,14 @@ class Token
 
     public function hashHmac(): string
     {
-        return hash_hmac('sha256', $this->token, getenv('SECURE_TOKEN_HMAC'));
+        $key = getenv('SECURE_TOKEN_HMAC');
+        if ($key === false || $key === '') {
+            throw new \RuntimeException('SECURE_TOKEN_HMAC env variable is not set.');
+        }
+
+        $hashHmac = hash_hmac('sha256', $this->token, $key);
+
+        return $hashHmac;
     }
 
     public static function hashCrc32(int|string $identifier): string

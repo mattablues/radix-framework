@@ -56,7 +56,27 @@ class Resolver
         if (is_string($concrete)) {
             $definition->setClass($concrete);
 
-        } elseif (is_array($concrete) || $concrete instanceof Closure) {
+        } elseif (is_array($concrete)) {
+            // Hantera array-fabriker: [SomeClass::class, 'method']
+            if (
+                count($concrete) === 2
+                && is_string($concrete[0])
+                && is_string($concrete[1])
+                && class_exists($concrete[0])
+                && method_exists($concrete[0], $concrete[1])
+            ) {
+                /** @var array{class-string, string} $factory */
+                $factory = $concrete;
+                $definition->setFactory($factory);
+            } elseif (is_callable($concrete)) {
+                // Callable array (t.ex. [$object, 'method'])
+                $definition->setFactory($concrete);
+            } else {
+                throw new ContainerConfigException('Array concrete is not a valid factory.');
+            }
+
+        } elseif ($concrete instanceof \Closure) {
+            // Closure är ett giltigt callable för fabriken
             $definition->setFactory($concrete);
 
         } elseif (is_object($concrete)) {
@@ -71,17 +91,23 @@ class Resolver
     {
         $class = $definition->getClass();
 
-        try {
-            $reflection = new ReflectionClass($definition->getClass());
-        } catch (ReflectionException $e) {
-            throw new ContainerDependencyInjectionException(
-                sprintf("Failed to resolve class '%s': %s", $definition->getClass(), $e->getMessage())
-            );
+        if ($class === null) {
+            throw new ContainerConfigException('Definition has no valid class to instantiate.');
         }
 
-        if (!$reflection->isInstantiable()){
+        if (!class_exists($class)) {
+            throw new ContainerDependencyInjectionException(sprintf(
+                "Class '%s' does not exist.",
+                $class
+            ));
+        }
+
+        /** @var class-string $class */
+        $reflection = new ReflectionClass($class);
+
+        if (!$reflection->isInstantiable()) {
             throw new ContainerDependencyInjectionException(
-                sprintf("Cannot instantiate class '%s'. It might be abstract or an interface.", $definition->getClass())
+                sprintf("Cannot instantiate class '%s'. It might be abstract or an interface.", $class)
             );
         }
 
@@ -140,10 +166,23 @@ class Resolver
         return call_user_func_array($factory, $this->resolveArguments($definition->getArguments()) ?: [$this->container]);
     }
 
-    private function invokeMethods(Definition $definition, ?object $instance): void
+    private function invokeMethods(Definition $definition, object $instance): void
     {
         foreach ($definition->getMethodCalls() as $method) {
-            call_user_func_array([$instance, $method[0]], $this->resolveArguments($method[1]));
+            $callable = [$instance, $method[0]];
+
+            if (!is_callable($callable)) {
+                throw new ContainerConfigException(sprintf(
+                    'Method "%s" is not callable on class "%s".',
+                    (string) $method[0],
+                    get_class($instance)
+                ));
+            }
+
+            $arguments = $this->resolveArguments($method[1]);
+
+            /** @var callable $callable */
+            call_user_func_array($callable, $arguments);
         }
     }
 

@@ -143,6 +143,11 @@ final class Reader
                 continue;
             }
 
+            if (!is_array($row)) {
+                // Skydda mot oväntade typer från SplFileObject
+                continue;
+            }
+
             // Trimma och ev. encoding-konvertera celler
             $row = array_map(static function ($v) use ($encoding, $castNumeric) {
                 if ($v === null) {
@@ -177,7 +182,8 @@ final class Reader
                 $assoc = [];
                 $max = max(count($headers), count($row));
                 for ($i = 0; $i < $max; $i++) {
-                    $key = $headers[$i] ?? "col_{$i}";
+                    $headerKey = $headers[$i] ?? "col_{$i}";
+                    $key = (string) $headerKey;
                     $assoc[$key] = $row[$i] ?? null;
                 }
                 $onRow($assoc);
@@ -194,9 +200,14 @@ final class Reader
     public static function textStream(string $path, callable $onChunk, int $chunkSize = 8192, ?string $encoding = null): void
     {
         self::ensureFileReadable($path);
+
+        if ($chunkSize <= 0) {
+            throw new RuntimeException("chunkSize must be a positive integer, got {$chunkSize}");
+        }
+
         $h = fopen($path, 'rb');
         if ($h === false) {
-            throw new RuntimeException("Kunde inte öppna fil: {$path}");
+            throw new RuntimeException("Kunde inte öppna fil: $path");
         }
         try {
             while (!feof($h)) {

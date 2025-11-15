@@ -31,7 +31,7 @@ trait Pagination
      * @param int $perPage
      * @param int $currentPage
      * @return array{
-     *     data: array<int, mixed>,
+     *     data: array<int|string, mixed>,
      *     pagination: array{
      *         per_page: int,
      *         current_page: int,
@@ -40,7 +40,7 @@ trait Pagination
      *     }
      * }
      */
-    public function simplePaginate(int $perPage = 10, int $currentPage = 1): array
+   public function simplePaginate(int $perPage = 10, int $currentPage = 1): array
     {
         $currentPage = ($currentPage > 0) ? $currentPage : 1;
         $offset = ($currentPage - 1) * $perPage;
@@ -48,7 +48,9 @@ trait Pagination
         // Hämta en extra rad för att indikera om det finns fler
         $this->limit($perPage + 1)->offset($offset);
         $data = $this->get(); // Collection
-        $items = $data->toArray();
+
+        // Reindexera till numeriska nycklar för att matcha array<int, mixed>
+        $items = $data->values()->toArray();
 
         $hasMore = count($items) > $perPage;
         if ($hasMore) {
@@ -72,7 +74,7 @@ trait Pagination
      * @param int $perPage
      * @param int $currentPage
      * @return array{
-     *     data: array<int, mixed>,
+     *     data: array<int|string, mixed>,
      *     pagination: array{
      *         total: int,
      *         per_page: int,
@@ -120,8 +122,8 @@ trait Pagination
         $this->limit($perPage)->offset($offset);
         $data = $this->get();
 
-        // $data är en Collection enligt QueryBuilder::get()
-        $dataArray = $data->toArray();
+        // Reindexera till numeriska nycklar
+        $dataArray = $data->values()->toArray();
 
         return [
             'data' => $dataArray,
@@ -142,7 +144,17 @@ trait Pagination
      * @param array<int,string> $searchColumns
      * @param int $perPage
      * @param int $currentPage
-     * @return array{data: array<int, mixed>, search: array{term:string,total:int,per_page:int,current_page:int,last_page:int,first_page:int}}
+     * @return array{
+     *     data: array<int|string, mixed>,
+     *     search: array{
+     *         term: string,
+     *         total: int,
+     *         per_page: int,
+     *         current_page: int,
+     *         last_page: int,
+     *         first_page: int
+     *     }
+     * }
      */
     public function search(string $term, array $searchColumns, int $perPage = 10, int $currentPage = 1): array
     {
@@ -164,7 +176,7 @@ trait Pagination
 
         $countQuery = clone $this;
         $countQuery->columns = [];
-               $countQuery->orderBy = [];
+        $countQuery->orderBy = [];
         $countQuery->limit = null;
         $countQuery->offset = null;
         $countQuery->selectRaw('COUNT(*) as total');
@@ -180,8 +192,8 @@ trait Pagination
         $this->limit($perPage)->offset(($currentPage - 1) * $perPage);
         $data = $this->get();
 
-        // $data är en Collection enligt QueryBuilder::get()
-        $dataArray = $data->toArray();
+        // Reindexera till numeriska nycklar
+        $dataArray = $data->values()->toArray();
 
         return [
             'data' => $dataArray,

@@ -88,6 +88,7 @@ class MakeControllerCommand extends BaseCommand
 
         $stub = file_get_contents($stubFile);
 
+        /** @var string $stub */
         // Ersätt placeholder med korrekt innehåll
         $className = $this->getClassName($controllerName);
         $content = str_replace(

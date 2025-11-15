@@ -6,28 +6,28 @@ namespace Radix\Database\ORM\Relationships;
 
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
-use Radix\Database\QueryBuilder\QueryBuilder;
 use Radix\Support\StringHelper;
 
 class HasMany
 {
     private Connection $connection;
+    /** @var class-string<Model> */
     private string $modelClass;
     private string $foreignKey;
     private string $localKeyName;
     private ?Model $parent = null;
-    private ?QueryBuilder $builder = null;
 
     public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
     {
-        $this->connection = $connection;
-
-        if (!class_exists($modelClass)) {
-            throw new \Exception("Class '$modelClass' not found for HasMany relation.");
+        $resolvedClass = $this->resolveModelClass($modelClass);
+        if (!class_exists($resolvedClass) || !is_subclass_of($resolvedClass, Model::class)) {
+            throw new \Exception("Model class '$resolvedClass' must exist and extend " . Model::class . '.');
         }
 
-        $this->modelClass = $modelClass;
-        $this->foreignKey = $foreignKey;
+        $this->connection   = $connection;
+        /** @var class-string<Model> $resolvedClass */
+        $this->modelClass   = $resolvedClass;
+        $this->foreignKey   = $foreignKey;
         $this->localKeyName = $localKeyName;
     }
 
@@ -37,71 +37,82 @@ class HasMany
         return $this;
     }
 
-    public function query(): QueryBuilder
-    {
-        if ($this->builder instanceof QueryBuilder) {
-            return $this->builder;
-        }
-
-        /** @var Model $instance */
-        $instance = new $this->modelClass();
-        $table = $instance->getTable();
-
-        $qb = (new QueryBuilder())
-            ->setConnection($this->connection)
-            ->setModelClass($this->modelClass)
-            ->from($table);
-
-        if ($this->parent !== null) {
-            $value = $this->parent->getAttribute($this->localKeyName);
-            if ($value !== null) {
-                $qb->where($this->foreignKey, '=', $value);
-            }
-        }
-
-        $this->builder = $qb;
-        return $this->builder;
-    }
-
     /**
      * @return array<int, Model>
      */
     public function get(): array
     {
-        if ($this->builder instanceof QueryBuilder) {
-            $col = $this->builder->get();
-            return $col->toArray();
+        // Hämta local key-värde från parent om satt, annars använd localKeyName som värde (backcompat)
+        if ($this->parent !== null) {
+            $localValue = $this->parent->getAttribute($this->localKeyName);
+            if ($localValue === null) {
+                return [];
+            }
+        } else {
+            $localValue = $this->localKeyName;
         }
 
-        $modelClass = $this->resolveModelClass($this->modelClass);
+        /** @var class-string<Model> $modelClass */
+        $modelClass   = $this->modelClass;
         $modelInstance = new $modelClass();
-        $table = $modelInstance->getTable();
+        /** @var Model $modelInstance */
+        $table        = $modelInstance->getTable();
 
-        if ($this->parent === null) {
-            throw new \LogicException("HasMany parent model is not set. Ensure the parent model is hydrated before loading relation.");
+        $sql = "SELECT * FROM `$table` WHERE `$this->foreignKey` = ?";
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = $this->connection->fetchAll($sql, [$localValue]);
+
+        /** @var array<int, Model> $results */
+        $results = [];
+        foreach ($rows as $row) {
+            $results[] = $this->createModelInstance($row, $this->modelClass);
         }
 
-        $localValue = $this->parent->getAttribute($this->localKeyName);
-        if ($localValue === null) {
-            return [];
-        }
-
-        $query = "SELECT * FROM `$table` WHERE `$this->foreignKey` = ?";
-        $results = $this->connection->fetchAll($query, [$localValue]);
-
-        return array_map(fn($data) => $this->createModelInstance($data, $modelClass), $results);
+        return $results;
     }
-
 
     public function first(): ?Model
     {
-        $results = $this->get();
-        if (empty($results)) {
+        $rows = $this->get();
+        if ($rows === []) {
             return null;
         }
-        return $results[0];
+        return $rows[0];
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function createModelInstance(array $data, string $classOrTable): Model
+    {
+        $modelClass = $this->resolveModelClass($classOrTable);
+
+        if (!is_subclass_of($modelClass, Model::class)) {
+            throw new \LogicException(
+                "HasMany relation resolved model class '$modelClass' must extend " . Model::class . '.'
+            );
+        }
+
+        /** @var class-string<Model> $modelClass */
+        $model = new $modelClass();
+        /** @var Model $model */
+        $model->hydrateFromDatabase($data);
+        $model->markAsExisting();
+
+        if ($this->parent !== null) {
+            // Koppla tillbaka parent som relation
+            $model->setRelation(
+                strtolower((new \ReflectionClass($this->parent))->getShortName()),
+                $this->parent
+            );
+        }
+
+        return $model;
+    }
+
+    /**
+     * Hjälpmetod för att lösa modellklass från klassnamn eller tabellnamn.
+     */
     private function resolveModelClass(string $classOrTable): string
     {
         if (class_exists($classOrTable)) {
@@ -114,17 +125,5 @@ class HasMany
         }
 
         throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    private function createModelInstance(array $data, string $classOrTable): Model
-    {
-        $modelClass = $this->resolveModelClass($classOrTable);
-        $model = new $modelClass();
-        $model->hydrateFromDatabase($data);
-        $model->markAsExisting();
-        return $model;
     }
 }

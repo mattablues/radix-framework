@@ -80,11 +80,22 @@ class Session implements SessionInterface
     {
         $_SESSION = [];
 
-        if(ini_get("session.use_cookies")) {
+        if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 86400,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
+
+            $name = session_name();
+            if ($name === false) {
+                throw new \RuntimeException('Unable to determine session name for cookie destruction.');
+            }
+
+            setcookie(
+                $name,
+                '',
+                time() - 86400,
+                $params['path'],
+                $params['domain'],
+                (bool) $params['secure'],
+                (bool) $params['httponly']
             );
         }
 

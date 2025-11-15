@@ -55,12 +55,21 @@ class ObjectArgument extends LiteralArgument
     {
         $object = $this->getValue();
 
-        if (!method_exists($object, $method)) {
+        if (!is_object($object)) {
+            // Borde inte hända eftersom konstruktorn kräver object,
+            // men skyddar både runtime och statisk analys.
+            throw new ContainerInvalidArgumentException('Underlying value is not an object.');
+        }
+
+        $callable = [$object, $method];
+
+        if (!is_callable($callable)) {
             throw new ContainerInvalidArgumentException(
                 sprintf('Method "%s" does not exist on the given object.', $method)
             );
         }
 
-        return call_user_func_array([$object, $method], $arguments);
+        /** @var callable $callable */
+        return call_user_func_array($callable, $arguments);
     }
 }

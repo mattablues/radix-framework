@@ -48,13 +48,34 @@ class Image
         $optimalWidth = $dimensions['optimalWidth'];
         $optimalHeight = $dimensions['optimalHeight'];
 
+        if ($optimalWidth <= 0 || $optimalHeight <= 0) {
+            throw new InvalidArgumentException(
+                sprintf('Ogiltiga bilddimensioner: %d x %d', $optimalWidth, $optimalHeight)
+            );
+        }
+
         $this->imageResized = imagecreatetruecolor($optimalWidth, $optimalHeight);
 
         $transparent = imagecolorallocatealpha($this->imageResized, 0, 0, 0, 127);
+        if ($transparent === false) {
+            throw new RuntimeException('Kunde inte allokera transparent färg för den ändrade bilden.');
+        }
+
         imagefill($this->imageResized, 0, 0, $transparent);
         imagesavealpha($this->imageResized, true);
 
-        if (!imagecopyresampled($this->imageResized, $this->image, 0, 0, 0, 0, $optimalWidth, $optimalHeight, $this->width, $this->height)) {
+        if (!imagecopyresampled(
+            $this->imageResized,
+            $this->image,
+            0,
+            0,
+            0,
+            0,
+            $optimalWidth,
+            $optimalHeight,
+            $this->width,
+            $this->height
+        )) {
             throw new RuntimeException('Misslyckades med att ändra storlek på bilden.');
         }
 
@@ -283,12 +304,32 @@ class Image
 
     private function crop(int $optimalWidth, int $optimalHeight, int $newWidth, int $newHeight): void
     {
+        if ($newWidth <= 0 || $newHeight <= 0) {
+            throw new InvalidArgumentException(
+                sprintf('Ogiltiga beskärningsdimensioner: %d x %d', $newWidth, $newHeight)
+            );
+        }
+
         $cropStartX = (int)round(($optimalWidth - $newWidth) / 2);
         $cropStartY = (int)round(($optimalHeight - $newHeight) / 2);
 
         $crop = imagecreatetruecolor($newWidth, $newHeight);
 
-        if (!$crop || !imagecopyresampled($crop, $this->imageResized, 0, 0, $cropStartX, $cropStartY, $newWidth, $newHeight, $newWidth, $newHeight)) {
+        if (
+            !$crop
+            || !imagecopyresampled(
+                $crop,
+                $this->imageResized,
+                0,
+                0,
+                $cropStartX,
+                $cropStartY,
+                $newWidth,
+                $newHeight,
+                $newWidth,
+                $newHeight
+            )
+        ) {
             throw new RuntimeException('Misslyckades med att beskära bilden.');
         }
 

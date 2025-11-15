@@ -81,6 +81,7 @@ class MakeEventCommand extends BaseCommand
 
         $template = file_get_contents($templateFile);
 
+        /** @var string $template */
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[EventName]', '[Namespace]'],

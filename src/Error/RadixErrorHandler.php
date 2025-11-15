@@ -63,6 +63,7 @@ class RadixErrorHandler
                     ['field' => 'Exception', 'messages' => [$exception->getMessage()]],
                 ],
             ];
+
             if ($isDev) {
                 $body['debug'] = [
                     'exception_class' => get_class($exception),
@@ -70,11 +71,18 @@ class RadixErrorHandler
                 ];
             }
 
-            $response = new JsonResponse();
+            $response = new \Radix\Http\JsonResponse();
             $response
                 ->setStatusCode($statusCode)
                 ->setHeader('Content-Type', 'application/json; charset=utf-8')
-                ->setBody($method === 'HEAD' ? '' : json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                ->setBody(
+                    $method === 'HEAD'
+                        ? ''
+                        : json_encode(
+                            $body,
+                            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+                        )
+                );
 
             $response->send();
             exit;

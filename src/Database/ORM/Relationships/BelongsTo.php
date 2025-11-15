@@ -125,7 +125,16 @@ class BelongsTo
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);
+
+        if (!is_subclass_of($modelClass, Model::class)) {
+            throw new \LogicException(
+                "BelongsTo relation resolved model class '$modelClass' måste ärva " . Model::class . "."
+            );
+        }
+
+        /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
+        /** @var Model $model */
         $model->hydrateFromDatabase($data);
         $model->markAsExisting();
 

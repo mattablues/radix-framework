@@ -11,6 +11,7 @@ use Radix\Support\StringHelper;
 class BelongsToMany
 {
     private Connection $connection;
+    /** @var class-string<Model> */
     private string $relatedModelClass; // ändrat: spara klassnamn
     private string $pivotTable;
     private string $foreignPivotKey;
@@ -18,9 +19,8 @@ class BelongsToMany
     private string $parentKeyName;
     private ?Model $parent = null;
     /** @var array<int, string> */
-    private array $pivotColumns = []; // nya: extra kolumner att hämta från pivot
-    private ?\Radix\Database\QueryBuilder\QueryBuilder $builder = null; // ny: relationens QB
-
+    private array $pivotColumns = [];
+    private ?\Radix\Database\QueryBuilder\QueryBuilder $builder = null;
 
     public function __construct(
         Connection $connection,
@@ -31,7 +31,12 @@ class BelongsToMany
         string $parentKeyName
     ) {
         $this->connection = $connection;
-        $this->relatedModelClass = $this->resolveModelClass($relatedModel);
+        $resolved = $this->resolveModelClass($relatedModel);
+        if (!is_subclass_of($resolved, Model::class)) {
+            throw new \LogicException("BelongsToMany related model '$resolved' must extend " . Model::class . '.');
+        }
+        /** @var class-string<Model> $resolved */
+        $this->relatedModelClass = $resolved;
         $this->pivotTable = $pivotTable;
         $this->foreignPivotKey = $foreignPivotKey;
         $this->relatedPivotKey = $relatedPivotKey;
@@ -109,11 +114,17 @@ class BelongsToMany
     {
         // 1) Om query()-builder finns (används av eager loading med closure), kör den
         if ($this->builder instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
-            $modelsCollection = $this->builder->get(); // Collection
+            $modelsCollection = $this->builder->get(); // Collection<Model>
 
-            // Mappa pivot_* alias till relation 'pivot'
-            if (!empty($this->pivotColumns)) {
-                foreach ($modelsCollection as $m) {
+            /** @var array<int, Model> $models */
+            $models = [];
+            foreach ($modelsCollection as $m) {
+                if (!$m instanceof Model) {
+                    throw new \LogicException('BelongsToMany::get() expected Collection<Model>.');
+                }
+
+                // Mappa pivot_* alias till relation 'pivot'
+                if (!empty($this->pivotColumns)) {
                     $pivotData = [];
                     foreach ($this->pivotColumns as $col) {
                         $alias = "pivot_$col";
@@ -122,19 +133,18 @@ class BelongsToMany
                             $pivotData[$col] = $val;
                         }
                     }
-                    if (!empty($pivotData) && method_exists($m, 'setRelation')) {
+                    if (!empty($pivotData)) {
                         $m->setRelation('pivot', $pivotData);
-                    } elseif (!empty($pivotData) && method_exists($m, 'setAttribute')) {
-                        $m->setAttribute('pivot', $pivotData);
                     }
                 }
+
+                $models[] = $m;
             }
 
-            // Konvertera till array för att matcha signaturen
-            return $modelsCollection->toArray();
+            return $models;
         }
 
-        // 2) Fallback: manuell SQL (behåller din tidigare logik)
+        // 2) Fallback: manuell SQL
         if ($this->parent !== null) {
             $parentValue = $this->parent->getAttribute($this->parentKeyName);
             if ($parentValue === null) {
@@ -163,9 +173,14 @@ class BelongsToMany
               ON related.id = pivot.`$this->relatedPivotKey`
             WHERE pivot.`$this->foreignPivotKey` = ?";
 
+        /** @var array<int, array<string, mixed>> $results */
         $results = $this->connection->fetchAll($query, [$parentValue]);
 
-        $models = array_map(fn($data) => $this->createModelInstance($data, $this->relatedModelClass), $results);
+        /** @var array<int, Model> $models */
+        $models = array_map(
+            fn(array $data): Model => $this->createModelInstance($data, $this->relatedModelClass),
+            $results
+        );
 
         // Injicera pivot-data på modellerna om withPivot använts
         if (!empty($this->pivotColumns)) {
@@ -177,10 +192,8 @@ class BelongsToMany
                         $pivotData[$col] = $results[$i][$key];
                     }
                 }
-                if (!empty($pivotData) && method_exists($model, 'setRelation')) {
+                if (!empty($pivotData)) {
                     $model->setRelation('pivot', $pivotData);
-                } elseif (!empty($pivotData) && method_exists($model, 'setAttribute')) {
-                    $model->setAttribute('pivot', $pivotData);
                 }
             }
         }
@@ -349,7 +362,16 @@ class BelongsToMany
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);
+
+        if (!is_subclass_of($modelClass, Model::class)) {
+            throw new \LogicException(
+                "BelongsToMany relation resolved model class '$modelClass' must extend " . Model::class . "."
+            );
+        }
+
+        /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
+        /** @var Model $model */
         $model->hydrateFromDatabase($data);
         $model->markAsExisting();
 

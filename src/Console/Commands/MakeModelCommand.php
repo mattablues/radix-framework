@@ -105,6 +105,7 @@ class MakeModelCommand extends BaseCommand
             $tableName = $toSnake($modelName);
         }
 
+        /** @var string $template */
         $content = str_replace(
             ['[ModelName]', '[Namespace]', '[table_name]'],
             [$modelName, 'App\Models', $tableName],

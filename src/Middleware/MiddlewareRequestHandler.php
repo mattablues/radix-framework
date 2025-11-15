@@ -12,7 +12,7 @@ use Radix\Http\Response;
 class MiddlewareRequestHandler implements RequestHandlerInterface
 {
     /**
-     * @param array<int,object> $middlewares
+     * @param array<int,MiddlewareInterface> $middlewares
      */
     public function __construct(
         private array $middlewares,

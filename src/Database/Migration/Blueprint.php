@@ -15,7 +15,7 @@ class Blueprint
     private array $keys = [];
     /** @var array<int,string> */
     private array $constraints = [];
-    /** @var array<string,mixed> */
+    /** @var array<int,string> */
     private array $tableOptions = [];
     private bool $isAlter;
 

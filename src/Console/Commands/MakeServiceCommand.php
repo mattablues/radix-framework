@@ -84,7 +84,12 @@ class MakeServiceCommand extends BaseCommand
         }
 
         $template = file_get_contents($templateFile);
+        if ($template === false) {
+            $this->coloredOutput("Error: Failed to read service template at $templateFile.", "red");
+            return;
+        }
 
+        /** @var string $template */
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[ServiceName]', '[Namespace]'],

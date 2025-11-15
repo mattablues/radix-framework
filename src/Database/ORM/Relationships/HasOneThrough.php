@@ -8,23 +8,6 @@ use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
 
-/**
- * HasOneThrough: En "has one" relation via en mellanmodell/tabell.
- *
- * Exempelmodellstruktur:
- *  - Category (parent)
- *  - Subject (through) har column: category_id
- *  - Vote (related) har column: subject_id
- *
- * Nycklar:
- *  - $firstKey:   kolumn på through-tabellen som pekar till parent (ex: subjects.category_id)
- *  - $secondKey:  kolumn på related-tabellen som pekar till through (ex: votes.subject_id)
- *  - $localKey:   kolumn på parent-modellen som matchas mot $firstKey (ex: categories.id)
- *  - $secondLocal: primärnyckel på through-tabellen som matchas mot $secondKey (ex: subjects.id)
- *
- * Användning:
- *  $category->hasOneThrough(Vote::class, Subject::class, 'category_id', 'subject_id', 'id', 'id')->first();
- */
 class HasOneThrough
 {
     private Connection $connection;
@@ -69,9 +52,21 @@ class HasOneThrough
         $relatedClass = $this->resolveModelClass($this->related);
         $throughClass = $this->resolveModelClass($this->through);
 
+        // Säkerställ att båda klasserna ärver Model
+        if (!is_subclass_of($relatedClass, Model::class)) {
+            throw new \LogicException("HasOneThrough related class '$relatedClass' must extend " . Model::class . '.');
+        }
+        if (!is_subclass_of($throughClass, Model::class)) {
+            throw new \LogicException("HasOneThrough through class '$throughClass' must extend " . Model::class . '.');
+        }
+
+        /** @var class-string<Model> $relatedClass */
+        /** @var class-string<Model> $throughClass */
         $relatedModel = new $relatedClass();
         $throughModel = new $throughClass();
 
+        /** @var Model $relatedModel */
+        /** @var Model $throughModel */
         $relatedTable = $relatedModel->getTable();
         $throughTable = $throughModel->getTable();
 
@@ -114,6 +109,7 @@ class HasOneThrough
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         $modelClass = $this->resolveModelClass($classOrTable);
+        /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
         $model->hydrateFromDatabase($data);
         $model->markAsExisting();

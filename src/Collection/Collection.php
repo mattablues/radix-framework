@@ -51,8 +51,17 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
         return true;
     }
 
-    public function containsKey(int|string $key): bool
+    /**
+     * Kontrollera om en nyckel finns i samlingen.
+     *
+     * @param mixed $key
+     */
+    public function containsKey(mixed $key): bool
     {
+        if (!is_int($key) && !is_string($key)) {
+            return false;
+        }
+
         // array_key_exists hanterar även null-värden korrekt
         return array_key_exists($key, $this->elements);
     }
@@ -289,6 +298,10 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
     {
         $subset = [];
         foreach ($keys as $k) {
+            if (!is_int($k) && !is_string($k)) {
+                // Ignorera nycklar som inte är int|string (t.ex. false)
+                continue;
+            }
             if (array_key_exists($k, $this->elements)) {
                 $subset[$k] = $this->elements[$k];
             }
@@ -303,6 +316,10 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
     {
         $copy = $this->elements;
         foreach ($keys as $k) {
+            if (!is_int($k) && !is_string($k)) {
+                // Ignorera ogiltiga nycklar
+                continue;
+            }
             unset($copy[$k]);
         }
         return new self($copy);
@@ -317,9 +334,15 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
             $key = $callback ? $callback($v, $k) : $v;
 
             // Serialize för att jämföra komplexa värden säkert
-            $hash = is_object($key) || is_array($key)
-                ? md5(serialize($key))
-                : ($strict ? json_encode([$key, gettype($key)]) : (string)$key);
+            if (is_object($key) || is_array($key)) {
+                $hash = md5(serialize($key));
+            } elseif ($strict) {
+                $encoded = json_encode([$key, gettype($key)]);
+                // Säkerställ att hash alltid är en sträng, även om json_encode misslyckas
+                $hash = $encoded === false ? 'null' : $encoded;
+            } else {
+                $hash = (string) $key;
+            }
 
             if (!array_key_exists($hash, $seen)) {
                 $seen[$hash] = true;

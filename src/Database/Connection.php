@@ -110,7 +110,13 @@ class Connection
 
     public function lastInsertId(): string
     {
-        return $this->pdo->lastInsertId();
+        $id = $this->pdo->lastInsertId();
+
+        if ($id === false) {
+            throw new \RuntimeException('No last insert id available for this connection.');
+        }
+
+        return $id;
     }
 
     /**
