@@ -206,7 +206,7 @@ readonly class Dispatcher
     {
         $path = parse_url($uri, PHP_URL_PATH);
 
-        if ($path === false){
+        if ($path === false || $path === null) {
             throw new UnexpectedValueException("Malformed URL: '$uri'");
         }
 

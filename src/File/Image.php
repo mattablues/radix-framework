@@ -96,6 +96,10 @@ class Image
     {
         $quality = $quality ?? $this->defaultQuality;
 
+        if (!$this->imageResized instanceof \GdImage) {
+            throw new RuntimeException('Ingen ändrad bild att spara. Anropa resizeImage() innan saveImage().');
+        }
+
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         switch ($ext) {
@@ -212,7 +216,7 @@ class Image
             default => throw new InvalidArgumentException("Bildformat \"$mimeType\" stöds inte."),
         };
 
-        if (!$img instanceof \GdImage) {
+        if ($img === false) {
             throw new RuntimeException('Kunde inte öppna bilden.');
         }
 
@@ -314,22 +318,26 @@ class Image
         $cropStartY = (int)round(($optimalHeight - $newHeight) / 2);
 
         $crop = imagecreatetruecolor($newWidth, $newHeight);
+        if (!$crop instanceof \GdImage) {
+            throw new RuntimeException('Kunde inte skapa canvas för beskärd bild.');
+        }
 
-        if (
-            !$crop
-            || !imagecopyresampled(
-                $crop,
-                $this->imageResized,
-                0,
-                0,
-                $cropStartX,
-                $cropStartY,
-                $newWidth,
-                $newHeight,
-                $newWidth,
-                $newHeight
-            )
-        ) {
+        if (!$this->imageResized instanceof \GdImage) {
+            throw new RuntimeException('Ingen ändrad bild att beskära.');
+        }
+
+        if (!imagecopyresampled(
+            $crop,
+            $this->imageResized,
+            0,
+            0,
+            $cropStartX,
+            $cropStartY,
+            $newWidth,
+            $newHeight,
+            $newWidth,
+            $newHeight
+        )) {
             throw new RuntimeException('Misslyckades med att beskära bilden.');
         }
 

@@ -21,13 +21,26 @@ class Connection
     }
 
     /**
+     * Intern hjälpare: returnera PDO eller kasta om anslutningen är stängd.
+     */
+    private function getPdoInternal(): PDO
+    {
+        if ($this->pdo === null) {
+            throw new \RuntimeException('PDO instance is not initialized in Connection (connection may be disconnected).');
+        }
+
+        return $this->pdo;
+    }
+
+    /**
      * Kör ett statement och returnera PDOStatement.
      *
      * @param array<int|string,mixed> $params
      */
     public function execute(string $query, array $params = []): PDOStatement
     {
-        $statement = $this->pdo->prepare($query);
+        $pdo = $this->getPdoInternal();
+        $statement = $pdo->prepare($query);
         $statement->execute($params);
 
         return $statement; // Returnera statement istället för bool
@@ -41,7 +54,8 @@ class Connection
      */
     public function fetchAll(string $query, array $params = []): array
     {
-        $statement = $this->pdo->prepare($query);
+        $pdo = $this->getPdoInternal();
+        $statement = $pdo->prepare($query);
         $statement->execute($params);
         return $statement->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -54,7 +68,8 @@ class Connection
      */
     public function fetchAllAsClass(string $query, array $params = [], ?string $className = null): array
     {
-        $statement = $this->pdo->prepare($query);
+        $pdo = $this->getPdoInternal();
+        $statement = $pdo->prepare($query);
         $statement->execute($params);
 
         if ($className) {
@@ -71,7 +86,8 @@ class Connection
      */
     public function fetchOneAsClass(string $query, array $params = [], ?string $className = null): ?object
     {
-        $statement = $this->pdo->prepare($query);
+        $pdo = $this->getPdoInternal();
+        $statement = $pdo->prepare($query);
         $statement->execute($params);
 
         if ($className) {
@@ -90,7 +106,8 @@ class Connection
      */
     public function fetchOne(string $query, array $params = []): ?array
     {
-        $statement = $this->pdo->prepare($query);
+        $pdo = $this->getPdoInternal();
+        $statement = $pdo->prepare($query);
         $statement->execute($params);
         $result = $statement->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
@@ -103,14 +120,16 @@ class Connection
      */
     public function fetchAffected(string $query, array $params = []): int
     {
-        $statement = $this->pdo->prepare($query);
+        $pdo = $this->getPdoInternal();
+        $statement = $pdo->prepare($query);
         $statement->execute($params);
         return $statement->rowCount();
     }
 
     public function lastInsertId(): string
     {
-        $id = $this->pdo->lastInsertId();
+        $pdo = $this->getPdoInternal();
+        $id = $pdo->lastInsertId();
 
         if ($id === false) {
             throw new \RuntimeException('No last insert id available for this connection.');
@@ -124,7 +143,7 @@ class Connection
      */
     public function beginTransaction(): void
     {
-        $this->pdo->beginTransaction();
+        $this->getPdoInternal()->beginTransaction();
     }
 
     /**
@@ -132,7 +151,7 @@ class Connection
      */
     public function commitTransaction(): void
     {
-        $this->pdo->commit();
+        $this->getPdoInternal()->commit();
     }
 
     /**
@@ -140,7 +159,7 @@ class Connection
      */
     public function rollbackTransaction(): void
     {
-        $this->pdo->rollBack();
+        $this->getPdoInternal()->rollBack();
     }
 
     /**
@@ -151,9 +170,9 @@ class Connection
     public function isConnected(): bool
     {
         try {
-            $this->pdo->getAttribute(PDO::ATTR_CONNECTION_STATUS);
+            $this->getPdoInternal()->getAttribute(PDO::ATTR_CONNECTION_STATUS);
             return true;
-        } catch (Exception $e) {
+        } catch (\Throwable) {
             return false;
         }
     }
@@ -169,8 +188,8 @@ class Connection
     /**
      * Hämta den underliggande PDO-instansen.
      */
-    public function getPDO(): PDO
+    public function getPDO(): \PDO
     {
-        return $this->pdo;
+        return $this->getPdoInternal();
     }
 }

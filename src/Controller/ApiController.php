@@ -101,9 +101,13 @@ abstract class ApiController extends AbstractController
 
         if (empty($apiToken)) {
             $this->respondWithErrors(['API-token' => ['Token saknas eller är ogiltig.']], 401);
+            return; // för PHPStan: exekveringen fortsätter inte
         }
 
-        if (!$this->isTokenValid($apiToken)) {
+        // Gör token till ren sträng
+        $token = (string)$apiToken;
+
+        if (!$this->isTokenValid($token)) {
             $this->respondWithErrors(['API-token' => ['Token är ogiltig eller valideringen misslyckades.']], 401);
         }
     }
@@ -126,7 +130,13 @@ abstract class ApiController extends AbstractController
         /** @var \App\Models\Token|null $existingToken */
         $existingToken = Token::query()->where('value', '=', $token)->first();
 
-        if (!$existingToken || strtotime($existingToken->expires_at) < time()) {
+        if (!$existingToken) {
+            return false;
+        }
+
+        // Säkerställ att vi skickar en ren sträng till strtotime
+        $expiresAt = (string)$existingToken->expires_at;
+        if ($expiresAt === '' || strtotime($expiresAt) < time()) {
             return false;
         }
 

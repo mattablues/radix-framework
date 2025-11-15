@@ -21,7 +21,7 @@ trait Pagination
         $q->offset = null;
         $q->selectRaw('1');
 
-        $result = $this->connection->fetchOne($q->toSql(), $q->getBindings());
+        $result = $this->getConnection()->fetchOne($q->toSql(), $q->getBindings());
         return $result !== null;
     }
 
@@ -96,7 +96,7 @@ trait Pagination
         $countQuery->offset = null;
         $countQuery->selectRaw('COUNT(*) as total');
 
-        $countResult = $this->connection->fetchOne($countQuery->toSql(), $countQuery->getBindings());
+        $countResult = $this->getConnection()->fetchOne($countQuery->toSql(), $countQuery->getBindings());
         $totalRecords = (int)($countResult['total'] ?? 0);
 
         $lastPage = (int) ceil($totalRecords / $perPage);
@@ -181,7 +181,7 @@ trait Pagination
         $countQuery->offset = null;
         $countQuery->selectRaw('COUNT(*) as total');
 
-        $countResult = $this->connection->fetchOne($countQuery->toSql(), $countQuery->getBindings());
+        $countResult = $this->getConnection()->fetchOne($countQuery->toSql(), $countQuery->getBindings());
         $totalRecords = (int)($countResult['total'] ?? 0);
 
         $lastPage = (int) ceil($totalRecords / $perPage);

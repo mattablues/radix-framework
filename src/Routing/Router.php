@@ -272,7 +272,18 @@ class Router
     {
         if ($data) {
             foreach ($data as $replace) {
-                $url = preg_replace('/{([a-z]+):([^}]+)}/', (string)$replace, $url, 1);
+                $result = preg_replace(
+                    '/{([a-z]+):([^}]+)}/',
+                    (string) $replace,
+                    $url,
+                    1
+                );
+
+                if ($result === null) {
+                    throw new \RuntimeException('Misslyckades med att ersätta route-parametrar i URL: ' . $url);
+                }
+
+                $url = $result;
             }
         }
 

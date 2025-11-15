@@ -430,8 +430,12 @@ class Validator
         return strtotime((string)$value) !== false;
     }
 
-    protected function validateUnique(mixed $value, ?string $parameter = null): bool
+    protected function validateUnique(mixed $value, string $parameter): bool
     {
+        if ($parameter === '') {
+            throw new InvalidArgumentException("Valideringsregeln 'unique' kräver en parametersträng.");
+        }
+
         $parts = explode(',', $parameter);
         $modelClass = $parts[0] ?? null;
         $column = $parts[1] ?? null;
@@ -514,8 +518,13 @@ class Validator
         return false;
     }
 
-    protected function validateConfirmed(mixed $value, ?string $parameter = null): bool
+    protected function validateConfirmed(mixed $value, string $parameter): bool
     {
+        // Extra säkerhet om någon skulle anropa felaktigt utanför applyRule
+        if ($parameter === '') {
+            throw new InvalidArgumentException("Valideringsregeln 'confirmed' kräver ett huvudfält.");
+        }
+
         // Matcha huvudfältet (t.ex. 'password') med '_confirmation'
         $confirmationField = "{$parameter}_confirmation";
 

@@ -63,7 +63,13 @@ final class Writer
         self::ensureParentDir($path);
 
         $isAssoc = self::rowsAreAssoc($rows);
-        if ($isAssoc && $headers === null) {
+
+        // Normalisera headers så att det alltid är en array
+        if ($headers === null) {
+            $headers = [];
+        }
+
+        if ($isAssoc && $headers === []) {
             $headers = self::collectHeaders($rows);
         }
 

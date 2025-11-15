@@ -55,7 +55,7 @@ trait WithAggregate
     {
         /** @var Model $parent */
         $parent = new $this->modelClass();
-        $parentTable = trim($this->table, '`');
+        $parentTable = trim((string)$this->table, '`');
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {

@@ -206,7 +206,12 @@ class Resolver
     {
         $solved = [];
         foreach ($dependencies as $dependency) {
-            $cacheKey = $dependency->getName() . ':' . $dependency->getDeclaringClass()->getName();
+            $declaringClass = $dependency->getDeclaringClass();
+            $declaringClassName = $declaringClass instanceof \ReflectionClass
+                ? $declaringClass->getName()
+                : 'global';
+
+            $cacheKey = $dependency->getName() . ':' . $declaringClassName;
 
             if (isset($this->resolvedDependenciesCache[$cacheKey])) {
                 $solved[] = $this->resolvedDependenciesCache[$cacheKey];
@@ -228,8 +233,8 @@ class Resolver
                 } else {
                     throw new ContainerDependencyInjectionException(sprintf(
                         'Unresolvable dependency for "%s" in class "%s".',
-                        $dependency->name,
-                        $dependency->getDeclaringClass()->getName()
+                        $dependency->getName(),
+                        $declaringClassName
                     ));
                 }
             }

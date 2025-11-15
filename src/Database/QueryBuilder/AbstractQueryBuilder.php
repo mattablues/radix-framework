@@ -54,7 +54,7 @@ abstract class AbstractQueryBuilder
             }
 
             $sql = $this->toSql();
-            $rows = $this->connection->fetchAll($sql, $this->bindings);
+            $rows = $this->getConnection()->fetchAll($sql, $this->bindings);
 
             $results = [];
             foreach ($rows as $row) {
@@ -115,4 +115,19 @@ abstract class AbstractQueryBuilder
         }
 
     abstract public function toSql(): string;
+
+
+    /**
+     * Säkerställ att en Connection finns och returnera den.
+     *
+     * @return Connection
+     */
+    protected function getConnection(): Connection
+    {
+        if ($this->connection === null) {
+            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
+        }
+
+        return $this->connection;
+    }
 }

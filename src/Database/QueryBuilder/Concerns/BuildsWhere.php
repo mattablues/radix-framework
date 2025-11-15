@@ -27,16 +27,20 @@ trait BuildsWhere
                 throw new \InvalidArgumentException("The column name in WHERE clause cannot be empty.");
             }
 
+            // Normalisera operator till en ren sträng (default '=')
+            $operator = $operator ?? '=';
+            $opUpper  = strtoupper($operator);
+
             $validOperators = ['=', '!=', '<', '<=', '>', '>=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'BETWEEN', 'IS', 'IS NOT'];
-            if (!in_array(strtoupper($operator), $validOperators, true)) {
+            if (!in_array($opUpper, $validOperators, true)) {
                 throw new \InvalidArgumentException("Invalid operator '$operator' in WHERE clause.");
             }
 
-            if (strtoupper($operator) === 'IS' || strtoupper($operator) === 'IS NOT') {
+            if ($opUpper === 'IS' || $opUpper === 'IS NOT') {
                 $this->where[] = [
                     'type' => 'raw',
                     'column' => $this->wrapColumn($column),
-                    'operator' => $operator,
+                    'operator' => $opUpper,
                     'value' => null,
                     'boolean' => $boolean,
                 ];
@@ -46,7 +50,7 @@ trait BuildsWhere
                 $this->where[] = [
                     'type' => 'subquery',
                     'column' => $this->wrapColumn($column),
-                    'operator' => $operator,
+                    'operator' => $opUpper,
                     'value' => $valueSql,
                     'boolean' => $boolean,
                 ];
@@ -55,7 +59,7 @@ trait BuildsWhere
                 $this->where[] = [
                     'type' => 'raw',
                     'column' => $this->wrapColumn($column),
-                    'operator' => $operator,
+                    'operator' => $opUpper,
                     'value' => '?',
                     'boolean' => $boolean,
                 ];
@@ -281,7 +285,8 @@ trait BuildsWhere
                 case 'raw':
                 case 'list':
                 case 'subquery':
-                    if (in_array(strtoupper($condition['operator']), ['IS', 'IS NOT'], true) && $condition['value'] === null) {
+                    $operatorUpper = strtoupper((string)($condition['operator'] ?? ''));
+                    if (in_array($operatorUpper, ['IS', 'IS NOT'], true) && $condition['value'] === null) {
                         $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} NULL");
                     } else {
                         $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");

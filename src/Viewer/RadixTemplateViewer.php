@@ -216,7 +216,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
         foreach ($matches as $match) {
             $templateFilePath = $viewsDirectory . $match['view'];
             $includedContent = $this->loadTemplate($templateFilePath);
-            $code = preg_replace("#{% include \"{$match['view']}\" %}#", $includedContent, $code);
+
+            $code = preg_replace(
+                "#{% include \"{$match['view']}\" %}#",
+                $includedContent,
+                (string) $code
+            ) ?? $code;
         }
 
         return $code;
@@ -242,7 +247,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
                 $match[2]
             );
 
-            $attributes[$key] = trim($value);
+            // preg_replace_callback kan returnera null vid regex-fel – säkerställ alltid string
+            $attributes[$key] = trim((string) $value);
         }
 
         return $attributes;
@@ -262,8 +268,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
                 return $this->renderComponent($componentName, $attributes, $this->replacePlaceholders($content));
             },
-            $code
-        );
+            (string) $code
+        ) ?? $code;
 
         // 2. Specifik hantering av globala variabler (t.ex., {{ $globalVar }})
         $code = preg_replace_callback(
@@ -271,8 +277,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
             function ($matches) {
                 return '<?php echo $' . $matches[1] . '; ?>';
             },
-            $code
-        );
+            (string) $code
+        ) ?? $code;
 
         // 3. Bearbeta PHP-direktiv `{% ... %}`
         $code = $this->replacePHPDirectives($code);
@@ -305,7 +311,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         // Justera attribut med att lägga till slots
         $attributes = array_map(
-            fn($value) => trim($this->replaceVariableOutput($value)),
+            /**
+             * @param string|null $value
+             */
+            fn($value): string => trim((string) $this->replaceVariableOutput((string) $value)),
             $attributes
         );
 
@@ -318,6 +327,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         return $result;
     }
+
 
     /**
      * Extracts named slots from the given slotContent.
@@ -352,9 +362,11 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Convert `{% directive %}` to PHP code.
      */
-    private function replacePHPDirectives(string $code): string
+    private function replacePHPDirectives(?string $code): string
     {
-        return preg_replace("#{%\s*(.+?)\s*%}#", "<?php $1 ?>", $code);
+        $code = (string) $code;
+
+        return preg_replace("#{%\s*(.+?)\s*%}#", "<?php $1 ?>", $code) ?? $code;
     }
 
     /**
@@ -369,7 +381,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
                return '<?php echo trim($slot); ?>';
            },
            $code
-       );
+       ) ?? $code;
 
        // 2. Bearbeta uttryck med "|raw" för att undvika HTML-escaping
        $code = preg_replace_callback(
@@ -378,7 +390,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
                return '<?php echo secure_output('. $matches[1] . ', true); ?>'; // Tillåt rå data
            },
            $code
-       );
+       ) ?? $code;
 
        // 3. Alla andra placeholders (inklusive variabler och funktioner)
        $code = preg_replace_callback(
@@ -387,7 +399,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
                return '<?php echo secure_output('. $matches[1] . '); ?>'; // Escapar HTML-output via secureOutput
            },
            $code
-       );
+       ) ?? $code;
 
        return $code;
     }
@@ -422,11 +434,11 @@ class RadixTemplateViewer implements TemplateViewerInterface
             "#{%\s*yield\s+(?<name>\w+)\s*%}(?<fallback>.*?){%\s*endyield\s+\k<name>\s*%}#s",
             function (array $m) use ($blocks): string {
                 $name = $m['name'];
-                $fallback = (string)$m['fallback'];
-                return array_key_exists($name, $blocks) ? (string)$blocks[$name] : $fallback;
+                $fallback = (string) $m['fallback'];
+                return array_key_exists($name, $blocks) ? (string) $blocks[$name] : $fallback;
             },
             $code
-        );
+        ) ?? $code;
 
         // Hantera enkla yield-taggar utan fallback: {% yield name %}
         preg_match_all("#{%\s*yield\s+(?<name>\\w+)\s*%}#", $code, $matches, PREG_SET_ORDER);
@@ -522,17 +534,17 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         // 2. Utför lätt minifiering för HTML utanför PHP-block
         // Ta bort onödiga radbrytningar och blanksteg i HTML
-        $code = preg_replace('/^\h*\R+/m', '', $code); // Ta bort tomma rader
-        $code = preg_replace('/>\s+</', ">\n<", $code); // Behåll radbrytningar mellan HTML-taggar
-        $code = preg_replace('/\s+/', ' ', $code); // Komprimera mellanslag till ett enda
+        $code = preg_replace('/^\h*\R+/m', '', (string) $code); // Ta bort tomma rader
+        $code = preg_replace('/>\s+</', ">\n<", (string) $code); // Behåll radbrytningar mellan HTML-taggar
+        $code = preg_replace('/\s+/', ' ', (string) $code); // Komprimera mellanslag till ett enda
 
         // 3. Återställ skyddad PHP tillbaka till koden
         foreach ($preservedPHP as $key => $originalPHP) {
-            $code = str_replace($key, $originalPHP, $code);
+            $code = str_replace($key, $originalPHP, (string) $code);
         }
 
         // 4. Trimma kod (ta bort whitespace i början och slutet)
-        return trim($code);
+        return trim((string) $code);
     }
 
     /**

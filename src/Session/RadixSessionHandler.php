@@ -40,6 +40,17 @@ class RadixSessionHandler implements SessionHandlerInterface
         $this->lifetime = (int) ($config['lifetime'] ?? 1440);
     }
 
+    /**
+     * @return PDO
+     */
+    private function getPdo(): PDO
+    {
+        if ($this->pdo === null) {
+            throw new \RuntimeException('PDO-instans saknas för databasdriven sessionhantering.');
+        }
+        return $this->pdo;
+    }
+
     public function open(string $path, string $name): bool
     {
         return true;
@@ -61,7 +72,7 @@ class RadixSessionHandler implements SessionHandlerInterface
             return '';
         }
 
-        $stmt = $this->pdo->prepare("SELECT data FROM {$this->tableName} WHERE id = :id AND expiry > :expiry");
+        $stmt = $this->getPdo()->prepare("SELECT data FROM {$this->tableName} WHERE id = :id AND expiry > :expiry");
         $stmt->execute([':id' => $id, ':expiry' => time()]);
         $val = $stmt->fetchColumn();
         return ($val === false || $val === null) ? '' : (string) $val;
@@ -83,7 +94,7 @@ class RadixSessionHandler implements SessionHandlerInterface
             return $ok;
         }
 
-        $stmt = $this->pdo->prepare("
+        $stmt = $this->getPdo()->prepare("
             INSERT INTO {$this->tableName} (id, data, expiry)
             VALUES (:id, :data, :expiry)
             ON DUPLICATE KEY UPDATE data = :data, expiry = :expiry
@@ -98,7 +109,7 @@ class RadixSessionHandler implements SessionHandlerInterface
             return is_file($file) ? @unlink($file) : true;
         }
 
-        $stmt = $this->pdo->prepare("DELETE FROM {$this->tableName} WHERE id = :id");
+        $stmt = $this->getPdo()->prepare("DELETE FROM {$this->tableName} WHERE id = :id");
         return $stmt->execute([':id' => $id]);
     }
 
@@ -117,7 +128,7 @@ class RadixSessionHandler implements SessionHandlerInterface
             return $deleted;
         }
 
-        $stmt = $this->pdo->prepare("DELETE FROM {$this->tableName} WHERE expiry < :time");
+        $stmt = $this->getPdo()->prepare("DELETE FROM {$this->tableName} WHERE expiry < :time");
         return $stmt->execute([':time' => time()]) ? $stmt->rowCount() : false;
     }
 }

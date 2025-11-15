@@ -34,7 +34,7 @@ trait WithCount
     {
         /** @var \Radix\Database\ORM\Model $parent */
         $parent = new $this->modelClass();
-        $parentTable = trim($this->table, '`');
+        $parentTable = trim((string)$this->table, '`');
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
@@ -43,6 +43,7 @@ trait WithCount
 
         // snake_case alias av relationsnamnet
         $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation);
+
 
         $rel = $parent->$relation();
         /** @var \Radix\Database\ORM\Relationships\HasMany
@@ -232,7 +233,7 @@ trait WithCount
 
         /** @var \Radix\Database\ORM\Model $parent */
         $parent = new $this->modelClass();
-        $parentTable = trim($this->table, '`');
+        $parentTable = trim((string)$this->table, '`');
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
@@ -250,7 +251,6 @@ trait WithCount
         $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation);
         $valSql = is_int($value) || is_float($value) ? (string)$value : ("'" . addslashes((string)$value) . "'");
         $aggAlias = $alias ?: "{$snake}_count_" . (is_scalar($value) ? (string)$value : 'value');
-
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             /** @var \Radix\Database\ORM\Relationships\HasMany $rel */

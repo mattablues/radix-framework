@@ -12,20 +12,17 @@ trait JsonFunctions
     protected function getDriverName(): string
     {
         try {
-            // Antag att Connection exponerar en metod getPdo() eller attribute()
-            if (method_exists($this->connection, 'getPdo')) {
-                /** @var \PDO $pdo */
-                $pdo = $this->connection->getPdo();
-                return $pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) ?: 'mysql';
-            }
-            if (method_exists($this->connection, 'attribute')) {
-                $name = $this->connection->attribute(\PDO::ATTR_DRIVER_NAME);
-                return is_string($name) ? $name : 'mysql';
-            }
+            $connection = $this->getConnection(); // garanterar Connection, ej null
+
+            /** @var \PDO $pdo */
+            $pdo = $connection->getPDO(); // Connection har alltid getPDO()
+            $name = $pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+            return is_string($name) && $name !== '' ? $name : 'mysql';
         } catch (\Throwable) {
-            // ignorera och fall tillbaka
+            // Vid fel: fallback till mysql
+            return 'mysql';
         }
-        return 'mysql';
     }
 
     public function jsonExtract(string $column, string $path, ?string $alias = null): self

@@ -177,11 +177,9 @@ class QueryBuilder extends AbstractQueryBuilder
      */
     public function fetchAllRaw(): array
     {
-        if ($this->connection === null) {
-            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
-        }
         $sql = $this->toSql();
-        return $this->connection->fetchAll($sql, $this->bindings);
+        return $this->getConnection()->fetchAll($sql, $this->bindings);
+
     }
 
     /**
@@ -191,11 +189,8 @@ class QueryBuilder extends AbstractQueryBuilder
      */
     public function fetchRaw(): ?array
     {
-        if ($this->connection === null) {
-            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
-        }
         $sql = $this->toSql();
-        return $this->connection->fetchOne($sql, $this->bindings);
+        return $this->getConnection()->fetchOne($sql, $this->bindings);
     }
 
     public function from(string $table): self
@@ -265,7 +260,7 @@ class QueryBuilder extends AbstractQueryBuilder
     {
         $this->limit(1);
         $this->select([$column]);
-        $row = $this->connection->fetchOne($this->toSql(), $this->bindings);
+        $row = $this->getConnection()->fetchOne($this->toSql(), $this->bindings);
         if ($row === null) {
             return null;
         }
@@ -286,7 +281,7 @@ class QueryBuilder extends AbstractQueryBuilder
             $this->select([$valueColumn, $keyColumn]);
         }
 
-        $rows = $this->connection->fetchAll($this->toSql(), $this->getBindings());
+        $rows = $this->getConnection()->fetchAll($this->toSql(), $this->getBindings());
 
         if ($keyColumn === null) {
             return array_map(static function (array $row) use ($valueColumn) {
