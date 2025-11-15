@@ -367,7 +367,9 @@ class QueryBuilder extends AbstractQueryBuilder
         } while ($results->count() === $size);
     }
 
-    // Lazy: generator som yield:ar modeller (minnesvänligt)
+    /**
+     * @return \Generator<int, \Radix\Database\ORM\Model>
+     */
     public function lazy(int $size = 1000): \Generator
     {
         $page = 1;
