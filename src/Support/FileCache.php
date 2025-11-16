@@ -35,10 +35,15 @@ final class FileCache
         if (!is_array($payload)) {
             return $default;
         }
-        if (!empty($payload['e']) && time() > (int) $payload['e']) {
+
+        $expiresRaw = $payload['e'] ?? 0;
+        $expires = is_numeric($expiresRaw) ? (int) $expiresRaw : 0;
+
+        if ($expires > 0 && time() > $expires) {
             @unlink($file);
             return $default;
         }
+
         return $payload['v'] ?? $default;
     }
 

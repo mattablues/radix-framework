@@ -596,10 +596,22 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     private function getPaginationKey(array $data): array
     {
-        // Isolera endast pagineringen
-        return isset($data['pagination']) && is_array($data['pagination'])
-            ? ['page' => $data['pagination']['page'] ?? 1]
-            : [];
+        if (!isset($data['pagination']) || !is_array($data['pagination'])) {
+            return [];
+        }
+
+        $rawPage = $data['pagination']['page'] ?? 1;
+
+        if (!is_int($rawPage)) {
+            if (is_numeric($rawPage)) {
+                $rawPage = (int) $rawPage;
+            } else {
+                $rawPage = 1;
+            }
+        }
+
+        /** @var int $rawPage */
+        return ['page' => $rawPage];
     }
 
     private function getFilterKey(): string

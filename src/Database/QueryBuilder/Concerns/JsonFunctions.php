@@ -47,20 +47,18 @@ trait JsonFunctions
 
         if ($driver === 'sqlite') {
             $expr = "$wrapped LIKE ?";
-            $binding = '%' . (string)$needle . '%';
+            $binding = '%' . (string) $needle . '%';
         } else {
-            $expr = "$wrapped JSON_CONTAINS ?";
+            $expr = "JSON_CONTAINS($wrapped, ?)";
             $binding = json_encode($needle, JSON_UNESCAPED_UNICODE);
         }
 
-        // Skriv rå WHERE-del (utan parenteser)
         $this->whereRawString = is_string($this->whereRawString ?? null) ? $this->whereRawString : '';
         $this->whereRawString = $this->whereRawString === ''
             ? $expr
             : ($this->whereRawString . ' ' . strtoupper($boolean) . ' ' . $expr);
 
-        // Viktigt: lägg needle i select-bucket för att komma efter path i bindings
-        $this->addSelectBinding($binding);
+        $this->addWhereBinding($binding);
 
         return $this;
     }

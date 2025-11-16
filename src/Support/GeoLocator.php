@@ -15,8 +15,13 @@ class GeoLocator
      */
     public function getLocation(?string $ip = null): array
     {
-        $ip = $ip ?? $_SERVER['REMOTE_ADDR'];
-        $url = "$this->baseUrl/$ip";
+        $serverIp = $_SERVER['REMOTE_ADDR'] ?? null;
+
+        if ($ip === null) {
+            $ip = is_string($serverIp) ? $serverIp : '';
+        }
+
+        $url = $this->baseUrl . '/' . $ip;
         $data = @file_get_contents($url);
 
         if ($data === false) {
