@@ -42,7 +42,15 @@ class CallableArgument extends LiteralArgument
      */
     public function invoke(...$args): mixed
     {
-        return call_user_func($this->getValue(), ...$args);
+        $callable = $this->getValue();
+
+        if (!is_callable($callable)) {
+            // Ska inte kunna hända eftersom konstruktorn validerar, men skyddar runtime/statisk analys.
+            throw new ContainerInvalidArgumentException('Underlying value is not a callable.');
+        }
+
+        /** @var callable $callable */
+        return call_user_func($callable, ...$args);
     }
 
     /**
@@ -52,7 +60,12 @@ class CallableArgument extends LiteralArgument
      */
     public function isMethod(): bool
     {
-        return is_array($this->getValue()) && count($this->getValue()) === 2 && is_object($this->getValue()[0]) && is_string($this->getValue()[1]);
+        $value = $this->getValue();
+
+        return is_array($value)
+            && count($value) === 2
+            && is_object($value[0])
+            && is_string($value[1]);
     }
 
     /**
@@ -62,16 +75,34 @@ class CallableArgument extends LiteralArgument
      */
     public function describe(): string
     {
-        if (is_string($this->getValue())) {
-            return sprintf('Callable function: %s', $this->getValue());
+        $value = $this->getValue();
+
+        if (is_string($value)) {
+            // $value är nu garanterat string för sprintf
+            return sprintf('Callable function: %s', $value);
         }
 
-        if (is_array($this->getValue())) {
-            [$object, $method] = $this->getValue();
-            return sprintf('Callable method: %s::%s', is_object($object) ? get_class($object) : $object, $method);
+        if (is_array($value)) {
+            // Förvänta [object|string, string]
+            if (count($value) === 2 && is_string($value[1])) {
+                [$object, $method] = $value;
+
+                if (is_object($object)) {
+                    $className = get_class($object);
+                } elseif (is_string($object)) {
+                    $className = $object;
+                } else {
+                    // Ogiltig typ i arrayen – fall tillbaka
+                    return 'Callable: unknown type';
+                }
+
+                return sprintf('Callable method: %s::%s', $className, $method);
+            }
+
+            return 'Callable: unknown type';
         }
 
-        if ($this->getValue() instanceof \Closure) {
+        if ($value instanceof \Closure) {
             return 'Callable: anonymous function';
         }
 

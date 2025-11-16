@@ -57,7 +57,14 @@ class StringArgument extends LiteralArgument
      */
     public function toUpperCase(): string
     {
-        return strtoupper($this->getValue());
+        $value = $this->getValue();
+
+        if (!is_string($value)) {
+            // Borde inte hända p.g.a. validateString(), men skyddar runtime/statisk analys.
+            throw new ContainerInvalidArgumentException('Underlying value is not a string.');
+        }
+
+        return strtoupper($value);
     }
 
     /**
@@ -67,7 +74,13 @@ class StringArgument extends LiteralArgument
      */
     public function toLowerCase(): string
     {
-        return strtolower($this->getValue());
+        $value = $this->getValue();
+
+        if (!is_string($value)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not a string.');
+        }
+
+        return strtolower($value);
     }
 
     /**
@@ -77,6 +90,12 @@ class StringArgument extends LiteralArgument
      */
     public function length(): int
     {
-        return strlen($this->getValue());
+        $value = $this->getValue();
+
+        if (!is_string($value)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not a string.');
+        }
+
+        return strlen($value);
     }
 }

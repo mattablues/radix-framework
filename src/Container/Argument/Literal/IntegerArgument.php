@@ -48,7 +48,14 @@ class IntegerArgument extends LiteralArgument
      */
     public function add(int $value): int
     {
-        return $this->getValue() + $value;
+        $current = $this->getValue();
+
+        if (!is_int($current)) {
+            // Ska inte kunna hända om konstruktorn och setValue validerar korrekt.
+            throw new ContainerInvalidArgumentException('Underlying value is not an integer.');
+        }
+
+        return $current + $value;
     }
 
     /**
@@ -59,7 +66,13 @@ class IntegerArgument extends LiteralArgument
      */
     public function subtract(int $value): int
     {
-        return $this->getValue() - $value;
+        $current = $this->getValue();
+
+        if (!is_int($current)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not an integer.');
+        }
+
+        return $current - $value;
     }
 
     /**
@@ -69,7 +82,13 @@ class IntegerArgument extends LiteralArgument
      */
     public function isEven(): bool
     {
-        return $this->getValue() % 2 === 0;
+        $current = $this->getValue();
+
+        if (!is_int($current)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not an integer.');
+        }
+
+        return $current % 2 === 0;
     }
 
     /**
@@ -90,6 +109,12 @@ class IntegerArgument extends LiteralArgument
      */
     public function multiply(int $multiplier): int
     {
-        return $this->getValue() * $multiplier;
+        $current = $this->getValue();
+
+        if (!is_int($current)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not an integer.');
+        }
+
+        return $current * $multiplier;
     }
 }

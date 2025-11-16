@@ -48,7 +48,13 @@ class FloatArgument extends LiteralArgument
      */
     public function multiply(float $factor): float
     {
-        return $this->getValue() * $factor;
+        $current = $this->getValue();
+
+        if (!is_float($current)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not a float.');
+        }
+
+        return $current * $factor;
     }
 
     /**
@@ -64,7 +70,13 @@ class FloatArgument extends LiteralArgument
             throw new ContainerInvalidArgumentException('Division by zero is not allowed.');
         }
 
-        return $this->getValue() / $divisor;
+        $current = $this->getValue();
+
+        if (!is_float($current)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not a float.');
+        }
+
+        return $current / $divisor;
     }
 
     /**
@@ -75,6 +87,12 @@ class FloatArgument extends LiteralArgument
      */
     public function round(int $precision): float
     {
-        return round($this->getValue(), $precision);
+        $current = $this->getValue();
+
+        if (!is_float($current)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not a float.');
+        }
+
+        return round($current, $precision);
     }
 }

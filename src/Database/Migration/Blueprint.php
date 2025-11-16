@@ -77,19 +77,23 @@ class Blueprint
             $default = $options['default'];
 
             if (is_bool($default)) {
-                $default = $default ? '1' : '0';
+                $defaultStr = $default ? '1' : '0';
             } else {
                 // Kontrollera om det är en sökväg, annars gör det VERSALER.
                 if (is_string($default) && preg_match('#^(/|[a-zA-Z]:|https?://)#', $default)) {
-                    $default = (string)$default; // Behåll originalform.
+                    $defaultStr = $default; // Behåll originalform.
                 } else {
-                    $default = strtoupper((string)$default); // Konvertera till versaler.
+                    if (!is_scalar($default)) {
+                        throw new \InvalidArgumentException("Default value must be a scalar or string.");
+                    }
+                    /** @var int|float|string $default */
+                    $defaultStr = strtoupper((string) $default); // Konvertera till versaler.
                 }
             }
 
-            $definition .= ($default === 'CURRENT_TIMESTAMP')
-                ? " DEFAULT $default"
-                : " DEFAULT '" . addslashes($default) . "'";
+            $definition .= ($defaultStr === 'CURRENT_TIMESTAMP')
+                ? " DEFAULT $defaultStr"
+                : " DEFAULT '" . addslashes($defaultStr) . "'";
         }
 
         if (isset($options['autoIncrement']) && $options['autoIncrement'] === true) {
@@ -97,20 +101,35 @@ class Blueprint
         }
 
         if (isset($options['onUpdate'])) {
+            if (!is_string($options['onUpdate'])) {
+                throw new \InvalidArgumentException("Option 'onUpdate' must be a string.");
+            }
             $definition .= ' ON UPDATE ' . $options['onUpdate'];
         }
 
         if (isset($options['collation'])) {
+            if (!is_string($options['collation'])) {
+                throw new \InvalidArgumentException("Option 'collation' must be a string.");
+            }
             $definition .= ' COLLATE ' . $options['collation'];
         }
 
         if (isset($options['comment'])) {
+            if (!is_string($options['comment'])) {
+                throw new \InvalidArgumentException("Option 'comment' must be a string.");
+            }
             $definition .= " COMMENT '" . addslashes($options['comment']) . "'";
         }
 
         if (isset($options['before'])) {
+            if (!is_string($options['before'])) {
+                throw new \InvalidArgumentException("Option 'before' must be a string.");
+            }
             $definition .= ' BEFORE `' . $options['before'] . '`';
         } elseif (isset($options['after'])) {
+            if (!is_string($options['after'])) {
+                throw new \InvalidArgumentException("Option 'after' must be a string.");
+            }
             $definition .= ' AFTER `' . $options['after'] . '`';
         } elseif (!empty($options['first'])) {
             $definition .= ' FIRST';

@@ -42,6 +42,13 @@ class Resolver
             throw new ContainerConfigException('The definition is invalid');
         }
 
+        if (!is_object($instance)) {
+            throw new ContainerConfigException(
+                'Resolver::resolve() expected factory/class/resolved to produce an object, got ' . get_debug_type($instance)
+            );
+        }
+
+        /** @var object $instance */
         $this->invokeMethods($definition, $instance);
         $this->invokeProperties($definition, $instance);
         $definition->setResolved($instance);

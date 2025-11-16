@@ -59,15 +59,17 @@ abstract class ApiController extends AbstractController
         // Om JSON är ogiltig, skicka ett 400-fel
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($inputData)) {
             $this->respondWithBadRequest('Invalid or missing JSON in the request body.');
+            return []; // når i praktiken inte hit pga exit i respondWithBadRequest()
         }
 
+        /** @var array<string, mixed> $inputData */
         return $inputData;
     }
 
     /**
      * Validera inkommande request mot givna regler och API-token.
      *
-     * @param array<string, mixed> $rules
+     * @param array<string, array<int, string>|string> $rules
      */
     protected function validateRequest(array $rules = []): void
     {
@@ -76,6 +78,7 @@ abstract class ApiController extends AbstractController
 
         // Validera regler om några skickats
         if (!empty($rules)) {
+            /** @var array<string, array<int, string>|string> $rules */
             $validator = new Validator($this->request->post, $rules);
 
             if (!$validator->validate()) {

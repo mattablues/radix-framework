@@ -17,6 +17,14 @@ class DatabaseManager
 
     public function connection(): Connection
     {
-        return $this->container->get(Connection::class);
+        $connection = $this->container->get(Connection::class);
+
+        if (!$connection instanceof Connection) {
+            throw new \RuntimeException(
+                'Container did not return a ' . Connection::class . ' instance.'
+            );
+        }
+
+        return $connection;
     }
 }

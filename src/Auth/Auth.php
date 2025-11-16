@@ -45,11 +45,15 @@ readonly class Auth
      */
     public function logout(): void
     {
-        $user_id = $this->session->get(Session::AUTH_KEY);
+        $userIdRaw = $this->session->get(Session::AUTH_KEY);
 
-        if ($user_id) {
-            $this->setOfflineStatus($user_id); // Uppdatera offline-status
+        // Tillåt endast int, annars är sessionen korrupt/ogiltig
+        if (!is_int($userIdRaw)) {
+            throw new \RuntimeException('Invalid user id in session.');
         }
+
+        /** @var int $userIdRaw */
+        $this->setOfflineStatus($userIdRaw);
 
         $this->session->destroy(); // Förstör sessionen
     }
@@ -62,8 +66,8 @@ readonly class Auth
 
     private function setOfflineStatus(int $user_id): void
     {
-        $user = User::find($user_id); // Hämta användaren
-        $user?->setOffline(); // Markera som offline
+        $user = User::find($user_id);
+        $user?->setOffline();
     }
 
     private function updateInactiveUsers(): void

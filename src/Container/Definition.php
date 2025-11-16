@@ -20,7 +20,10 @@ class Definition
      * @var array<string, mixed>
      */
     private array $properties = [];
-    private mixed $factory = null;
+    /**
+     * @var array{class-string, string}|(callable(): mixed)|null
+     */
+    private $factory = null;
     /**
      * @var array<string, array<int, array<string, mixed>>>
      */
@@ -75,23 +78,46 @@ class Definition
     }
 
     /**
-     * Sätt factory som ska användas för att skapa instansen.
-     *
-     * @param callable|array{0: class-string, 1: string} $factory
+     * @param array{class-string, string}|(callable(): mixed)|null $factory
      */
-    public function setFactory(callable|array $factory): Definition
+    public function setFactory($factory): self
     {
-        $this->factory = $factory;
+        if ($factory === null) {
+            $this->factory = null;
+            return $this;
+        }
 
-        return $this;
+        if (is_array($factory)) {
+            // Måste vara [class-string, method]
+            if (
+                count($factory) !== 2
+                || !is_string($factory[0])
+                || !is_string($factory[1])
+            ) {
+                throw new \InvalidArgumentException('Factory array must be [class-string, method].');
+            }
+
+            /** @var array{class-string, string} $factory */
+            $this->factory = $factory;
+
+            return $this;
+        }
+
+        if (is_callable($factory)) {
+            /** @var callable(): mixed $factoryCallable */
+            $factoryCallable = $factory;
+            $this->factory = $factoryCallable;
+
+            return $this;
+        }
+
+        throw new \InvalidArgumentException('Factory must be [class-string, method], callable, or null.');
     }
 
     /**
-     * Hämta factory som används för att skapa instansen.
-     *
-     * @return callable|array{0: class-string, 1: string}|null
+     * @return array{class-string, string}|(callable(): mixed)|null
      */
-    public function getFactory(): null|callable|array
+    public function getFactory()
     {
         return $this->factory;
     }
@@ -139,7 +165,7 @@ class Definition
         return $this;
     }
 
-    public function setArgument(mixed $key, mixed $value): Definition
+    public function setArgument(int|string $key, mixed $value): Definition
     {
         $this->arguments[$key] = $value;
 

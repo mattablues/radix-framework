@@ -92,10 +92,19 @@ class Connection
 
         if ($className) {
             $statement->setFetchMode(PDO::FETCH_CLASS, $className);
-            return $statement->fetch() ?: null;
+            /** @var object|false $row */
+            $row = $statement->fetch();
+            return $row === false ? null : $row;
         }
 
-        return $statement->fetch(PDO::FETCH_ASSOC) ?: null;
+        /** @var array<string,mixed>|false $row */
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
+
+        // Gör assoc‑arrayen till ett stdClass‑objekt för att hålla signaturen object|null
+        return (object) $row;
     }
 
     /**
@@ -109,8 +118,15 @@ class Connection
         $pdo = $this->getPdoInternal();
         $statement = $pdo->prepare($query);
         $statement->execute($params);
+
+        /** @var array<string,mixed>|false $result */
         $result = $statement->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
+
+        if ($result === false) {
+            return null;
+        }
+
+        return $result;
     }
 
     /**

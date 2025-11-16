@@ -43,7 +43,16 @@ class ArrayArgument extends LiteralArgument
     public function addValue(mixed $value): array
     {
         $array = $this->getValue();
+
+        if (!is_array($array)) {
+            // Borde inte hända eftersom konstruktorn kräver array,
+            // men skyddar runtime/statisk analys.
+            throw new ContainerInvalidArgumentException('Underlying value is not an array.');
+        }
+
         $array[] = $value;
+
+        /** @var array<int|string, mixed> $array */
         return $array;
     }
 
@@ -55,12 +64,18 @@ class ArrayArgument extends LiteralArgument
     public function removeValue(mixed $value): array
     {
         $array = $this->getValue();
+
+        if (!is_array($array)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not an array.');
+        }
+
         $index = array_search($value, $array, true);
 
         if ($index !== false) {
             unset($array[$index]);
         }
 
+        /** @var array<int|string, mixed> $array */
         return $array;
     }
 
@@ -76,12 +91,19 @@ class ArrayArgument extends LiteralArgument
     {
         $array = $this->getValue();
 
-        if ($callback) {
+        if (!is_array($array)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not an array.');
+        }
+
+        if ($callback !== null) {
+            /** @var array<int, mixed> $array */
             usort($array, $callback);
         } else {
+            /** @var array<int, mixed> $array */
             sort($array);
         }
 
+        /** @var array<int|string, mixed> $array */
         return $array;
     }
 
@@ -92,6 +114,12 @@ class ArrayArgument extends LiteralArgument
      */
     public function length(): int
     {
-        return count($this->getValue());
+        $array = $this->getValue();
+
+        if (!is_array($array)) {
+            throw new ContainerInvalidArgumentException('Underlying value is not an array.');
+        }
+
+        return count($array);
     }
 }
