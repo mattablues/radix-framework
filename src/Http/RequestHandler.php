@@ -12,7 +12,7 @@ use Radix\Http\Event\ResponseEvent;
 readonly class RequestHandler implements RequestHandlerInterface
 {
     /**
-     * @param array<string,mixed> $args
+     * @param array<int|string,mixed> $args
      */
     public function __construct(
         private Closure|AbstractController $handler,

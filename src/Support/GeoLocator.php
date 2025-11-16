@@ -35,9 +35,19 @@ class GeoLocator
         }
 
         if ($location['status'] !== 'success') {
-            throw new GeoLocatorException("API fel: " . $location['message']);
+            $rawMessage = $location['message'] ?? 'okänt fel';
+
+            if (is_string($rawMessage)) {
+                $message = $rawMessage;
+            } else {
+                $encoded = json_encode($rawMessage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $message = $encoded === false ? 'okänt fel' : $encoded;
+            }
+
+            throw new GeoLocatorException('API fel: ' . $message);
         }
 
+        /** @var array<string,mixed> $location */
         return $location;
     }
 

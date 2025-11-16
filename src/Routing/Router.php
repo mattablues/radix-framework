@@ -54,9 +54,18 @@ class Router
                 }
 
                 if ($method && array_key_exists('method', $params)) {
-                    if (mb_strtolower($method) !== mb_strtolower((string) $params['method'])) {
+                    $routeMethod = $params['method'];
+
+                    // Säkerställ att route-metoden verkligen är en sträng
+                    if (!is_string($routeMethod)) {
+                        continue;
+                    }
+
+                    $routeMethodLower = mb_strtolower($routeMethod);
+
+                    if (mb_strtolower($method) !== $routeMethodLower) {
                         // Hantera HEAD som fallback för GET
-                        if (!($method === 'HEAD' && mb_strtolower((string) $params['method']) === 'get')) {
+                        if (!($method === 'HEAD' && $routeMethodLower === 'get')) {
                             continue; // Ignorera om HEAD inte kan mappas
                         }
                     }
@@ -259,7 +268,8 @@ class Router
     }
 
     /**
-     * @param array<string,mixed> $params
+     * @param array<int|string,mixed> $params
+     * @phpstan-param array<int|string,mixed> $params
      */
     private function add(string $path, array $params = []): void
     {

@@ -257,7 +257,7 @@ readonly class Dispatcher
     /**
      * Bygg argumentlista till en controller‑action baserat på route‑parametrar.
      *
-     * @param array<string,mixed> $params
+     * @param array<int|string,mixed> $params
      * @return array<string,mixed>
      */
     private function actionArguments(string $controller, string $action, array $params): array
@@ -267,7 +267,9 @@ readonly class Dispatcher
 
         foreach ($method->getParameters() as $parameter) {
             $name = $parameter->getName();
-            $args[$name] = $params[$name];
+            if (array_key_exists($name, $params)) {
+                $args[$name] = $params[$name];
+            }
         }
 
         return $args;
