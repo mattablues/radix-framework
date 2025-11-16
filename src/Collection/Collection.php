@@ -222,20 +222,40 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
         return new self($mapped);
     }
 
-    public function filter(?Closure $callback = null, int $mode = 0): self
+    /**
+     * @param callable(mixed, int|string): bool|null $callback
+     */
+    public function filter(?callable $callback = null, int $mode = 0): self
     {
         if ($callback === null) {
             return new self(array_filter($this->elements));
         }
 
-        return new self(array_filter($this->elements, static function ($v, $k) use ($callback) {
-            return $callback($v, $k);
-        }, ARRAY_FILTER_USE_BOTH));
+        return new self(
+            array_filter(
+                $this->elements,
+                /**
+                 * @param mixed      $v
+                 * @param int|string $k
+                 * @return bool
+                 */
+                static function (mixed $v, int|string $k) use ($callback): bool {
+                    return (bool) $callback($v, $k);
+                },
+                ARRAY_FILTER_USE_BOTH
+            )
+        );
     }
 
-    public function reject(Closure $callback): self
+    public function reject(callable $callback): self
     {
-        return $this->filter(fn($v, $k) => !$callback($v, $k));
+        return $this->filter(
+            /**
+             * @param mixed      $v
+             * @param int|string $k
+             */
+            fn(mixed $v, int|string $k): bool => !$callback($v, $k)
+        );
     }
 
     public function each(Closure $callback): self
@@ -257,7 +277,7 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
 
     /**
      * Plockar ut ett fält från varje element (stödjer array/objekt).
-     * @param  string  $field
+     * @param  string       $field
      * @param  string|null  $keyBy
      * @return self
      */
@@ -279,7 +299,9 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
                 } elseif (is_object($item) && isset($item->{$keyBy})) {
                     $kb = $item->{$keyBy};
                 }
-                if ($kb !== null) {
+
+                // Använd endast int|string som nycklar
+                if (is_int($kb) || is_string($kb)) {
                     $result[$kb] = $value;
                     continue;
                 }
@@ -341,7 +363,13 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
                 // Säkerställ att hash alltid är en sträng, även om json_encode misslyckas
                 $hash = $encoded === false ? 'null' : $encoded;
             } else {
-                $hash = (string) $key;
+                // I icke-strikt läge: tillåt endast scalar/null, annars fallback till serialize
+                if (is_scalar($key) || $key === null) {
+                    /** @var scalar|null $key */
+                    $hash = (string) $key;
+                } else {
+                    $hash = md5(serialize($key));
+                }
             }
 
             if (!array_key_exists($hash, $seen)) {

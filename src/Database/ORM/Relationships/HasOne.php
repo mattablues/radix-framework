@@ -99,7 +99,9 @@ class HasOne
 
         // Applicera default
         if (is_array($this->defaultAttributes)) {
-            $model->forceFill($this->defaultAttributes);
+            /** @var array<string, mixed> $defaults */
+            $defaults = $this->defaultAttributes;
+            $model->forceFill($defaults);
         } elseif (is_callable($this->defaultAttributes)) {
             ($this->defaultAttributes)($model);
         }

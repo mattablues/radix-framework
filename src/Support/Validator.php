@@ -93,10 +93,19 @@ class Validator
     }
 
     // Hjälpmetod att generera nytt honeypot-id efter validering
+    /**
+     * @param callable():string $generator
+     */
     public function regenerateHoneypotId(callable $generator): string
     {
         $newId = $generator();
+
+        if (!is_string($newId)) {
+            throw new \RuntimeException('Honeypot ID generator must return a string.');
+        }
+
         $_SESSION['honeypot_id'] = $newId;
+
         return $newId;
     }
 
@@ -513,15 +522,23 @@ class Validator
         $column = $parts[1] ?? null;
         $excludeId = isset($parts[2]) ? intval(explode('=', $parts[2])[1]) : null;
 
-        if (!$modelClass || !class_exists($modelClass)) {
+        if (!is_string($modelClass) || $modelClass === '' || !class_exists($modelClass)) {
             throw new InvalidArgumentException(
                 "Valideringsregeln 'unique' kräver en giltig modellklass. Kontrollera att '$modelClass' existerar."
             );
         }
 
-        if (!$column) {
+        if (!is_subclass_of($modelClass, \Radix\Database\ORM\Model::class)) {
+            throw new InvalidArgumentException(
+                "Valideringsregeln 'unique' kräver att modellen ärver " . \Radix\Database\ORM\Model::class . "."
+            );
+        }
+
+        if ($column === null || $column === '') {
             throw new InvalidArgumentException("Valideringsregeln 'unique' kräver att kolumn specificeras.");
         }
+
+        /** @var class-string<\Radix\Database\ORM\Model> $modelClass */
 
         // Bygg upp frågan och inkludera soft-deleted poster
         $query = $modelClass::query()->withSoftDeletes()->where($column, '=', $value);

@@ -113,10 +113,32 @@ final class Reader
         bool $castNumeric = true
     ): array {
         // För små/medelstora filer. För mycket stora filer använd csvStream().
+        /** @var array<int, array<string, mixed>> $rows */
         $rows = [];
-        self::csvStream($path, function (array $row) use (&$rows): void {
-            $rows[] = $row;
-        }, $delimiter, $hasHeader, $encoding, $castNumeric);
+
+        self::csvStream(
+            $path,
+            /**
+             * @param array<mixed> $row
+             */
+            function (array $row) use (&$rows): void {
+                // Normalisera nycklar till string
+                $normalized = [];
+                foreach ($row as $k => $v) {
+                    /** @var int|string $k */
+                    $normalized[(string) $k] = $v;
+                }
+
+                /** @var array<string, mixed> $normalized */
+                $rows[] = $normalized;
+            },
+            $delimiter,
+            $hasHeader,
+            $encoding,
+            $castNumeric
+        );
+
+        /** @var array<int, array<string, mixed>> $rows */
         return $rows;
     }
 
@@ -170,29 +192,45 @@ final class Reader
             }
 
             // Trimma och ev. encoding-konvertera celler
-            $row = array_map(static function ($v) use ($encoding, $castNumeric) {
-                if ($v === null) {
-                    return null;
-                }
-                $s = (string)$v;
-                $s = trim($s);
-                if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
-                    $s2 = @iconv($encoding, 'UTF-8//IGNORE', $s);
-                    if ($s2 === false) {
-                        throw new RuntimeException("Kunde inte konvertera cell från {$encoding} till UTF-8");
+            $row = array_map(
+                static function ($v) use ($encoding, $castNumeric) {
+                    if ($v === null) {
+                        return null;
                     }
-                    $s = $s2;
-                }
-                // Försök numerisk typning: heltal eller flyttal
-                if ($castNumeric && $s !== '' && is_numeric($s)) {
-                    if (ctype_digit($s)) {
-                        return (int)$s;
+
+                    // Gör om värdet till sträng på ett säkert sätt
+                    if (!is_scalar($v)) {
+                        // Oväntad typ: försök json_encode, annars tom sträng
+                        $encoded = json_encode($v);
+                        $s = $encoded !== false ? $encoded : '';
+                    } else {
+                        /** @var scalar $v */
+                        $s = (string) $v;
                     }
-                    // Hantera decimaltal med punkt
-                    return (float)$s;
-                }
-                return $s;
-            }, $row);
+
+                    $s = trim($s);
+
+                    if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
+                        $s2 = @iconv($encoding, 'UTF-8//IGNORE', $s);
+                        if ($s2 === false) {
+                            throw new RuntimeException("Kunde inte konvertera cell från {$encoding} till UTF-8");
+                        }
+                        $s = $s2;
+                    }
+
+                    // Försök numerisk typning: heltal eller flyttal
+                    if ($castNumeric && $s !== '' && is_numeric($s)) {
+                        if (ctype_digit($s)) {
+                            return (int) $s;
+                        }
+                        // Hantera decimaltal med punkt
+                        return (float) $s;
+                    }
+
+                    return $s;
+                },
+                $row
+            );
 
             if ($hasHeader && $headers === null) {
                 $headers = $row;
@@ -204,7 +242,10 @@ final class Reader
                 $max = max(count($headers), count($row));
                 for ($i = 0; $i < $max; $i++) {
                     $headerKey = $headers[$i] ?? "col_{$i}";
-                    $key = (string) $headerKey;
+
+                    /** @var string $key */
+                    $key = $headerKey;
+
                     $assoc[$key] = $row[$i] ?? null;
                 }
                 $onRow($assoc);

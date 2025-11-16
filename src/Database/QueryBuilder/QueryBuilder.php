@@ -270,7 +270,7 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     /**
-     * @return array<int, mixed>
+     * @return array<int|string, mixed>
      */
     public function pluck(string $valueColumn, ?string $keyColumn = null): array
     {

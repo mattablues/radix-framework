@@ -57,14 +57,18 @@ class Connection
         $pdo = $this->getPdoInternal();
         $statement = $pdo->prepare($query);
         $statement->execute($params);
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        /** @var array<int,array<string,mixed>> $rows */
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
     }
 
     /**
      * Hämta alla rader som objekt eller assoc‑arrayer.
      *
      * @param array<int|string,mixed> $params
-     * @return array<int,object>|array<int,array<string,mixed>>
+     * @return array<int, array<string,mixed>|object>
      */
     public function fetchAllAsClass(string $query, array $params = [], ?string $className = null): array
     {
@@ -73,10 +77,15 @@ class Connection
         $statement->execute($params);
 
         if ($className) {
-            return $statement->fetchAll(PDO::FETCH_CLASS, $className);
+            /** @var array<int, object> $rows */
+            $rows = $statement->fetchAll(PDO::FETCH_CLASS, $className);
+        } else {
+            /** @var array<int, array<string,mixed>> $rows */
+            $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        /** @var array<int, array<string,mixed>|object> $rows */
+        return $rows;
     }
 
     /**

@@ -14,7 +14,14 @@ class StringHelper
     public static function singularize(string $tableName): string
     {
         // Ladda konfigurationen för pluralisering
-        $config = new Config(include dirname(__DIR__, 3) . '/config/pluralization.php');
+        $pluralConfig = include dirname(__DIR__, 3) . '/config/pluralization.php';
+
+        if (!is_array($pluralConfig)) {
+            throw new \RuntimeException('pluralization.php måste returnera en array.');
+        }
+
+        /** @var array<string,mixed> $pluralConfig */
+        $config = new Config($pluralConfig);
         $rawIrregular = $config->get('irregular', []);
         $irregularWords = is_array($rawIrregular) ? $rawIrregular : [];
 
@@ -48,7 +55,14 @@ class StringHelper
      */
     public static function pluralize(string $word): string
     {
-        $config = new Config(include dirname(__DIR__, 3) . '/config/pluralization.php');
+        $pluralConfig = include dirname(__DIR__, 3) . '/config/pluralization.php';
+
+        if (!is_array($pluralConfig)) {
+            throw new \RuntimeException('pluralization.php måste returnera en array.');
+        }
+
+        /** @var array<string,mixed> $pluralConfig */
+        $config = new Config($pluralConfig);
         $rawIrregular = $config->get('irregular', []);
         $irregularWords = is_array($rawIrregular) ? $rawIrregular : [];
 

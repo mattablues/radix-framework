@@ -96,7 +96,8 @@ trait Windows
      */
     protected function compileWindowSelects(): array
     {
-        return $this->windowExpressions ?? [];
+        // Normalisera till en list-array med int-nycklar för PHPStan
+        return array_values($this->windowExpressions);
     }
 
     /**

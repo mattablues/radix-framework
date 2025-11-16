@@ -710,7 +710,15 @@ abstract class Model implements JsonSerializable
         if ($model && property_exists($model, 'autoloadRelations') && !empty($model->autoloadRelations)) {
             foreach ($model->autoloadRelations as $relation) {
                 if ($model->relationExists($relation)) {
-                    $model->setRelation($relation, $model->$relation()->get());
+                    $relObj = $model->$relation();
+
+                    if (is_object($relObj) && method_exists($relObj, 'get')) {
+                        $related = $relObj->get();
+                    } else {
+                        $related = null;
+                    }
+
+                    $model->setRelation($relation, $related);
                 }
             }
         }
@@ -1282,7 +1290,14 @@ abstract class Model implements JsonSerializable
         if (!empty($this->autoloadRelations)) {
             foreach ($this->autoloadRelations as $relation) {
                 if (!isset($array[$relation]) && $this->relationExists($relation)) {
-                    $relatedData = $this->$relation()->get();
+                    $relObj = $this->$relation();
+
+                    if (is_object($relObj) && method_exists($relObj, 'get')) {
+                        $relatedData = $relObj->get();
+                    } else {
+                        $relatedData = null;
+                    }
+
                     if ($relatedData instanceof Collection) {
                         $array[$relation] = $relatedData->map(
                             fn($item) => $item instanceof self ? $item->toArray() : $item

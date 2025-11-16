@@ -38,10 +38,12 @@ abstract class AbstractController
      */
     protected function view(string $template, array $data = []): Response
     {
-        // Kontrollera om det finns en `filters()`-metod i den aktuella kontrollern
-        if (method_exists($this, 'filters')) {
-            $this->registerFilters($this->filters());
-        }
+            // Kontrollera om det finns en `filters()`-metod i den aktuella kontrollern
+            if (method_exists($this, 'filters')) {
+                /** @var array<string, array{callback: callable(mixed): mixed, type?: string}> $filters */
+                $filters = $this->filters();
+                $this->registerFilters($filters);
+            }
 
         $defaultData = [
             'errors' => [], // Standardvärde för errors
@@ -61,7 +63,7 @@ abstract class AbstractController
      * Registrera template-filters i viewern.
      *
      * @param array<string, array{
-     *     callback: callable,
+     *     callback: callable(mixed): mixed,
      *     type?: string
      * }> $filters
      */
