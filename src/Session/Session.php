@@ -194,6 +194,7 @@ class Session implements SessionInterface
         }
 
         // Ta bort flash-data för att den bara ska visas en gång
+        /** @var array<string,mixed> $flash */
         $this->remove('flash_notification');
 
         return $flash;

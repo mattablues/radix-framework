@@ -27,8 +27,7 @@ class Request implements RequestInterface
         public array $files,
         public array $cookie,
         public array $server,
-    )
-    {
+    ) {
     }
 
     public static function createFromGlobals(): self
@@ -43,14 +42,25 @@ class Request implements RequestInterface
             $method = 'GET';
         }
 
+        /** @var array<string,mixed> $get */
+        $get = $_GET;
+        /** @var array<string,mixed> $post */
+        $post = $_POST;
+        /** @var array<string,mixed> $files */
+        $files = $_FILES;
+        /** @var array<string,mixed> $cookie */
+        $cookie = $_COOKIE;
+        /** @var array<string,mixed> $server */
+        $server = $_SERVER;
+
         return new self(
             $uri,
             $method,
-            $_GET,
-            $_POST,
-            $_FILES,
-            $_COOKIE,
-            $_SERVER,
+            $get,
+            $post,
+            $files,
+            $cookie,
+            $server,
         );
     }
 
