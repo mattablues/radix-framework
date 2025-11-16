@@ -38,12 +38,11 @@ trait WithCount
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
         }
 
         // snake_case alias av relationsnamnet
         $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation);
-
 
         $rel = $parent->$relation();
         /** @var \Radix\Database\ORM\Relationships\HasMany
@@ -74,6 +73,7 @@ trait WithCount
             $ref = new \ReflectionClass($rel);
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
             $this->columns[] =
@@ -104,6 +104,16 @@ trait WithCount
             $secondLocalProp = $ref->getProperty('secondLocal');
             $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
+
+            if (
+                !is_string($relatedClassOrTable) ||
+                !is_string($throughClassOrTable) ||
+                !is_string($firstKey) ||
+                !is_string($secondKey) ||
+                !is_string($secondLocal)
+            ) {
+                throw new \LogicException('HasOneThrough relation properties must be strings for withCount().');
+            }
 
             $resolveTable = function (string $classOrTable): string {
                 if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
@@ -147,6 +157,16 @@ trait WithCount
             $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
+            if (
+                !is_string($relatedClassOrTable) ||
+                !is_string($throughClassOrTable) ||
+                !is_string($firstKey) ||
+                !is_string($secondKey) ||
+                !is_string($secondLocal)
+            ) {
+                throw new \LogicException('HasManyThrough relation properties must be strings for withCount().');
+            }
+
             $resolveTable = function (string $classOrTable): string {
                 if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
                     /** @var class-string<Model> $classOrTable */
@@ -168,6 +188,9 @@ trait WithCount
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsToMany) {
             $pivotTable = $rel->getPivotTable();
             $foreignPivotKey = $rel->getForeignPivotKey();
+
+            /** @var string $pivotTable */
+            /** @var string $foreignPivotKey */
             $this->columns[] =
                 "(SELECT COUNT(*) FROM `$pivotTable` WHERE `$pivotTable`.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
@@ -179,19 +202,14 @@ trait WithCount
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
             $mcProp = $ref->getProperty('modelClass');
             $mcProp->setAccessible(true);
+            /** @var class-string<Model> $modelClass */
             $modelClass = $mcProp->getValue($rel);
 
-            if (!is_string($modelClass) || !is_subclass_of($modelClass, Model::class)) {
-                throw new \LogicException(
-                    "HasOne relation modelClass '$modelClass' must extend " . Model::class . " for withCount()."
-                );
-            }
-
-            /** @var class-string<Model> $modelClass */
             $relatedInstance = new $modelClass();
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
@@ -217,6 +235,10 @@ trait WithCount
             $tableProp->setAccessible(true);
             $relatedTable = $tableProp->getValue($rel);
 
+            if (!is_string($ownerKey) || !is_string($parentForeignKey) || !is_string($relatedTable)) {
+                throw new \LogicException('BelongsTo relation keys/tables must be strings for withCount().');
+            }
+
             $this->columns[] =
                 "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `{$snake}_count`";
             return;
@@ -237,7 +259,7 @@ trait WithCount
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
+            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
         }
 
         $rel = $parent->$relation();
@@ -249,14 +271,41 @@ trait WithCount
          *   |\Radix\Database\ORM\Relationships\BelongsToMany $rel
          */
         $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $relation) ?? $relation);
-        $valSql = is_int($value) || is_float($value) ? (string)$value : ("'" . addslashes((string)$value) . "'");
-        $aggAlias = $alias ?: "{$snake}_count_" . (is_scalar($value) ? (string)$value : 'value');
+
+        // Bygg värde‑SQL utan att casta mixed direkt till string
+        if (is_int($value) || is_float($value)) {
+            $valSql = (string)$value;
+        } elseif (is_string($value)) {
+            $valSql = "'" . addslashes($value) . "'";
+        } elseif (is_bool($value)) {
+            $valSql = $value ? '1' : '0';
+        } elseif ($value === null) {
+            $valSql = 'NULL';
+        } else {
+            throw new \InvalidArgumentException('withCountWhere() value must be scalar or null.');
+        }
+
+        if ($alias !== null) {
+            $aggAlias = $alias;
+        } else {
+            if (is_scalar($value)) {
+                if (is_bool($value)) {
+                    $suffix = $value ? 'true' : 'false';
+                } else {
+                    $suffix = (string)$value;
+                }
+            } else {
+                $suffix = 'value';
+            }
+            $aggAlias = "{$snake}_count_" . $suffix;
+        }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             /** @var \Radix\Database\ORM\Relationships\HasMany $rel */
             $ref = new \ReflectionClass($rel);
             $relatedModelClassProp = $ref->getProperty('modelClass');
             $relatedModelClassProp->setAccessible(true);
+            /** @var class-string<Model> $relatedClass */
             $relatedClass = $relatedModelClassProp->getValue($rel);
 
             $relatedInstance = (class_exists($relatedClass) && is_subclass_of($relatedClass, Model::class))
@@ -268,6 +317,7 @@ trait WithCount
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
             $this->columns[] =
@@ -299,6 +349,16 @@ trait WithCount
             $secondLocalProp = $ref->getProperty('secondLocal');
             $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
+
+            if (
+                !is_string($relatedClassOrTable) ||
+                !is_string($throughClassOrTable) ||
+                !is_string($firstKey) ||
+                !is_string($secondKey) ||
+                !is_string($secondLocal)
+            ) {
+                throw new \LogicException('HasOneThrough relation properties must be strings for withCountWhere().');
+            }
 
             $resolve = function (string $classOrTable): string {
                 if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
@@ -344,6 +404,16 @@ trait WithCount
             $secondLocalProp->setAccessible(true);
             $secondLocal = $secondLocalProp->getValue($rel);
 
+            if (
+                !is_string($relatedClassOrTable) ||
+                !is_string($throughClassOrTable) ||
+                !is_string($firstKey) ||
+                !is_string($secondKey) ||
+                !is_string($secondLocal)
+            ) {
+                throw new \LogicException('HasManyThrough relation properties must be strings for withCountWhere().');
+            }
+
             $resolve = function (string $classOrTable): string {
                 if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
                     /** @var class-string<Model> $classOrTable */
@@ -369,19 +439,14 @@ trait WithCount
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
             $mcProp = $ref->getProperty('modelClass');
             $mcProp->setAccessible(true);
+            /** @var class-string<Model> $modelClass */
             $modelClass = $mcProp->getValue($rel);
 
-            if (!is_string($modelClass) || !is_subclass_of($modelClass, Model::class)) {
-                throw new \LogicException(
-                    "HasOne relation modelClass '$modelClass' must extend " . Model::class . " for withCountWhere()."
-                );
-            }
-
-            /** @var class-string<Model> $modelClass */
             $relatedInstance = new $modelClass();
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
@@ -404,6 +469,8 @@ trait WithCount
                 );
             }
 
+            /** @var string $pivotTable */
+            /** @var string $foreignPivotKey */
             /** @var class-string<Model> $relatedClass */
             $relatedInstance = new $relatedClass();
             /** @var Model $relatedInstance */
@@ -411,6 +478,7 @@ trait WithCount
 
             $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
             $relatedPivotKeyProp->setAccessible(true);
+            /** @var string $relatedPivotKey */
             $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
 
             $this->columns[] =
@@ -434,6 +502,10 @@ trait WithCount
             $tableProp = $ref->getProperty('relatedTable');
             $tableProp->setAccessible(true);
             $relatedTable = $tableProp->getValue($rel);
+
+            if (!is_string($ownerKey) || !is_string($parentForeignKey) || !is_string($relatedTable)) {
+                throw new \LogicException('BelongsTo relation keys/tables must be strings for withCountWhere().');
+            }
 
             $this->columns[] =
                 "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";

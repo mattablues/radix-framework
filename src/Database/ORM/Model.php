@@ -169,6 +169,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder with(string|array<int,string> $relations)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withCount(string|array<int,string> $relations)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null)
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder withConstraint(string $relation, \Closure $constraint)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withSum(string $relation, string $column, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withAvg(string $relation, string $column, ?string $alias = null)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder withMin(string $relation, string $column, ?string $alias = null)
@@ -285,7 +286,10 @@ abstract class Model implements JsonSerializable
 
     protected function getConnection(): \Radix\Database\Connection
     {
-        return app(DatabaseManager::class)->connection();
+        /** @var \Radix\Database\DatabaseManager $db */
+        $db = app(\Radix\Database\DatabaseManager::class);
+
+        return $db->connection();
     }
 
     /**
@@ -623,12 +627,15 @@ abstract class Model implements JsonSerializable
             // Kontrollera om `deleted_at` är satt i attributen
             if (!isset($this->attributes['deleted_at'])) {
                 // Hämta värdet från databasen om det inte är tillgängligt
-                $result = $this->getConnection()
-                    ->execute("SELECT deleted_at FROM `$this->table` WHERE `$this->primaryKey` = ?", [$this->attributes[$this->primaryKey]])
-                    ->fetch();
+                $stmt = $this->getConnection()
+                    ->execute(
+                        "SELECT deleted_at FROM `$this->table` WHERE `$this->primaryKey` = ?",
+                            [$this->attributes[$this->primaryKey]]
+                    );
 
-                // Om inget `deleted_at` hittas i databasen, bör det stanna false
-                $this->attributes['deleted_at'] = $result['deleted_at'] ?? null;
+                /** @var array<string, mixed>|false $row */
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                $this->attributes['deleted_at'] = is_array($row) ? ($row['deleted_at'] ?? null) : null;
             }
 
             // Om modellen är soft-deleted (`deleted_at` har ett värde), återställ den
@@ -637,7 +644,9 @@ abstract class Model implements JsonSerializable
 
                 // Uppdatera posten i databasen och returnera bool
                 $query = "UPDATE `$this->table` SET `deleted_at` = NULL WHERE `$this->primaryKey` = ?";
-                $affected = $this->getConnection()->execute($query, [$this->attributes[$this->primaryKey]])->rowCount() > 0;
+                $affected = $this->getConnection()
+                    ->execute($query, [$this->attributes[$this->primaryKey]])
+                    ->rowCount() > 0;
 
                 // Återställ den ursprungliga `guarded`
                 $this->setGuarded($originalGuarded);
@@ -1101,10 +1110,17 @@ abstract class Model implements JsonSerializable
                             }
                         }
 
+                        $tableForQuery = $relatedTable ?? $name;
+                        if (!is_string($tableForQuery)) {
+                            throw new \LogicException('Related table name must be a string.');
+                        }
+
+                        $modelClassForQuery = is_string($relatedModelClass) ? $relatedModelClass : static::class;
+
                         $qb = (new QueryBuilder())
                             ->setConnection($this->getConnection())
-                            ->setModelClass(is_string($relatedModelClass) ? $relatedModelClass : static::class)
-                            ->from($relatedTable ?? $name);
+                            ->setModelClass($modelClassForQuery)
+                            ->from($tableForQuery);
 
                         // Applicera foreign key-filter om möjligt (för HasMany/HasOne)
                         try {
@@ -1115,11 +1131,17 @@ abstract class Model implements JsonSerializable
                                     $pfk->setAccessible(true);
                                     $plk = $rc->getProperty('localKeyName');
                                     $plk->setAccessible(true);
+
                                     $foreignKey = $pfk->getValue($relObj);
                                     $localKeyName = $plk->getValue($relObj);
-                                    $localValue = $this->getAttribute((string)$localKeyName);
+
+                                    if (!is_string($foreignKey) || !is_string($localKeyName)) {
+                                        throw new \LogicException('Relation foreignKey/localKeyName must be strings.');
+                                    }
+
+                                    $localValue = $this->getAttribute($localKeyName);
                                     if ($localValue !== null) {
-                                        $qb->where((string)$foreignKey, '=', $localValue);
+                                        $qb->where($foreignKey, '=', $localValue);
                                     }
                                 }
                             }

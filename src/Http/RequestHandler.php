@@ -27,7 +27,7 @@ readonly class RequestHandler implements RequestHandlerInterface
         // Kontrollera CSRF-validering för standardformulär (ej API-anrop)
         if (in_array($request->method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) && !$this->isApiRequest($request)) {
             $session = $request->session();
-            $csrfToken = $request->post['csrf_token'] ?? null;
+            $csrfToken = $request->getCsrfToken();
             $session->validateCsrfToken($csrfToken);
         }
 

@@ -31,15 +31,36 @@ final class Reader
     /**
      * Läs JSON-fil.
      *
-     * När $assoc = true returneras en assoc‑array.
-     * När $assoc = false returneras ett stdClass‑objekt.
-     *
-     * @phpstan-return ($assoc is true ? array<string, mixed> : object)
+     * @return array<string,mixed>|object
      */
-    public static function json(string $path, bool $assoc = true, ?string $encoding = null): array|object
+    public static function json(string $path, bool $assoc = true): array|object
     {
-        $content = self::text($path, $encoding);
-        return json_decode($content, $assoc, 512, JSON_THROW_ON_ERROR);
+        $contents = file_get_contents($path);
+        if ($contents === false) {
+            throw new \RuntimeException("Kunde inte läsa fil: {$path}");
+        }
+
+        $data = json_decode(
+            $contents,
+            $assoc,
+            512,
+            JSON_THROW_ON_ERROR
+        );
+
+        if ($assoc) {
+            if (!is_array($data)) {
+                throw new \RuntimeException("JSON-data i {$path} är inte ett objekt/array som kan tolkas associativt.");
+            }
+
+            /** @var array<string,mixed> $data */
+            return $data;
+        }
+
+        if (!is_object($data)) {
+            throw new \RuntimeException("JSON-data i {$path} är inte ett objekt.");
+        }
+
+        return $data;
     }
 
     /**

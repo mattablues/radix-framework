@@ -135,11 +135,12 @@ class Session implements SessionInterface
 
     public function csrf(): string
     {
-        if ($this->has('csrf_token') && !empty($this->get('csrf_token'))) {
-            return $this->get('csrf_token'); // Returnera den existerande tokenen
+        $token = $this->get('csrf_token');
+
+        if (is_string($token) && $token !== '') {
+            return $token;
         }
 
-        // Om ingen giltig token finns, generera ny
         return $this->setCsrfToken();
     }
 
@@ -180,7 +181,16 @@ class Session implements SessionInterface
 
         // Om flash är en sträng istället för en array, konvertera den
         if (!is_array($flash)) {
-            $flash = ['type' => 'info', 'body' => (string) $flash];
+            // Se till att vi har en sträng utan att kasta mixed direkt till string
+            if (!is_string($flash)) {
+                $encoded = json_encode($flash);
+                if ($encoded === false) {
+                    $encoded = '';
+                }
+                $flash = $encoded;
+            }
+
+            $flash = ['type' => 'info', 'body' => $flash];
         }
 
         // Ta bort flash-data för att den bara ska visas en gång
@@ -201,13 +211,13 @@ class Session implements SessionInterface
         $maxElapsed = 60 * 60 * 24; // 1 day
         $csrfTime = $this->get('csrf_time');
 
-        if ($csrfTime) {
-            $storedTime = $csrfTime;
-            return ($storedTime + $maxElapsed) >= time();
+        if (!is_int($csrfTime)) {
+            $this->destroyCsrfToken();
+            return false;
         }
 
-        $this->destroyCsrfToken();
-        return false;
+        $storedTime = $csrfTime;
+        return ($storedTime + $maxElapsed) >= time();
     }
 
     private function destroyCsrfToken(): void
@@ -221,8 +231,8 @@ class Session implements SessionInterface
         $timeout = 15 * 60; // 15 minuter, samma som i Auth-middleware
         $sessionLastLogin = $this->get('last_login');
 
-        if (!$sessionLastLogin) {
-            return false; // Om ingen "last_login" är satt, sessionen är inte giltig
+        if (!is_int($sessionLastLogin)) {
+            return false; // Om ingen eller ogiltig "last_login" är satt, sessionen är inte giltig
         }
 
         return (($sessionLastLogin + $timeout) >= time()); // Kolla om sessionen är inom timeout-gränsen

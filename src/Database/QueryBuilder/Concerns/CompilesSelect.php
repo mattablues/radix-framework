@@ -93,10 +93,29 @@ trait CompilesSelect
         $distinct = $this->distinct ? 'DISTINCT ' : '';
 
         $columns = implode(', ', array_map(function ($col) {
-            if (preg_match('/[A-Z]+\(/i', $col) || str_starts_with($col, 'COUNT') || str_contains($col, 'NOW') || str_starts_with($col, '(')) {
-                return $col;
+            if (!is_string($col)) {
+                // Tillåt Stringable, annars kasta tydligt fel så vi inte jobbar på mixed
+                if ($col instanceof \Stringable) {
+                    $colStr = (string) $col;
+                } else {
+                    throw new \RuntimeException('Ogiltig kolumntyp i SELECT: ' . get_debug_type($col));
+                }
+            } else {
+                $colStr = $col;
             }
-            return $this->wrapColumn($col);
+
+            // Rå uttryck / funktioner som inte ska wrappas
+            if (
+                preg_match('/[A-Z]+\(/i', $colStr) === 1
+                || str_starts_with($colStr, 'COUNT')
+                || str_contains($colStr, 'NOW')
+                || str_starts_with($colStr, '(')
+            ) {
+                return $colStr;
+            }
+
+            // Vanlig kolumn -> wrappa
+            return $this->wrapColumn($colStr);
         }, $this->columns));
 
         $ctePrefix = $this->compileCtePrefix();

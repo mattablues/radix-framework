@@ -118,20 +118,44 @@ trait BuildsWhere
     public function whereNotNull(string $column, string $boolean = 'AND'): self
     {
         $this->where = array_filter($this->where, function ($condition) use ($column, $boolean) {
+            if (!is_array($condition)) {
+                return true;
+            }
+
+            /** @var array{
+             *   type?: string,
+             *   column?: string,
+             *   operator?: string,
+             *   boolean?: string
+             * } $condition
+             */
+
             return !(
-                $condition['type'] === 'raw' &&
-                $condition['column'] === $this->wrapColumn($column) &&
-                $condition['operator'] === 'IS NULL' &&
-                $condition['boolean'] === $boolean
+                ($condition['type'] ?? null) === 'raw' &&
+                ($condition['column'] ?? null) === $this->wrapColumn($column) &&
+                ($condition['operator'] ?? null) === 'IS NULL' &&
+                ($condition['boolean'] ?? null) === $boolean
             );
         });
 
         foreach ($this->where as $condition) {
+            if (!is_array($condition)) {
+                continue;
+            }
+
+            /** @var array{
+             *   type?: string,
+             *   column?: string,
+             *   operator?: string,
+             *   boolean?: string
+             * } $condition
+             */
+
             if (
-                $condition['type'] === 'raw' &&
-                $condition['column'] === $this->wrapColumn($column) &&
-                $condition['operator'] === 'IS NOT NULL' &&
-                $condition['boolean'] === $boolean
+                ($condition['type'] ?? null) === 'raw' &&
+                ($condition['column'] ?? null) === $this->wrapColumn($column) &&
+                ($condition['operator'] ?? null) === 'IS NOT NULL' &&
+                ($condition['boolean'] ?? null) === $boolean
             ) {
                 return $this;
             }
@@ -281,38 +305,90 @@ trait BuildsWhere
 
         $conditions = [];
         foreach ($this->where as $condition) {
+            if (!is_array($condition) || !isset($condition['type']) || !is_string($condition['type'])) {
+                throw new \LogicException('Invalid where condition structure.');
+            }
+
+            /**
+             * @var array{
+             *   type: 'raw'|'list'|'subquery'|'between'|'column'|'exists'|'raw_sql'|'nested',
+             *   column?: string,
+             *   operator?: string,
+             *   value?: string|null,
+             *   boolean?: string,
+             *   sql?: string,
+             *   query?: QueryBuilder
+             * } $condition
+             */
+
             switch ($condition['type']) {
                 case 'raw':
                 case 'list':
                 case 'subquery':
-                    $operatorUpper = strtoupper((string)($condition['operator'] ?? ''));
-                    if (in_array($operatorUpper, ['IS', 'IS NOT'], true) && $condition['value'] === null) {
-                        $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} NULL");
+                    $operator = $condition['operator'] ?? '';
+                    $operatorUpper = strtoupper($operator);
+
+                    if (in_array($operatorUpper, ['IS', 'IS NOT'], true) && ($condition['value'] ?? null) === null) {
+                        $boolean = $condition['boolean'] ?? '';
+                        $column = $condition['column'] ?? '';
+
+                        $conditions[] = trim(
+                            "{$boolean} {$column} {$operator} NULL"
+                        );
                     } else {
-                        $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");
+                        $boolean = $condition['boolean'] ?? '';
+                        $column = $condition['column'] ?? '';
+                        $value = $condition['value'] ?? '';
+
+                        $conditions[] = trim(
+                            "{$boolean} {$column} {$operator} {$value}"
+                        );
                     }
                     break;
 
                 case 'between':
-                    $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");
+                    $boolean = $condition['boolean'] ?? '';
+                    $column = $condition['column'] ?? '';
+                    $operator = $condition['operator'] ?? '';
+                    $value = $condition['value'] ?? '';
+
+                    $conditions[] = trim("{$boolean} {$column} {$operator} {$value}");
                     break;
 
                 case 'column':
-                    $conditions[] = trim("{$condition['boolean']} {$condition['column']} {$condition['operator']} {$condition['value']}");
+                    $boolean = $condition['boolean'] ?? '';
+                    $column = $condition['column'] ?? '';
+                    $operator = $condition['operator'] ?? '';
+                    $value = $condition['value'] ?? '';
+
+                    $conditions[] = trim("{$boolean} {$column} {$operator} {$value}");
                     break;
 
                 case 'exists':
-                    $conditions[] = trim("{$condition['boolean']} {$condition['operator']} {$condition['value']}");
+                    $boolean = $condition['boolean'] ?? '';
+                    $operator = $condition['operator'] ?? '';
+                    $value = $condition['value'] ?? '';
+
+                    $conditions[] = trim("{$boolean} {$operator} {$value}");
                     break;
 
                 case 'raw_sql':
-                    $conditions[] = trim("{$condition['boolean']} ({$condition['sql']})");
+                    $boolean = $condition['boolean'] ?? '';
+                    $sql = $condition['sql'] ?? '';
+
+                    $conditions[] = trim("{$boolean} ({$sql})");
                     break;
 
                 case 'nested':
+                    if (!isset($condition['query']) || !$condition['query'] instanceof QueryBuilder) {
+                        throw new \LogicException('Nested where requires a QueryBuilder instance.');
+                    }
+
                     $nestedWhere = $condition['query']->buildWhere();
                     $nestedWhere = preg_replace('/^WHERE\s+/i', '', $nestedWhere);
-                    $conditions[] = "{$condition['boolean']} ($nestedWhere)";
+                    $boolean = $condition['boolean'] ?? '';
+
+                    $conditions[] = "{$boolean} ($nestedWhere)";
                     break;
 
                 default:

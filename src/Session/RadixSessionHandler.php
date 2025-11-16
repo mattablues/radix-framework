@@ -20,16 +20,30 @@ class RadixSessionHandler implements SessionHandlerInterface
      */
     public function __construct(array $config, ?PDO $pdo = null)
     {
-        $this->driver = $config['driver'] ?? 'file';
+        $driver = $config['driver'] ?? 'file';
+        if (!is_string($driver)) {
+            throw new \InvalidArgumentException('Session driver måste vara en sträng.');
+        }
+        $this->driver = $driver;
 
         if ($this->driver === 'database') {
             if ($pdo === null) {
                 throw new \InvalidArgumentException('PDO är krävd för databaslagring av sessioner.');
             }
             $this->pdo = $pdo;
-            $this->tableName = $config['table'] ?? 'sessions';
+
+            $table = $config['table'] ?? 'sessions';
+            if (!is_string($table)) {
+                throw new \InvalidArgumentException('Sessions-tabellnamn måste vara en sträng.');
+            }
+            $this->tableName = $table;
         } elseif ($this->driver === 'file') {
-            $this->filePath = $config['path'] ?? sys_get_temp_dir();
+            $path = $config['path'] ?? sys_get_temp_dir();
+            if (!is_string($path)) {
+                throw new \InvalidArgumentException('Sessions path måste vara en sträng.');
+            }
+            $this->filePath = $path;
+
             if (!is_dir($this->filePath) && !@mkdir($this->filePath, 0755, true) && !is_dir($this->filePath)) {
                 throw new \RuntimeException("Kunde inte skapa katalog för fil baserade sessioner: {$this->filePath}");
             }
@@ -37,7 +51,11 @@ class RadixSessionHandler implements SessionHandlerInterface
             throw new \InvalidArgumentException("Ogiltig driver specifikation: {$this->driver}");
         }
 
-        $this->lifetime = (int) ($config['lifetime'] ?? 1440);
+        $lifetime = $config['lifetime'] ?? 1440;
+        if (!is_int($lifetime)) {
+            throw new \InvalidArgumentException('Session lifetime måste vara ett heltal.');
+        }
+        $this->lifetime = $lifetime;
     }
 
     /**

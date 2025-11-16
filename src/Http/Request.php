@@ -33,9 +33,19 @@ class Request implements RequestInterface
 
     public static function createFromGlobals(): self
     {
+        $uri = $_SERVER['REQUEST_URI'] ?? '/';
+        if (!is_string($uri) || $uri === '') {
+            $uri = '/';
+        }
+
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        if (!is_string($method) || $method === '') {
+            $method = 'GET';
+        }
+
         return new self(
-            $_SERVER['REQUEST_URI'],
-            $_SERVER['REQUEST_METHOD'],
+            $uri,
+            $method,
             $_GET,
             $_POST,
             $_FILES,
@@ -47,8 +57,16 @@ class Request implements RequestInterface
     public function fullUrl(): string
     {
         $scheme = (!empty($this->server['HTTPS']) && $this->server['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host   = $this->server['HTTP_HOST'] ?? ($this->server['SERVER_NAME'] ?? 'localhost');
-        $uri    = $this->server['REQUEST_URI'] ?? '/';
+
+        $host = $this->server['HTTP_HOST'] ?? ($this->server['SERVER_NAME'] ?? 'localhost');
+        if (!is_string($host) || $host === '') {
+            $host = 'localhost';
+        }
+
+        $uri = $this->server['REQUEST_URI'] ?? '/';
+        if (!is_string($uri) || $uri === '') {
+            $uri = '/';
+        }
 
         return $scheme . '://' . $host . $uri;
     }
@@ -59,24 +77,39 @@ class Request implements RequestInterface
         $trustedProxies = ['192.168.0.1', '10.0.0.1'];
 
         // Kontrollera om klientens IP finns i X_FORWARDED_FOR
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ipList = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        $forwardedFor = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null;
+        if (is_string($forwardedFor) && $forwardedFor !== '') {
+            $ipList = explode(',', $forwardedFor);
             $ip = trim($ipList[0]); // Returnerar den första IP-adressen i listan
 
-            // Kontrollera om proxyn är betrodd och IP-adressen är giltig
-            if (in_array($_SERVER['REMOTE_ADDR'], $trustedProxies) && filter_var($ip, FILTER_VALIDATE_IP)) {
+            $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? null;
+            if (
+                is_string($remoteAddr)
+                && in_array($remoteAddr, $trustedProxies, true)
+                && filter_var($ip, FILTER_VALIDATE_IP) !== false
+            ) {
                 return $ip;
             }
         }
 
         // Kontrollera om en proxy-klient skickade klientens IP
-        if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP)) {
-            return $_SERVER['HTTP_CLIENT_IP'];
+        $clientIp = $_SERVER['HTTP_CLIENT_IP'] ?? null;
+        if (
+            is_string($clientIp)
+            && $clientIp !== ''
+            && filter_var($clientIp, FILTER_VALIDATE_IP) !== false
+        ) {
+            return $clientIp;
         }
 
         // Direkt IP från klienten
-        if (!empty($_SERVER['REMOTE_ADDR']) && filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP)) {
-            return $_SERVER['REMOTE_ADDR'];
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? null;
+        if (
+            is_string($remoteAddr)
+            && $remoteAddr !== ''
+            && filter_var($remoteAddr, FILTER_VALIDATE_IP) !== false
+        ) {
+            return $remoteAddr;
         }
 
         // Om ingen giltig IP hittas, returnera en standard-IP
@@ -91,9 +124,14 @@ class Request implements RequestInterface
 
     public function getCsrfToken(): ?string
     {
-        return $this->post['csrf_token'] ?? null;
-    }
+        $token = $this->post['csrf_token'] ?? null;
 
+        if (!is_string($token)) {
+            return null;
+        }
+
+        return $token;
+    }
 
     public function session(): SessionInterface
     {
@@ -109,7 +147,13 @@ class Request implements RequestInterface
      */
     public function viewer(): TemplateViewerInterface
     {
-        return app(RadixTemplateViewer::class);
+        $viewer = app(RadixTemplateViewer::class);
+
+        if (!$viewer instanceof TemplateViewerInterface) {
+            throw new \RuntimeException('Viewer resolver returned invalid instance.');
+        }
+
+        return $viewer;
     }
 
     /**
@@ -130,20 +174,29 @@ class Request implements RequestInterface
         // Standardsätt att leta efter header
         $headerKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
         if (array_key_exists($headerKey, $this->server)) {
-            return $this->server[$headerKey];
+            $value = $this->server[$headerKey];
+            if (is_string($value)) {
+                return $value;
+            }
         }
 
         // Sök i vanliga rubriker utan prefix
         $standardKey = ucfirst(strtolower(str_replace('-', '_', $key)));
         if (array_key_exists($standardKey, $this->server)) {
-            return $this->server[$standardKey];
+            $value = $this->server[$standardKey];
+            if (is_string($value)) {
+                return $value;
+            }
         }
 
         // Sista fallback för att hantera vissa CGI-miljöer eller headers som skickas konstigt
         if ($key === 'Authorization' && function_exists('getallheaders')) {
             $headers = getallheaders();
-            if (!empty($headers['Authorization'])) {
-                return $headers['Authorization'];
+            if (array_key_exists('Authorization', $headers)) {
+                $auth = $headers['Authorization'];
+                if (is_string($auth)) {
+                    return $auth;
+                }
             }
         }
 

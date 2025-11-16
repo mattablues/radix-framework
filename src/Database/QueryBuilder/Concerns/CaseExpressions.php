@@ -7,14 +7,18 @@ namespace Radix\Database\QueryBuilder\Concerns;
 trait CaseExpressions
 {
     /**
-     * @param array<int, array<string, mixed>> $conditions
+     * @param array<int, array{
+     *     cond: string,
+     *     then?: string,
+     *     bindings?: array<int, mixed>
+     * }> $conditions
      */
     public function caseWhen(array $conditions, ?string $else = null, ?string $alias = null): self
     {
         $parts = ['CASE'];
         foreach ($conditions as $c) {
-            $cond = (string)($c['cond'] ?? '');
-            $then = (string)($c['then'] ?? 'NULL');
+            $cond = $c['cond'];
+            $then = $c['then'] ?? 'NULL';
             $bindings = (array)($c['bindings'] ?? []);
             foreach ($bindings as $b) {
                 $this->addSelectBinding($b);

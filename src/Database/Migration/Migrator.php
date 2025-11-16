@@ -76,8 +76,18 @@ class Migrator
      */
     private function getExecutedMigrations(): array
     {
+        /** @var array<int, array<string, mixed>> $results */
         $results = $this->connection->fetchAll("SELECT `migration` FROM `migrations`");
-        return array_column($results, 'migration');
+
+        $migrations = [];
+        foreach ($results as $row) {
+            $name = $row['migration'] ?? null;
+            if (is_string($name)) {
+                $migrations[] = $name;
+            }
+        }
+
+        return $migrations;
     }
 
     /**
@@ -109,7 +119,7 @@ class Migrator
             // Om flera matchningar hittas
             if (count($matchedMigrations) > 1) {
                 // Sortera migrationer efter namn (tidsstämpeln ordnas i fallande ordning)
-                usort($matchedMigrations, function ($a, $b) {
+                usort($matchedMigrations, static function (string $a, string $b): int {
                     return strcmp($b, $a); // Sortera i fallande ordning baserat på filnamnet
                 });
 
@@ -123,7 +133,7 @@ class Migrator
                 // Returnera information och köra rollback för den senaste
                 return [
                     "Multiple migrations match '$partialName'. Rolling back the latest migration:",
-                    $this->rollbackMigration($latestMigration)
+                    $this->rollbackMigration($latestMigration),
                 ];
             }
 
@@ -137,17 +147,18 @@ class Migrator
             }
         } else {
             // Om ingen $partialName anges, rulla tillbaka de senaste migrationerna
+            /** @var array<int, array<string, mixed>> $migrations */
             $migrations = $this->connection->fetchAll(
                 "SELECT `migration` FROM `migrations` ORDER BY `migration` DESC"
             );
 
-            foreach ($migrations as $migration) {
-                // Säkerställa att 'migration' existerar innan vi försöker använda det
-                if (!isset($migration['migration'])) {
+            foreach ($migrations as $row) {
+                $name = $row['migration'] ?? null;
+                if (!is_string($name)) {
                     continue;
                 }
 
-                $rolledBackMigrations[] = $this->rollbackMigration($migration['migration']);
+                $rolledBackMigrations[] = $this->rollbackMigration($name);
             }
         }
 
@@ -161,17 +172,26 @@ class Migrator
      */
     private function getMatchingMigrations(string $partialName): array
     {
-        $migrations = $this->connection->fetchAll(
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = $this->connection->fetchAll(
             "SELECT `migration` FROM `migrations`"
         );
 
-        $filteredMigrations = array_filter(
-            array_column($migrations, 'migration'),
-            fn($migration) => stripos($migration, $partialName) !== false
-        );
+        $matches = [];
+        foreach ($rows as $row) {
+            $name = $row['migration'] ?? null;
+            if (!is_string($name)) {
+                continue;
+            }
 
-        // Om indexera arrayen för att säkerställa att nycklarna är numeriska
-        return array_values($filteredMigrations);
+            // stripos kräver string, och $partialName är redan string
+            if (stripos($name, $partialName) !== false) {
+                $matches[] = $name;
+            }
+        }
+
+        // $matches är redan list<string>
+        return $matches;
     }
 
     private function rollbackMigration(string $migrationName): string

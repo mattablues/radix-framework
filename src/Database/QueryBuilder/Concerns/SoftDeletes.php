@@ -10,13 +10,30 @@ trait SoftDeletes
     {
         $this->withSoftDeletes = true;
 
-        $this->where = array_filter($this->where, function ($condition) {
-            return !(
-                $condition['type'] === 'raw' &&
-                $condition['column'] === $this->wrapColumn('deleted_at') &&
-                $condition['operator'] === 'IS NULL'
-            );
-        });
+        $this->where = array_filter(
+            $this->where,
+            function ($condition): bool {
+                // Säkerställ att vi bara jobbar med "where"-villkor som är arrayer
+                if (!is_array($condition)) {
+                    return true;
+                }
+
+                // Kräv nödvändiga nycklar, annars behåll villkoret
+                if (
+                    !array_key_exists('type', $condition)
+                    || !array_key_exists('column', $condition)
+                    || !array_key_exists('operator', $condition)
+                ) {
+                    return true;
+                }
+
+                return !(
+                    $condition['type'] === 'raw'
+                    && $condition['column'] === $this->wrapColumn('deleted_at')
+                    && $condition['operator'] === 'IS NULL'
+                );
+            }
+        );
 
         return $this;
     }

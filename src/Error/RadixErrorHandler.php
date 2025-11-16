@@ -33,10 +33,18 @@ class RadixErrorHandler
         $appEnv = strtolower((string) (getenv('APP_ENV') ?: 'production'));
         $isDev = in_array($appEnv, ['dev','development'], true);
 
-        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
-        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-        $isApiRequest = str_contains($requestUri, '/api/') || str_contains($accept, 'application/json');
+        $requestUriRaw = $_SERVER['REQUEST_URI'] ?? '';
+        $requestUri = is_string($requestUriRaw) ? $requestUriRaw : '';
+
+        $acceptRaw = $_SERVER['HTTP_ACCEPT'] ?? '';
+        $accept = is_string($acceptRaw) ? $acceptRaw : '';
+
+        $methodRaw = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $method = is_string($methodRaw) && $methodRaw !== '' ? strtoupper($methodRaw) : 'GET';
+
+        $isApiRequest =
+            str_contains($requestUri, '/api/')
+            || str_contains($accept, 'application/json');
 
         $statusCode = $exception instanceof HttpException ? $exception->getStatusCode() : 500;
 

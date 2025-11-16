@@ -18,9 +18,17 @@ class Response
         return $this;
     }
 
+    /**
+     * @param scalar $value
+     */
     public function setHeader(string $key, mixed $value): Response
     {
-        // Säkerställ att alla header-värden lagras som strängar
+        if (!is_scalar($value)) {
+            throw new \InvalidArgumentException(
+                'Header value must be a scalar, ' . get_debug_type($value) . ' given.'
+            );
+        }
+
         $this->headers[$key] = (string) $value;
 
         return $this;

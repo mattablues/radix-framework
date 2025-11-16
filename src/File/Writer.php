@@ -269,11 +269,30 @@ final class Writer
      */
     public static function validateRows(array $rows, array $schema, string $onError = 'throw'): array
     {
-        $required = $schema['required'] ?? [];
-        $types = $schema['types'] ?? [];
-        $defaults = $schema['defaults'] ?? [];
+        // Normalisera schema-delar till säkra typer
+        $requiredRaw = $schema['required'] ?? [];
+        $required = is_array($requiredRaw) ? array_values($requiredRaw) : [];
+
+        $typesRaw = $schema['types'] ?? [];
+        $types = is_array($typesRaw) ? $typesRaw : [];
+
+        $defaultsRaw = $schema['defaults'] ?? [];
+        $defaults = is_array($defaultsRaw) ? $defaultsRaw : [];
+
         $trim = (bool)($schema['trim'] ?? false);
-        $nullable = array_flip($schema['nullable'] ?? []);
+
+        $nullableRaw = $schema['nullable'] ?? [];
+        $nullableList = [];
+        if (is_array($nullableRaw)) {
+            foreach ($nullableRaw as $name) {
+                if (!is_int($name) && !is_string($name)) {
+                    continue;
+                }
+                $nullableList[] = (string) $name;
+            }
+        }
+        /** @var array<string,int> $nullable */
+        $nullable = array_flip($nullableList);
 
         $out = [];
         foreach ($rows as $row) {
@@ -281,19 +300,31 @@ final class Writer
                 if ($onError === 'skip') { continue; }
                 throw new RuntimeException('Raden är inte en array');
             }
+
             // required
-            foreach ($required as $key) {
-                if (!array_key_exists($key, $row) || ($row[$key] === '' && !isset($nullable[$key]))) {
+            foreach ($required as $reqKey) {
+                // säkerställ att vi bara hanterar int|string innan cast
+                if (!is_int($reqKey) && !is_string($reqKey)) {
+                    continue;
+                }
+                $key = (string) $reqKey;
+
+                if (
+                    !array_key_exists($key, $row)
+                    || ($row[$key] === '' && !array_key_exists($key, $nullable))
+                ) {
                     if ($onError === 'skip') { continue 2; }
                     throw new RuntimeException("Saknar obligatoriskt fält: {$key}");
                 }
             }
+
             // defaults
             foreach ($defaults as $k => $v) {
                 if (!array_key_exists($k, $row) || $row[$k] === null || $row[$k] === '') {
                     $row[$k] = $v;
                 }
             }
+
             // trim
             if ($trim) {
                 foreach ($row as $k => $v) {
@@ -302,44 +333,72 @@ final class Writer
                     }
                 }
             }
+
             // typer
             foreach ($types as $k => $t) {
                 if (!array_key_exists($k, $row)) {
                     continue;
                 }
+
                 $val = $row[$k];
-                if (isset($nullable[$k]) && ($val === '' || $val === null)) {
+                if (array_key_exists((string)$k, $nullable) && ($val === '' || $val === null)) {
                     $row[$k] = null;
                     continue;
                 }
+
                 switch ($t) {
                     case 'int':
-                        if (is_numeric($val) && (string)(int)$val == (string)$val) { $row[$k] = (int)$val; break; }
+                        if (is_numeric($val) && (string)(int)$val == (string)$val) {
+                            $row[$k] = (int)$val;
+                            break;
+                        }
                         if ($onError === 'skip') { continue 3; }
                         throw new RuntimeException("Fält {$k} måste vara int");
+
                     case 'float':
-                        if (is_numeric($val)) { $row[$k] = (float)$val; break; }
+                        if (is_numeric($val)) {
+                            $row[$k] = (float)$val;
+                            break;
+                        }
                         if ($onError === 'skip') { continue 3; }
                         throw new RuntimeException("Fält {$k} måste vara float");
+
                     case 'bool':
-                        if (is_bool($val)) { break; }
-                        $lower = is_string($val) ? strtolower($val) : $val;
-                        if ($lower === 1 || $lower === 0 || $lower === '1' || $lower === '0' || $lower === 'true' || $lower === 'false' || $lower === 'yes' || $lower === 'no') {
+                        if (is_bool($val)) {
+                            break;
+                        }
+
+                        if (is_string($val)) {
+                            $lower = strtolower($val);
+                        } else {
+                            $lower = $val;
+                        }
+
+                        if (
+                            $lower === 1 || $lower === 0 ||
+                            $lower === '1' || $lower === '0' ||
+                            $lower === 'true' || $lower === 'false' ||
+                            $lower === 'yes' || $lower === 'no'
+                        ) {
                             $row[$k] = in_array($lower, [1, '1', 'true', 'yes'], true);
                             break;
                         }
                         if ($onError === 'skip') { continue 3; }
                         throw new RuntimeException("Fält {$k} måste vara bool");
+
                     case 'string':
                         $row[$k] = (string)$val;
                         break;
+
                     default:
                         // okänd typ -> lämna orörd
                         break;
                 }
             }
+
             $out[] = $row;
         }
+
         return $out;
     }
 
@@ -348,7 +407,7 @@ final class Writer
      * - $rootName: rotnodens namn.
      * - $targetEncoding: konvertering från UTF-8 till målencoding om satt.
      *
-     * @param array<string,mixed>|object $data
+     * @param array<mixed,mixed>|object $data
      */
     public static function xml(string $path, array|object $data, string $rootName = 'root', ?string $targetEncoding = null): void
     {
@@ -383,7 +442,7 @@ final class Writer
     }
 
     /**
-     * @param array<string,mixed> $data
+     * @param array<mixed,mixed> $data
      */
     private static function arrayToXml(array $data, \SimpleXMLElement $xml): void
     {
@@ -395,8 +454,15 @@ final class Writer
             } else {
                 if (is_bool($value)) {
                     $value = $value ? 'true' : 'false';
+                } elseif (is_scalar($value)) {
+                    $value = (string) $value;
+                } else {
+                    // Fallback för objekt/resurser/null: serialisera eller gör tom sträng
+                    $encoded = json_encode($value);
+                    $value = $encoded !== false ? $encoded : '';
                 }
-                $xml->addChild($key, htmlspecialchars((string)$value));
+
+                $xml->addChild($key, htmlspecialchars($value));
             }
         }
     }

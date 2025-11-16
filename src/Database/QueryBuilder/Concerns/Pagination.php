@@ -97,7 +97,17 @@ trait Pagination
         $countQuery->selectRaw('COUNT(*) as total');
 
         $countResult = $this->getConnection()->fetchOne($countQuery->toSql(), $countQuery->getBindings());
-        $totalRecords = (int)($countResult['total'] ?? 0);
+
+        $rawTotal = $countResult['total'] ?? 0;
+        if (!is_int($rawTotal)) {
+            if (is_numeric($rawTotal)) {
+                $rawTotal = (int) $rawTotal;
+            } else {
+                $rawTotal = 0;
+            }
+        }
+        /** @var int $rawTotal */
+        $totalRecords = $rawTotal;
 
         $lastPage = (int) ceil($totalRecords / $perPage);
 
@@ -182,7 +192,17 @@ trait Pagination
         $countQuery->selectRaw('COUNT(*) as total');
 
         $countResult = $this->getConnection()->fetchOne($countQuery->toSql(), $countQuery->getBindings());
-        $totalRecords = (int)($countResult['total'] ?? 0);
+
+        $rawTotal = $countResult['total'] ?? 0;
+        if (!is_int($rawTotal)) {
+            if (is_numeric($rawTotal)) {
+                $rawTotal = (int) $rawTotal;
+            } else {
+                $rawTotal = 0;
+            }
+        }
+        /** @var int $rawTotal */
+        $totalRecords = $rawTotal;
 
         $lastPage = (int) ceil($totalRecords / $perPage);
         if ($currentPage > $lastPage && $lastPage > 0) {

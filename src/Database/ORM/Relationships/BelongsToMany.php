@@ -210,20 +210,21 @@ class BelongsToMany
      *        - [1 => ['extra' => 'x'], 2 => ['extra' => 'y']]
      * @param  array<string, mixed>  $attributes
      */
-    public function attach(int|string|array $ids, array $attributes = [], bool $ignoreDuplicates = true): void    {
+    public function attach(int|string|array $ids, array $attributes = [], bool $ignoreDuplicates = true): void
+    {
         $parentId = $this->requireParentId();
         $rows = $this->normalizeAttachInput($ids, $attributes);
 
         foreach ($rows as $relatedId => $attrs) {
             // Kolla om redan finns om vi vill ignorera dubletter
-            if ($ignoreDuplicates && $this->existsInPivot($parentId, (int)$relatedId)) {
+            if ($ignoreDuplicates && $this->existsInPivot($parentId, $relatedId)) {
                 // Uppdatera endast extra attribut om de skickats
                 if (!empty($attrs)) {
                     $set = implode(', ', array_map(fn($k) => "`$k` = ?", array_keys($attrs)));
                     $sql = "UPDATE `$this->pivotTable` SET $set WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` = ?";
                     $bindings = array_values($attrs);
                     $bindings[] = $parentId;
-                    $bindings[] = (int)$relatedId;
+                    $bindings[] = $relatedId;
                     $this->connection->execute($sql, $bindings);
                 }
                 continue;
@@ -232,7 +233,7 @@ class BelongsToMany
             // INSERT
             $payload = array_merge($attrs, [
                 $this->foreignPivotKey => $parentId,
-                $this->relatedPivotKey => (int)$relatedId,
+                $this->relatedPivotKey => $relatedId,
             ]);
 
             $columns = array_keys($payload);
@@ -297,7 +298,6 @@ class BelongsToMany
 
         // Attach/Update
         foreach ($target as $relatedId => $attrs) {
-            $relatedId = (int)$relatedId;
             if (in_array($relatedId, $existing, true)) {
                 if (!empty($attrs)) {
                     $set = implode(', ', array_map(fn($k) => "`$k` = ?", array_keys($attrs)));
@@ -389,7 +389,12 @@ class BelongsToMany
         if ($id === null) {
             throw new \RuntimeException('Parent-modellen saknar primärnyckel.');
         }
-        return (int)$id;
+
+        if (!is_int($id) && !is_string($id)) {
+            throw new \RuntimeException('Parent-id måste vara int eller string, fick: ' . get_debug_type($id));
+        }
+
+        return (int) $id;
     }
 
     /**
@@ -400,38 +405,96 @@ class BelongsToMany
     private function normalizeAttachInput(int|string|array $ids, array $attributes = []): array
     {
         if (!is_array($ids)) {
-            return [(int)$ids => $attributes];
+            // ids är int|string här enligt signaturen
+            return [$this->normalizeSingleId($ids) => $attributes];
         }
+
         // Lista: [1,2] -> [1=>attrs,2=>attrs]
         if (array_keys($ids) === range(0, count($ids) - 1)) {
             $out = [];
             foreach ($ids as $id) {
-                $out[(int)$id] = $attributes;
+                // enligt phpdoc: int|array<string,mixed>; vi accepterar bara int
+                if (!is_int($id)) {
+                    throw new \InvalidArgumentException(
+                        'BelongsToMany ids-list måste innehålla heltal, fick ' . get_debug_type($id)
+                    );
+                }
+                $out[$this->normalizeSingleId($id)] = $attributes;
             }
             return $out;
         }
-        // Assoc: [id => attrs]
+
+        // Assoc: [id => attrs] (id enligt phpdoc: int)
         $out = [];
         foreach ($ids as $k => $v) {
-            $out[(int)$k] = is_array($v) ? $v : $attributes;
+            if (!is_int($k)) {
+                throw new \InvalidArgumentException(
+                    'BelongsToMany ids-nycklar måste vara heltal, fick ' . get_debug_type($k)
+                );
+            }
+            $id = $this->normalizeSingleId($k);
+            $out[$id] = is_array($v) ? $v : $attributes;
         }
         return $out;
     }
 
-    private function existsInPivot(int $parentId, int $relatedId): bool
+   private function existsInPivot(int $parentId, int $relatedId): bool
     {
         $sql = "SELECT 1 FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` = ? LIMIT 1";
         $row = $this->connection->fetchOne($sql, [$parentId, $relatedId]);
         return $row !== null;
     }
 
-    /**
+     /**
      * @return array<int, int>
      */
     private function getExistingRelatedIds(int $parentId): array
     {
         $sql = "SELECT `$this->relatedPivotKey` AS rid FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ?";
+        /** @var array<int, array<string, mixed>> $rows */
         $rows = $this->connection->fetchAll($sql, [$parentId]);
-        return array_map(fn($r) => (int)$r['rid'], $rows);
+
+        return array_map(
+            /**
+             * @param array<string, mixed> $r
+             */
+            function (array $r): int {
+                $rid = $r['rid'] ?? null;
+
+                if (is_int($rid)) {
+                    return $rid;
+                }
+                if (is_string($rid)) {
+                    $trimmed = trim($rid);
+                    if ($trimmed !== '' && ctype_digit($trimmed)) {
+                        return (int) $trimmed;
+                    }
+                }
+
+                throw new \RuntimeException(
+                    'BelongsToMany::getExistingRelatedIds(): ogiltig rid-typ: ' . get_debug_type($rid)
+                );
+            },
+            $rows
+        );
+    }
+
+    /**
+     * Normalisera ett enskilt id till int.
+     *
+     * @param int|string $id
+     */
+    private function normalizeSingleId(int|string $id): int
+    {
+        if (is_int($id)) {
+            return $id;
+        }
+
+        $trimmed = trim($id);
+        if ($trimmed === '' || !ctype_digit($trimmed)) {
+            throw new \InvalidArgumentException('BelongsToMany id måste vara ett heltal eller numerisk sträng, fick: ' . $id);
+        }
+
+        return (int) $trimmed;
     }
 }

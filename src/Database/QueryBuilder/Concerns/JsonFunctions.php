@@ -47,10 +47,26 @@ trait JsonFunctions
 
         if ($driver === 'sqlite') {
             $expr = "$wrapped LIKE ?";
-            $binding = '%' . (string) $needle . '%';
+
+            // Normalisera $needle till sträng på ett säkert sätt
+            if (is_scalar($needle)) {
+                $needleStr = (string) $needle;
+            } elseif ($needle instanceof \Stringable) {
+                $needleStr = (string) $needle;
+            } else {
+                // Fallback: json_encode, annars tom sträng
+                $encoded = json_encode($needle, JSON_UNESCAPED_UNICODE);
+                $needleStr = $encoded !== false ? $encoded : '';
+            }
+
+            $binding = '%' . $needleStr . '%';
         } else {
             $expr = "JSON_CONTAINS($wrapped, ?)";
-            $binding = json_encode($needle, JSON_UNESCAPED_UNICODE);
+            $json = json_encode($needle, JSON_UNESCAPED_UNICODE);
+            if (!is_string($json)) {
+                throw new \RuntimeException('Failed to JSON-encode value for whereJsonContains().');
+            }
+            $binding = $json;
         }
 
         $this->whereRawString = is_string($this->whereRawString ?? null) ? $this->whereRawString : '';

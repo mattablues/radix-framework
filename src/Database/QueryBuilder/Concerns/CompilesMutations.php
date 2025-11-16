@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
-use Radix\Database\QueryBuilder\QueryBuilder;
-
 trait CompilesMutations
 {
     protected array $withAggregateExpressions = [];
@@ -23,7 +21,10 @@ trait CompilesMutations
             $columns = implode(
                 ', ',
                 array_map(
-                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    function ($col): string {
+                        $name = $this->normalizeColumnName($col);
+                        return $this->wrapColumn($name);
+                    },
                     $this->columns
                 )
             );
@@ -36,7 +37,10 @@ trait CompilesMutations
             $setClause = implode(
                 ', ',
                 array_map(
-                    fn (int|string $col): string => $this->wrapColumn((string) $col) . ' = ?',
+                    function ($col): string {
+                        $name = $this->normalizeColumnName($col);
+                        return $this->wrapColumn($name) . ' = ?';
+                    },
                     array_keys($this->columns)
                 )
             );
@@ -68,7 +72,10 @@ trait CompilesMutations
             $columns = implode(
                 ', ',
                 array_map(
-                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    function ($col): string {
+                        $name = $this->normalizeColumnName($col);
+                        return $this->wrapColumn($name);
+                    },
                     $this->columns
                 )
             );
@@ -85,7 +92,10 @@ trait CompilesMutations
             $columns = implode(
                 ', ',
                 array_map(
-                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    function ($col): string {
+                        $name = $this->normalizeColumnName($col);
+                        return $this->wrapColumn($name);
+                    },
                     $this->columns
                 )
             );
@@ -94,21 +104,33 @@ trait CompilesMutations
             $conflict = implode(
                 ', ',
                 array_map(
-                    fn (int|string $col): string => $this->wrapColumn((string) $col),
+                    function ($col): string {
+                        $name = $this->normalizeColumnName($col);
+                        return $this->wrapColumn($name);
+                    },
                     $this->upsertUnique
                 )
             );
 
             $updates = $this->upsertUpdate;
             if ($updates === null || $updates === []) {
-                $updates = array_combine($this->columns, array_fill(0, count($this->columns), null));
+                /** @var array<int,string> $columnNames */
+                $columnNames = array_values(array_map(
+                    function ($col): string {
+                        return $this->normalizeColumnName($col);
+                    },
+                    $this->columns
+                ));
+                $updates = array_combine($columnNames, array_fill(0, count($columnNames), null));
             }
 
             $updateSql = implode(
                 ', ',
                 array_map(
-                    fn (int|string $col): string =>
-                        $this->wrapColumn((string) $col) . ' = EXCLUDED.' . $this->wrapColumn((string) $col),
+                    function ($col): string {
+                        $name = $this->normalizeColumnName($col);
+                        return $this->wrapColumn($name) . ' = EXCLUDED.' . $this->wrapColumn($name);
+                    },
                     array_keys($updates)
                 )
             );
@@ -118,6 +140,24 @@ trait CompilesMutations
         }
 
         throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
+    }
+
+    /**
+     * Normalisera ett kolumnnamn till en sträng på ett typesäkert sätt.
+     */
+    private function normalizeColumnName(mixed $col): string
+    {
+        if (is_string($col)) {
+            return $col;
+        }
+
+        if ($col instanceof \Stringable) {
+            return (string) $col;
+        }
+
+        // Om du vill tillåta int som indexerade kolumner kan du göra t.ex. "col_$col",
+        // men i din kod används kolumner som faktiska namnssträngar.
+        throw new \RuntimeException('Ogiltigt kolumnnamn: ' . get_debug_type($col));
     }
 
     /**
@@ -173,10 +213,10 @@ trait CompilesMutations
         return $this;
     }
 
-  /**
-     * @param array<string, mixed>  $data     Rad att upserta (kolumn => värde)
-     * @param array<int, string>    $uniqueBy Kolumner/nycklar som definierar unikhet
-     * @param array<string, mixed>|null $update Kolumner att uppdatera vid konflikt (null = alla kolumner)
+    /**
+     * @param array<string, mixed>     $data      Rad att upserta (kolumn => värde)
+     * @param array<int, string>       $uniqueBy  Kolumner/nycklar som definierar unikhet
+     * @param array<string, mixed>|null $update   Kolumner att uppdatera vid konflikt (null = alla kolumner)
      */
     public function upsert(array $data, array $uniqueBy, ?array $update = null): self
     {

@@ -70,17 +70,16 @@ trait WithAggregate
             $ref = new \ReflectionClass($rel);
             $relatedModelClassProp = $ref->getProperty('modelClass');
             $relatedModelClassProp->setAccessible(true);
+            /** @var class-string<Model> $relatedClass */
             $relatedClass = $relatedModelClassProp->getValue($rel);
 
-            $relatedInstance = (class_exists($relatedClass) && is_subclass_of($relatedClass, Model::class))
-                ? new $relatedClass()
-                : null;
-
-            /** @var Model|null $relatedInstance */
-            $relatedTable = $relatedInstance ? $relatedInstance->getTable() : $relation;
+            $relatedInstance = new $relatedClass();
+            /** @var Model $relatedInstance */
+            $relatedTable = $relatedInstance->getTable();
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
             $this->columns[] =
@@ -94,22 +93,27 @@ trait WithAggregate
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
+            /** @var string $relatedClassOrTable */
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
             $throughProp = $ref->getProperty('through');
             $throughProp->setAccessible(true);
+            /** @var string $throughClassOrTable */
             $throughClassOrTable = $throughProp->getValue($rel);
 
             $firstKeyProp = $ref->getProperty('firstKey');
             $firstKeyProp->setAccessible(true);
+            /** @var string $firstKey */
             $firstKey = $firstKeyProp->getValue($rel);
 
             $secondKeyProp = $ref->getProperty('secondKey');
             $secondKeyProp->setAccessible(true);
+            /** @var string $secondKey */
             $secondKey = $secondKeyProp->getValue($rel);
 
             $secondLocalProp = $ref->getProperty('secondLocal');
             $secondLocalProp->setAccessible(true);
+            /** @var string $secondLocal */
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
@@ -136,22 +140,27 @@ trait WithAggregate
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
+            /** @var string $relatedClassOrTable */
             $relatedClassOrTable = $relatedProp->getValue($rel);
 
             $throughProp = $ref->getProperty('through');
             $throughProp->setAccessible(true);
+            /** @var string $throughClassOrTable */
             $throughClassOrTable = $throughProp->getValue($rel);
 
             $firstKeyProp = $ref->getProperty('firstKey');
             $firstKeyProp->setAccessible(true);
+            /** @var string $firstKey */
             $firstKey = $firstKeyProp->getValue($rel);
 
             $secondKeyProp = $ref->getProperty('secondKey');
             $secondKeyProp->setAccessible(true);
+            /** @var string $secondKey */
             $secondKey = $secondKeyProp->getValue($rel);
 
             $secondLocalProp = $ref->getProperty('secondLocal');
             $secondLocalProp->setAccessible(true);
+            /** @var string $secondLocal */
             $secondLocal = $secondLocalProp->getValue($rel);
 
             $resolveTable = function (string $classOrTable): string {
@@ -178,19 +187,14 @@ trait WithAggregate
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
             $mcProp = $ref->getProperty('modelClass');
             $mcProp->setAccessible(true);
+            /** @var class-string<Model> $modelClass */
             $modelClass = $mcProp->getValue($rel);
 
-            if (!is_string($modelClass) || !is_subclass_of($modelClass, Model::class)) {
-                throw new \LogicException(
-                    "HasOne relation modelClass '$modelClass' must extend " . Model::class . " for withAggregate()."
-                );
-            }
-
-            /** @var class-string<Model> $modelClass */
             $relatedInstance = new $modelClass();
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
@@ -206,14 +210,17 @@ trait WithAggregate
 
             $ownerKeyProp = $ref->getProperty('ownerKey');
             $ownerKeyProp->setAccessible(true);
+            /** @var string $ownerKey */
             $ownerKey = $ownerKeyProp->getValue($rel);
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
+            /** @var string $parentForeignKey */
             $parentForeignKey = $fkProp->getValue($rel);
 
             $tableProp = $ref->getProperty('relatedTable');
             $tableProp->setAccessible(true);
+            /** @var string $relatedTable */
             $relatedTable = $tableProp->getValue($rel);
 
             $this->columns[] =
@@ -233,6 +240,8 @@ trait WithAggregate
                 );
             }
 
+            /** @var string $pivotTable */
+            /** @var string $foreignPivotKey */
             /** @var class-string<Model> $relatedClass */
             $relatedInstance = new $relatedClass();
             /** @var Model $relatedInstance */
@@ -240,6 +249,7 @@ trait WithAggregate
 
             $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
             $relatedPivotKeyProp->setAccessible(true);
+            /** @var string $relatedPivotKey */
             $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
 
             $this->columns[] =

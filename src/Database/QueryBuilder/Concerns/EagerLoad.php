@@ -4,44 +4,85 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use Radix\Database\QueryBuilder\QueryBuilder;
+use Radix\Database\ORM\Model;
+
 trait EagerLoad
 {
     /**
-     * @param string|array<int,string>|array<string,\Closure(\Radix\Database\QueryBuilder\QueryBuilder):void> $relations
+     * Registrera relationer som ska eager-loadas.
+     *
+     * Stödjer:
+     * - with('comments')
+     * - with(['comments', 'author'])
+     * - with(['comments' => function (QueryBuilder $q) { ... }])
+     *
+     * @param array<int,string>|array<string,\Closure>|string $relations
      */
     public function with(array|string $relations): self
     {
-        if (!$this->modelClass) {
-            throw new \LogicException('Model class is not set. Use setModelClass() to assign a model.');
+        // Normalisera till array
+        if (is_string($relations)) {
+            $relations = [$relations];
         }
 
-        if (!is_array($relations)) {
-            $relations = func_get_args();
-        }
+        $normalized = [];
 
         foreach ($relations as $key => $value) {
-            if (is_int($key)) {
-                $relation = $value;
-                if (!method_exists($this->modelClass, $relation)) {
-                    throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
-                }
-                $this->eagerLoadRelations[] = $relation;
-            } else {
-                $relation = $key;
-                if (!method_exists($this->modelClass, $relation)) {
-                    throw new \InvalidArgumentException("Relation '$relation' is not defined in the model '$this->modelClass'.");
-                }
-                $this->eagerLoadRelations[] = $relation;
+            $relation = null;
+            $constraint = null;
 
-                if ($value instanceof \Closure) {
-                    $this->eagerLoadConstraints[$relation] = $value;
-                } else {
-                    throw new \InvalidArgumentException("The value for with('$relation') must be a Closure.");
-                }
+            // Assoc-array: ['relation' => Closure]
+            if (is_string($key) && $value instanceof \Closure) {
+                $relation = $key;
+                $constraint = $value;
+            } else {
+                // Vanlig lista: ['relation1', 'relation2']
+                $relation = $value;
+            }
+
+            // Hoppa över icke-sträng-relationer
+            if (!is_string($relation) || $relation === '') {
+                continue;
+            }
+
+            // Kontrollera att relationen finns på modelklassen
+            $modelClass = $this->modelClass ?? null;
+            if ($modelClass === null || !is_subclass_of($modelClass, Model::class)) {
+                throw new \LogicException('Model class must be set and extend ' . Model::class . ' before calling with().');
+            }
+
+            if (!method_exists($modelClass, $relation)) {
+                throw new \InvalidArgumentException(
+                    sprintf("Relation '%s' is not defined on model '%s'.", $relation, $modelClass)
+                );
+            }
+
+            $normalized[] = $relation;
+
+            if ($constraint instanceof \Closure) {
+                $this->eagerLoadConstraints[$relation] = $constraint;
             }
         }
 
-        $this->eagerLoadRelations = array_values(array_unique($this->eagerLoadRelations));
+        /** @var list<non-empty-string> $normalized */
+        $this->eagerLoadRelations = $normalized;
+
+        return $this;
+    }
+
+    /**
+     * Lägg till/ändra constraint för en given relation.
+     */
+    public function withConstraint(string $relation, \Closure $constraint): self
+    {
+        $this->eagerLoadConstraints[$relation] = $constraint;
+
+        // Se till att relationen också är med i eagerLoadRelations
+        if (!in_array($relation, $this->eagerLoadRelations, true)) {
+            $this->eagerLoadRelations[] = $relation;
+        }
+
         return $this;
     }
 }

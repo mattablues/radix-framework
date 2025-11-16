@@ -84,6 +84,12 @@ readonly class Dispatcher
             throw new PageNotFoundException("No route matched for '$path' with method '$request->method'");
         }
 
+        $routeHandler = null;
+        /** @var array<string,mixed> $args */
+        $args = [];
+        $action = null;
+
+        // Bygg handler + args
         if (is_callable($params[0])) {
             $action = null;
             $handler = $params[0];
@@ -91,7 +97,16 @@ readonly class Dispatcher
 
             if (is_array($handler) && count($handler) === 2) {
                 // [$object, 'method'] eller [ClassName::class, 'method']
-                $reflection = new ReflectionMethod($handler[0], $handler[1]);
+                [$objOrClass, $methodName] = $handler;
+
+                if (!is_object($objOrClass) && !is_string($objOrClass)) {
+                    throw new UnexpectedValueException('First element of callable array must be object|string.');
+                }
+                if (!is_string($methodName)) {
+                    throw new UnexpectedValueException('Second element of callable array must be a method name string.');
+                }
+
+                $reflection = new ReflectionMethod($objOrClass, $methodName);
             } elseif ($handler instanceof \Closure || is_string($handler)) {
                 // Funktionsnamn eller anonym funktion
                 $reflection = new ReflectionFunction($handler);
@@ -108,44 +123,87 @@ readonly class Dispatcher
                 }
 
                 if ($argument->getName() === 'response') {
-                    $params['response'] = $this->container->get(Response::class);
+                    $resp = $this->container->get(Response::class);
+                    if (!$resp instanceof Response) {
+                        throw new UnexpectedValueException(
+                            'Container must return Radix\Http\Response for Response::class.'
+                        );
+                    }
+                    $params['response'] = $resp;
                 }
             }
 
             $except = ['method', 'middlewares'];
-
             $args = [];
 
             foreach ($params as $key => $value) {
                 if (in_array($key, $except, true)) {
                     continue;
-                } else {
-                    $args[$key] = $value;
                 }
+                $args[$key] = $value;
             }
 
             if (count($args) !== count($arguments)) {
                 throw new PageNotFoundException("Function argument(s) missing in query string");
             }
 
+            // Normalisera till Closure så att RequestHandler alltid får en Closure i detta fall
+            $callableHandler = $handler;
+            $routeHandler = static function (...$invokeArgs) use ($callableHandler) {
+                return $callableHandler(...$invokeArgs);
+            };
         } else {
             $controller = $params[0];
             $action = $params[1];
 
-            $handler = $this->container->get($controller);
-            $handler->setViewer($this->container->get(TemplateViewerInterface::class));
-            $handler->setResponse($this->container->get(Response::class));
+            if (!is_string($controller) || !is_string($action)) {
+                throw new UnexpectedValueException('Controller and action for route must be strings.');
+            }
+
+            $controllerInstance = $this->container->get($controller);
+            if (!$controllerInstance instanceof \Radix\Controller\AbstractController) {
+                throw new UnexpectedValueException(
+                    "Resolved controller '$controller' must extend Radix\\Controller\\AbstractController."
+                );
+            }
+
+            $viewer = $this->container->get(TemplateViewerInterface::class);
+            if (!$viewer instanceof TemplateViewerInterface) {
+                throw new UnexpectedValueException(
+                    'Container must return TemplateViewerInterface for TemplateViewerInterface::class.'
+                );
+            }
+
+            $responseObj = $this->container->get(Response::class);
+            if (!$responseObj instanceof Response) {
+                throw new UnexpectedValueException(
+                    'Container must return Radix\Http\Response for Response::class.'
+                );
+            }
+
+            $controllerInstance->setViewer($viewer);
+            $controllerInstance->setResponse($responseObj);
 
             try {
                 $args = $this->actionArguments($controller, $action, $params);
             } catch (Exception) {
                 throw new PageNotFoundException("Controller method '$action' does not exist.'");
             }
+
+            $routeHandler = $controllerInstance;
+        }
+
+        // Hämta och typ-säkra EventDispatcher
+        $eventDispatcher = $this->container->get(\Radix\EventDispatcher\EventDispatcher::class);
+        if (!$eventDispatcher instanceof \Radix\EventDispatcher\EventDispatcher) {
+            throw new UnexpectedValueException(
+                'Container must return Radix\EventDispatcher\EventDispatcher for its EventDispatcher binding.'
+            );
         }
 
         $requestHandler = new RequestHandler(
-            handler: $handler,
-            eventDispatcher: $this->container->get(\Radix\EventDispatcher\EventDispatcher::class),
+            handler: $routeHandler,
+            eventDispatcher: $eventDispatcher,
             args: $args,
             action: $action
         );
@@ -153,15 +211,12 @@ readonly class Dispatcher
         $middleware = $this->middlewares($params);
         $middlewareHandler = new MiddlewareRequestHandler($middleware, $requestHandler);
 
-        $response = $middlewareHandler->handle($request);
-
-        // Returnera response korrekt
-        return $response;
+        return $middlewareHandler->handle($request);
     }
 
     /**
      * @param array<int|string,mixed> $params
-     * @return array<int,mixed>
+     * @return array<int,\Radix\Middleware\MiddlewareInterface>
      */
     private function middlewares(array $params): array
     {
@@ -171,15 +226,31 @@ readonly class Dispatcher
 
         $middlewares = $params['middlewares'];
 
-        // Kontrollera att alla middleware-klasser finns
-        array_walk($middlewares, function (&$value) {
-            if (!array_key_exists($value, $this->middlewareClasses)) {
-                throw new UnexpectedValueException("Middleware class '$value' does not exist.");
+        if (!is_array($middlewares)) {
+            return [];
+        }
+
+        // Mappa alias → instanser och typ‑säkra
+        foreach ($middlewares as $key => $alias) {
+            if (!is_string($alias)) {
+                throw new UnexpectedValueException('Middleware alias must be a string.');
             }
 
-            $value = $this->container->get($this->middlewareClasses[$value]);
-        });
+            if (!array_key_exists($alias, $this->middlewareClasses)) {
+                throw new UnexpectedValueException("Middleware class alias '{$alias}' does not exist.");
+            }
 
+            $instance = $this->container->get($this->middlewareClasses[$alias]);
+
+            if (!$instance instanceof \Radix\Middleware\MiddlewareInterface) {
+                $class = $this->middlewareClasses[$alias];
+                throw new UnexpectedValueException("Middleware '$class' must implement MiddlewareInterface.");
+            }
+
+            $middlewares[$key] = $instance;
+        }
+
+        /** @var array<int,\Radix\Middleware\MiddlewareInterface> $middlewares */
         return $middlewares;
     }
 

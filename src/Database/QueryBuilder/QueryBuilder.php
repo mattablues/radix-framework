@@ -291,8 +291,16 @@ class QueryBuilder extends AbstractQueryBuilder
 
         $out = [];
         foreach ($rows as $row) {
-            $out[$row[$keyColumn] ?? null] = $row[$valueColumn] ?? null;
+            // $keyColumn är string här (ej null), men värdet i raden kan saknas
+            $rawKey = $row[$keyColumn] ?? null;
+            $key = $rawKey;
+
+            // Normalisera nycklar till int|string om möjligt, annars hoppa över raden
+            if (is_int($key) || is_string($key)) {
+                $out[$key] = $row[$valueColumn] ?? null;
+            }
         }
+
         return $out;
     }
 
@@ -407,25 +415,100 @@ class QueryBuilder extends AbstractQueryBuilder
         $this->limit(1);
         $stmt = $this->execute();
         $row = $stmt->fetch(\PDO::FETCH_NUM);
-        return $row[0] ?? null;
+
+        // PDO::fetch kan returnera array|false
+        if (!is_array($row) || !array_key_exists(0, $row)) {
+            return null;
+        }
+
+        return $row[0];
     }
 
     public function int(): ?int
     {
         $v = $this->scalar();
-        return $v === null ? null : (int)$v;
+        if ($v === null) {
+            return null;
+        }
+
+        if (is_int($v)) {
+            return $v;
+        }
+
+        if (is_float($v)) {
+            return (int) $v;
+        }
+
+        if (is_string($v)) {
+            $trimmed = trim($v);
+            if ($trimmed === '' || !is_numeric($trimmed)) {
+                throw new \RuntimeException('Cannot convert scalar() result to int: ' . $v);
+            }
+            return (int) $trimmed;
+        }
+
+        if (is_bool($v)) {
+            return $v ? 1 : 0;
+        }
+
+        // Fallback: ej konverterbart -> kasta exception
+        throw new \RuntimeException('Cannot convert scalar() result to int: ' . get_debug_type($v));
     }
 
     public function float(): ?float
     {
         $v = $this->scalar();
-        return $v === null ? null : (float)$v;
+        if ($v === null) {
+            return null;
+        }
+
+        if (is_int($v) || is_float($v)) {
+            return (float) $v;
+        }
+
+        if (is_string($v) && is_numeric($v)) {
+            return (float) $v;
+        }
+
+        if (is_bool($v)) {
+            return $v ? 1.0 : 0.0;
+        }
+
+        if ($v instanceof \DateTimeInterface) {
+            // t.ex. sekunder sedan epoch som float
+            return (float) $v->getTimestamp();
+        }
+
+        // Fallback: ej konverterbart -> kasta exception
+        throw new \RuntimeException('Cannot convert scalar() result to float: ' . get_debug_type($v));
     }
 
     public function string(): ?string
     {
         $v = $this->scalar();
-        return $v === null ? null : (string)$v;
+        if ($v === null) {
+            return null;
+        }
+
+        if (is_string($v)) {
+            return $v;
+        }
+
+        if (is_int($v) || is_float($v)) {
+            return (string) $v;
+        }
+
+        if (is_bool($v)) {
+            return $v ? '1' : '0';
+        }
+
+        if ($v instanceof \DateTimeInterface) {
+            return $v->format('Y-m-d H:i:s');
+        }
+
+        // Fallback: försök serialisera andra typer till JSON-sträng
+        $encoded = json_encode($v);
+        return $encoded !== false ? $encoded : '';
     }
 
     /**
@@ -453,10 +536,14 @@ class QueryBuilder extends AbstractQueryBuilder
                 $replacement = 'NULL';
             } elseif (is_bool($binding)) {
                 $replacement = $binding ? '1' : '0';
+            } elseif (is_int($binding) || is_float($binding)) {
+                $replacement = (string) $binding;
             } elseif ($binding instanceof \DateTimeInterface) {
                 $replacement = "'" . $binding->format('Y-m-d H:i:s') . "'";
             } else {
-                $replacement = (string) $binding;
+                // Sista fallback: json_encode andra typer, eller 'NULL' om det misslyckas
+                $encoded = json_encode($binding);
+                $replacement = $encoded !== false ? "'" . addslashes($encoded) . "'" : 'NULL';
             }
 
             $pos = strpos($query, '?');
