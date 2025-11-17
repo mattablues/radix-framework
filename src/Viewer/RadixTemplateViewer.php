@@ -387,7 +387,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
        $code = preg_replace_callback(
            "#{{\s*(.+?)\|raw\s*}}#",
            function ($matches) {
-               return '<?php echo secure_output('. $matches[1] . ', true); ?>'; // Tillåt rå data
+               // Casta till string så secure_output inte får mixed
+               return '<?php echo secure_output((string) (' . $matches[1] . '), true); ?>';
            },
            $code
        ) ?? $code;
@@ -396,7 +397,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
        $code = preg_replace_callback(
            "#{{\s*(.+?)\s*}}#",
            function ($matches) {
-               return '<?php echo secure_output('. $matches[1] . '); ?>'; // Escapar HTML-output via secureOutput
+               // Casta till string för säkert, escapat output
+               return '<?php echo secure_output((string) (' . $matches[1] . ')); ?>';
            },
            $code
        ) ?? $code;

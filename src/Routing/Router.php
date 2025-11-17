@@ -149,7 +149,7 @@ class Router
     }
 
     /**
-     * @param array<int,mixed> $data
+     * @param array<int|string, mixed> $data
      */
     public static function routePathByName(string $routeName, array $data = []): string
     {
@@ -337,7 +337,7 @@ class Router
     }
 
     /**
-     * @param array<int,mixed> $data
+     * @param array<int|string, mixed> $data
      */
     private static function extractRoute(string $url, array $data): string
     {

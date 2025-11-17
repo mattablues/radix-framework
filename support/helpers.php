@@ -64,9 +64,14 @@ if (!function_exists('setAppContainer')) {
 }
 
 if (!function_exists('response')) {
+    /**
+     * Skapa ett Response-objekt med given body.
+     */
     function response(string $content): \Radix\Http\Response
     {
+        /** @var \Radix\Http\Response $response */
         $response = app(\Radix\Http\Response::class);
+
         $response->setBody($content);
 
         return $response;
@@ -76,11 +81,17 @@ if (!function_exists('response')) {
 if (!function_exists('request')) {
     function request(): \Radix\Http\Request
     {
-        return app(\Radix\Http\Request::class);
+        /** @var \Radix\Http\Request $request */
+        $request = app(\Radix\Http\Request::class);
+
+        return $request;
     }
 }
 
 if (!function_exists('route')) {
+    /**
+     * @param array<string, bool|int|float|string|\Stringable|null> $data
+     */
     function route(string $name, array $data = []): string
     {
         return Router::routePathByName($name, $data);
@@ -95,20 +106,40 @@ if (!function_exists('redirect')) {
 }
 
 if (!function_exists('view')) {
+    /**
+     * Rendera ett template och returnera ett Response-objekt.
+     *
+     * @param array<string, mixed> $data
+     */
     function view(string $template, array $data = []): \Radix\Http\Response
     {
+        /** @var \Radix\Viewer\RadixTemplateViewer $view */
         $view = app(\Radix\Viewer\RadixTemplateViewer::class);
 
-        return response($view->render($template, $data));
+        /** @var array<string, mixed> $data */
+        $html = $view->render($template, $data);
+
+        return response($html);
     }
 }
 
 if (!function_exists('array_merge_deep')) {
+    /**
+     * Rekursiv array-merge.
+     *
+     * @param array<int|string, mixed> $array1
+     * @param array<int|string, mixed> $array2
+     * @return array<int|string, mixed>
+     */
     function array_merge_deep(array $array1, array $array2): array
     {
         foreach ($array2 as $key => $value) {
             if (isset($array1[$key]) && is_array($array1[$key]) && is_array($value)) {
-                $array1[$key] = array_merge_deep($array1[$key], $value);
+                /** @var array<int|string, mixed> $nested1 */
+                /** @var array<int|string, mixed> $nested2 */
+                $nested1 = $array1[$key];
+                $nested2 = $value;
+                $array1[$key] = array_merge_deep($nested1, $nested2);
             } else {
                 $array1[$key] = $value;
             }
@@ -121,8 +152,11 @@ if (!function_exists('array_merge_deep')) {
 if (!function_exists('csrf_field')) {
     function csrf_field(): string
     {
+        /** @var \Radix\Session\SessionInterface $session */
         $session = app(\Radix\Session\SessionInterface::class); // Hämtar din session från DI
+
         $csrfToken = $session->csrf(); // Kommer nu endast generera ny token om nödvändigt
+
         return '<input type="hidden" name="csrf_token" value="' . secure_output($csrfToken) . '">';
     }
 }
@@ -131,18 +165,25 @@ if (!function_exists('error')) {
     /**
      * Hämta valideringsfel för ett specifikt fält.
      *
-     * @param array|null $errors Valideringsfelen (kan vara null).
+     * @param array<string, array<int, string>>|null $errors Valideringsfelen (kan vara null).
      * @param string $field Fältet du vill hämta fel för.
      * @param bool $first Om endast det första felet ska returneras (standard: true).
-     * @return string|array|null Retunerar första felet som en sträng, alla fel som array, eller null om inga fel finns.
+     * @return string|array<int,string>|null
      */
     function error(?array $errors, string $field, bool $first = true): string|array|null
     {
-        if (empty($errors) || !isset($errors[$field])) {
+        if ($errors === null || !isset($errors[$field]) || !is_array($errors[$field])) {
             return null;
         }
 
-        return $first ? ($errors[$field][0] ?? null) : $errors[$field];
+        /** @var array<int,string> $fieldErrors */
+        $fieldErrors = $errors[$field];
+
+        if ($fieldErrors === []) {
+            return null;
+        }
+
+        return $first ? $fieldErrors[0] : $fieldErrors;
     }
 }
 
@@ -152,11 +193,16 @@ if (!function_exists('old')) {
         /** @var \Radix\Session\SessionInterface $session */
         $session = app(\Radix\Session\SessionInterface::class);
 
-        // Använd sessionens `get`-metod för att hämta tidigare data
+        // Kan vara vad som helst → typ-säkra det
         $oldData = $session->get('old', []);
 
-        // Kontrollera om nyckeln finns i den gamla datan
-        return $oldData[$key] ?? $default;
+        if (!is_array($oldData)) {
+            return $default;
+        }
+
+        $value = $oldData[$key] ?? $default;
+
+        return is_string($value) ? $value : $default;
     }
 }
 
@@ -183,6 +229,11 @@ if (!function_exists('starts_with_uppercase')) {
 }
 
 if (!function_exists('is_assoc')) {
+    /**
+     * Kontrollera om en array är associativ.
+     *
+     * @param array<int|string, mixed> $data
+     */
     function is_assoc(array $data): bool
     {
         return array_keys($data) !== range(0, count($data) - 1);
@@ -202,9 +253,24 @@ if (!function_exists('mb_ucfirst')) {
 }
 
 if (!function_exists('matches')) {
+    /**
+     * Summerar längden av alla strängar i en array.
+     *
+     * @param array<int, string> $data
+     */
     function matches(array $data): int
     {
-        return array_reduce($data, fn($carry, $item) => $carry + strlen($item), 0);
+        return array_reduce(
+            $data,
+            /**
+             * @param int $carry
+             * @param string $item
+             */
+            function (int $carry, string $item): int {
+                return $carry + strlen($item);
+            },
+            0
+        );
     }
 }
 
@@ -223,12 +289,23 @@ if (!function_exists('remove_whitespace')) {
 }
 
 if (!function_exists('replace_placeholder')) {
+    /**
+     * Ersätter `{key}`-plats­hållare i en URL med värden från arrayen.
+     *
+     * @param array<string, bool|int|float|string|null> $data
+     */
     function replace_placeholder(string $url, array $data): string
     {
         $placeholders = array_combine(
-            array_map(fn($placeholder) => "{{$placeholder}}", array_keys($data)),
+            array_map(
+                fn (string $placeholder): string => "{{$placeholder}}",
+                array_keys($data)
+            ),
             $data
         );
+
+        // I denna kontext kan array_combine inte misslyckas, så $placeholders är alltid array
+        /** @var array<string, bool|int|float|string|null> $placeholders */
 
         return strtr($url, $placeholders);
     }
@@ -257,13 +334,24 @@ if (!function_exists('thumb')) {
 if (!function_exists('clean_text')) {
     function clean_text(string $text): string
     {
-        $text = preg_replace("/[\r\n]+/", " ", $text);
-        return trim(preg_replace("/^\s+|\s+$|\s+(?=\s)/", "", $text));
+        $first = preg_replace("/[\r\n]+/", " ", $text);
+
+        if ($first === null) {
+            $first = $text;
+        }
+
+        $second = preg_replace("/^\s+|\s+$|\s+(?=\s)/", "", $first);
+
+        if ($second === null) {
+            $second = $first;
+        }
+
+        return trim($second);
     }
 }
 
 if (!function_exists('camel_case_to_hyphen')) {
-    function camel_case_to_hyphen($camel_case): string
+    function camel_case_to_hyphen(string $camel_case): string
     {
         $result = '';
 
@@ -271,17 +359,22 @@ if (!function_exists('camel_case_to_hyphen')) {
             $char = $camel_case[$i];
 
             if (ctype_upper($char)) {
-                $result .= '-' . mb_strtolower($char);
+                $result .= '-' . mb_strtolower($char, 'UTF-8');
             } else {
                 $result .= $char;
             }
         }
 
-        return mb_strtolower(ltrim($result, '-'));
+        return mb_strtolower(ltrim($result, '-'), 'UTF-8');
     }
 }
 
 if (!function_exists('get_object_public_fields')) {
+    /**
+     * Hämta alla publika egenskaper från ett objekt.
+     *
+     * @return array<string, mixed>
+     */
     function get_object_public_fields(object $obj): array
     {
         return get_object_vars($obj);
@@ -294,6 +387,11 @@ if (!function_exists('studly_to_snake')) {
         $pattern = '/([a-z])([A-Z])/';
         $snakeCase = preg_replace($pattern, '$1_$2', $string);
 
+        // preg_replace kan returnera null, fallback till originalsträngen
+        if ($snakeCase === null) {
+            $snakeCase = $string;
+        }
+
         return mb_strtolower($snakeCase);
     }
 }
@@ -303,6 +401,11 @@ if (!function_exists('camel_to_snake')) {
     {
         $pattern = '/(?<=\\w)(?=[A-Z])|(?<=[a-z])(?=[0-9])/';
         $snakeCase = preg_replace($pattern, '_', $string);
+
+        // preg_replace kan returnera null, fallback till originalsträngen
+        if ($snakeCase === null) {
+            $snakeCase = $string;
+        }
 
         return mb_strtolower($snakeCase);
     }
@@ -328,7 +431,12 @@ if (!function_exists('studly_to_dashed')) {
         $pattern = '/([a-zA-Z])(?=[A-Z])/';
         $dashed = preg_replace($pattern, '$1-', $string);
 
-        return mb_strtolower($dashed);
+        // preg_replace kan returnera null, fallback till originalsträngen
+        if ($dashed === null) {
+            $dashed = $string;
+        }
+
+        return mb_strtolower($dashed, 'UTF-8');
     }
 }
 
@@ -394,7 +502,7 @@ if (!function_exists('encrypt')) {
      */
     function encrypt(string $text): string
     {
-        $key = getenv('SECURE_ENCRYPTION_KEY') ?? null;
+        $key = getenv('SECURE_ENCRYPTION_KEY');
 
         if (!$key) {
             throw new RuntimeException('Krypteringsnyckeln saknas.');
@@ -576,18 +684,34 @@ if (!function_exists('secure_output')) {
    /**
     * Säker escapning av utdata.
     *
-    * @param string|\Stringable|int|float|bool|null $content
-    * @param bool $allowRaw Om true, returnera värdet utan htmlspecialchars (men alltid som sträng).
+    * @param mixed $content Valfri typ som ska renderas.
+    * @param bool  $allowRaw Om true, returnera värdet utan htmlspecialchars (men alltid som sträng).
     */
-   function secure_output(string|\Stringable|int|float|bool|null $content, bool $allowRaw = false): string
+   function secure_output(mixed $content, bool $allowRaw = false): string
    {
-       if ($allowRaw) {
-           // Om rå data är tillåten, returnera direkt utan escaping (alltid som sträng)
-           return (string) $content;
+       if ($content instanceof \Stringable) {
+           $str = (string) $content;
+       } elseif (is_string($content)) {
+           $str = $content;
+       } elseif (is_int($content) || is_float($content) || is_bool($content) || $content === null) {
+           $str = (string) $content;
+       } else {
+           try {
+               $encoded = json_encode(
+                   $content,
+                   JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+               );
+           } catch (\JsonException) {
+               $encoded = '';
+           }
+           $str = $encoded;
        }
 
-       // Konvertera innehållet till en sträng och escapa sedan för säkerhet
-       return htmlspecialchars((string) $content, ENT_QUOTES, 'UTF-8');
+       if ($allowRaw) {
+           return $str;
+       }
+
+       return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
    }
 }
 
