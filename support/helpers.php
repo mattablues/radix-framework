@@ -6,6 +6,21 @@ use Psr\Container\ContainerInterface;
 use Radix\Container\ApplicationContainer;
 use Radix\Routing\Router;
 
+if (!function_exists('getApplicationTimezone')) {
+    /**
+     * @return string
+     */
+    function getApplicationTimezone(): string
+    {
+        $timezone = getenv('APP_TIMEZONE');
+        if ($timezone === false || $timezone === '') {
+            return 'UTC';
+        }
+
+        return $timezone;
+    }
+}
+
 if (!function_exists('public_path')) {
     function public_path(string $path = ''): string
     {
@@ -385,7 +400,6 @@ if (!function_exists('encrypt')) {
             throw new RuntimeException('Krypteringsnyckeln saknas.');
         }
 
-        // Decodera Base64 om nyckeln har prefixet "base64:"
         if (str_starts_with($key, 'base64:')) {
             $key = base64_decode(substr($key, 7));
         }
@@ -394,25 +408,29 @@ if (!function_exists('encrypt')) {
             throw new RuntimeException('Krypteringsnyckeln är ogiltig eller för kort (förväntar minst 256-bitars).');
         }
 
-        // Generera en slumpmässig IV (initialiseringsvektor)
-        $iv = random_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+        /** @var int $ivLength */
+        $ivLength = openssl_cipher_iv_length('aes-256-cbc');
+        if ($ivLength <= 0) {
+            throw new RuntimeException('Ogiltig IV-längd för cipher aes-256-cbc.');
+        }
+        /** @var positive-int $ivLength */
 
-        // Kryptera texten
+        $iv = random_bytes($ivLength);
+
         $encrypted = openssl_encrypt($text, 'aes-256-cbc', substr($key, 0, 32), 0, $iv);
 
         if ($encrypted === false) {
             throw new RuntimeException('Kryptering misslyckades.');
         }
 
-        // Kombinera IV och den krypterade texten och returnera Base64-kodat resultat
         return base64_encode($iv . $encrypted);
     }
 }
 
 if (!function_exists('decrypt')) {
-    function decrypt(string $text): string|false
+    function decrypt(string $text): string
     {
-        $key = getenv('SECURE_ENCRYPTION_KEY') ?? null;
+        $key = getenv('SECURE_ENCRYPTION_KEY');
 
         if (!$key) {
             throw new RuntimeException('Krypteringsnyckeln saknas.');
@@ -503,7 +521,7 @@ if (!function_exists('human_name')) {
             'von','van','de','da','del','della','di','la','le','du','den','af','av','och',
         ];
 
-        $words = explode(' ', $name);
+        $words = explode(' ', (string)$name);
 
         foreach ($words as $i => &$w) {
             $w = mb_strtolower($w, 'UTF-8');
@@ -555,16 +573,21 @@ if (!function_exists('honeypot_field')) {
 }
 
 if (!function_exists('secure_output')) {
-   function secure_output($content, $allowRaw = false): string
+   /**
+    * Säker escapning av utdata.
+    *
+    * @param string|\Stringable|int|float|bool|null $content
+    * @param bool $allowRaw Om true, returnera värdet utan htmlspecialchars (men alltid som sträng).
+    */
+   function secure_output(string|\Stringable|int|float|bool|null $content, bool $allowRaw = false): string
    {
-    if ($allowRaw) {
-        // Om rå data är tillåten, returnera direkt utan escaping
-        // kan behövas (string)
-        return $content;
-    }
+       if ($allowRaw) {
+           // Om rå data är tillåten, returnera direkt utan escaping (alltid som sträng)
+           return (string) $content;
+       }
 
-    // Konvertera innehållet till en sträng och escapa sedan för säkerhet
-    return htmlspecialchars((string) $content, ENT_QUOTES, 'UTF-8');
+       // Konvertera innehållet till en sträng och escapa sedan för säkerhet
+       return htmlspecialchars((string) $content, ENT_QUOTES, 'UTF-8');
    }
 }
 
@@ -597,9 +620,17 @@ if (!function_exists('paginate_links')) {
     /**
      * Generera HTML för sidnavigering baserat på en pagineringsstruktur.
      *
-     * @param  array  $pagination  Pagineringsdata (från t.ex. en paginate-metod).
-     * @param  string  $route  Routens namn (t.ex. "admin.user.index").
-     * @param  int|null  $interval  Antal sidor att visa som intervall runt den aktuella sidan.
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination  Pagineringsdata (från t.ex. en paginate-metod).
+     * @param string $route  Routens namn (t.ex. "admin.user.index").
+     * @param int|null $interval  Antal sidor att visa som intervall runt den aktuella sidan.
+     * @param array<string, int|string|null> $routeParams
+     *
      * @return string HTML-sträng för sidnavigeringen.
      */
     function paginate_links(array $pagination, string $route, ?int $interval = null, array $routeParams = []): string
@@ -616,7 +647,7 @@ if (!function_exists('paginate_links')) {
         $last   = render_last_link($pagination, $route, $routeParams);
 
         $pagesMobile  = render_page_links_with_interval($pagination, $route, 1, $routeParams);
-        $pagesDesktop = ($desktopInterval === null)
+        $pagesDesktop = ($interval === null)
             ? render_page_links($pagination, $route, $routeParams)
             : render_page_links_with_interval($pagination, $route, $desktopInterval, $routeParams);
 
@@ -673,7 +704,16 @@ if (!function_exists('paginate_links')) {
             default => '',
         };
     }
-
+    /**
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination
+     * @param array<string, int|string|null> $routeParams
+     */
     function render_first_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] > $pagination['first_page']);
@@ -694,6 +734,16 @@ if (!function_exists('paginate_links')) {
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-l-lg', $icon);
     }
 
+    /**
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination
+     * @param array<string, int|string|null> $routeParams
+     */
     function render_previous_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] > $pagination['first_page']);
@@ -712,7 +762,16 @@ if (!function_exists('paginate_links')) {
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
     }
-
+    /**
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination
+     * @param array<string, int|string|null> $routeParams
+     */
     function render_page_links(array $pagination, string $route, array $routeParams = []): string
     {
         $html = '';
@@ -734,6 +793,16 @@ if (!function_exists('paginate_links')) {
         return $html;
     }
 
+    /**
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination
+     * @param array<string, int|string|null> $routeParams
+     */
     function render_page_links_with_interval(array $pagination, string $route, int $interval, array $routeParams = []): string
     {
         $html = '';
@@ -779,6 +848,16 @@ if (!function_exists('paginate_links')) {
         return $html;
     }
 
+    /**
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination
+     * @param array<string, int|string|null> $routeParams
+     */
     function render_next_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] < $pagination['last_page']);
@@ -798,6 +877,18 @@ if (!function_exists('paginate_links')) {
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
     }
 
+    /**
+     * Renderar "sista sidan"-länken i en pagineringskomponent.
+     *
+     * @param array{
+     *     total: int,
+     *     per_page: int,
+     *     current_page: int,
+     *     first_page: int,
+     *     last_page: int
+     * } $pagination
+     * @param array<string, int|string|null> $routeParams
+     */
     function render_last_link(array $pagination, string $route, array $routeParams = []): string
     {
         $disabled = !($pagination['current_page'] < $pagination['last_page']);
