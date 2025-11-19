@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use Closure;
+use InvalidArgumentException;
+use LogicException;
 use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait BuildsWhere
 {
-    public function where(string|\Closure $column, string $operator = null, mixed $value = null, string $boolean = 'AND'): self
+    public function where(string|Closure $column, string $operator = null, mixed $value = null, string $boolean = 'AND'): self
     {
-        if ($column instanceof \Closure) {
+        if ($column instanceof Closure) {
             $query = new \Radix\Database\QueryBuilder\QueryBuilder();
             $column($query);
 
@@ -18,22 +21,22 @@ trait BuildsWhere
                 $this->where[] = [
                     'type' => 'nested',
                     'query' => $query,
-                    'boolean' => $boolean
+                    'boolean' => $boolean,
                 ];
                 $this->mergeBindings($query);
             }
         } else {
             if (empty(trim($column))) {
-                throw new \InvalidArgumentException("The column name in WHERE clause cannot be empty.");
+                throw new InvalidArgumentException("The column name in WHERE clause cannot be empty.");
             }
 
             // Normalisera operator till en ren sträng (default '=')
-            $operator = $operator ?? '=';
+            $operator ??= '=';
             $opUpper  = strtoupper($operator);
 
             $validOperators = ['=', '!=', '<', '<=', '>', '>=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'BETWEEN', 'IS', 'IS NOT'];
             if (!in_array($opUpper, $validOperators, true)) {
-                throw new \InvalidArgumentException("Invalid operator '$operator' in WHERE clause.");
+                throw new InvalidArgumentException("Invalid operator '$operator' in WHERE clause.");
             }
 
             if ($opUpper === 'IS' || $opUpper === 'IS NOT') {
@@ -75,7 +78,7 @@ trait BuildsWhere
     public function whereIn(string $column, array $values, string $boolean = 'AND'): self
     {
         if (empty($values)) {
-            throw new \InvalidArgumentException("Argumentet 'values' måste innehålla minst ett värde för whereIn.");
+            throw new InvalidArgumentException("Argumentet 'values' måste innehålla minst ett värde för whereIn.");
         }
 
         $placeholders = implode(', ', array_fill(0, count($values), '?'));
@@ -131,10 +134,10 @@ trait BuildsWhere
              */
 
             return !(
-                ($condition['type'] ?? null) === 'raw' &&
-                ($condition['column'] ?? null) === $this->wrapColumn($column) &&
-                ($condition['operator'] ?? null) === 'IS NULL' &&
-                ($condition['boolean'] ?? null) === $boolean
+                ($condition['type'] ?? null) === 'raw'
+                && ($condition['column'] ?? null) === $this->wrapColumn($column)
+                && ($condition['operator'] ?? null) === 'IS NULL'
+                && ($condition['boolean'] ?? null) === $boolean
             );
         });
 
@@ -152,10 +155,10 @@ trait BuildsWhere
              */
 
             if (
-                ($condition['type'] ?? null) === 'raw' &&
-                ($condition['column'] ?? null) === $this->wrapColumn($column) &&
-                ($condition['operator'] ?? null) === 'IS NOT NULL' &&
-                ($condition['boolean'] ?? null) === $boolean
+                ($condition['type'] ?? null) === 'raw'
+                && ($condition['column'] ?? null) === $this->wrapColumn($column)
+                && ($condition['operator'] ?? null) === 'IS NOT NULL'
+                && ($condition['boolean'] ?? null) === $boolean
             ) {
                 return $this;
             }
@@ -183,7 +186,7 @@ trait BuildsWhere
     public function whereNotIn(string $column, array $values, string $boolean = 'AND'): self
     {
         if (empty($values)) {
-            throw new \InvalidArgumentException("Argumentet 'values' måste innehålla minst ett värde för whereNotIn.");
+            throw new InvalidArgumentException("Argumentet 'values' måste innehålla minst ett värde för whereNotIn.");
         }
 
         $placeholders = implode(', ', array_fill(0, count($values), '?'));
@@ -206,7 +209,7 @@ trait BuildsWhere
     public function whereBetween(string $column, array $range, string $boolean = 'AND'): self
     {
         if (count($range) !== 2) {
-            throw new \InvalidArgumentException('whereBetween kräver exakt två värden.');
+            throw new InvalidArgumentException('whereBetween kräver exakt två värden.');
         }
 
         $this->where[] = [
@@ -227,7 +230,7 @@ trait BuildsWhere
     public function whereNotBetween(string $column, array $range, string $boolean = 'AND'): self
     {
         if (count($range) !== 2) {
-            throw new \InvalidArgumentException('whereNotBetween kräver exakt två värden.');
+            throw new InvalidArgumentException('whereNotBetween kräver exakt två värden.');
         }
 
         $this->where[] = [
@@ -306,7 +309,7 @@ trait BuildsWhere
         $conditions = [];
         foreach ($this->where as $condition) {
             if (!is_array($condition) || !isset($condition['type']) || !is_string($condition['type'])) {
-                throw new \LogicException('Invalid where condition structure.');
+                throw new LogicException('Invalid where condition structure.');
             }
 
             /**
@@ -381,7 +384,7 @@ trait BuildsWhere
 
                 case 'nested':
                     if (!isset($condition['query']) || !$condition['query'] instanceof QueryBuilder) {
-                        throw new \LogicException('Nested where requires a QueryBuilder instance.');
+                        throw new LogicException('Nested where requires a QueryBuilder instance.');
                     }
 
                     $nestedWhere = $condition['query']->buildWhere();
@@ -392,7 +395,7 @@ trait BuildsWhere
                     break;
 
                 default:
-                    throw new \LogicException("Unknown condition type: {$condition['type']}");
+                    throw new LogicException("Unknown condition type: {$condition['type']}");
             }
         }
 

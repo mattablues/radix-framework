@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Radix\Viewer;
 
+use RuntimeException;
+use Throwable;
+
 class RadixTemplateViewer implements TemplateViewerInterface
 {
     /** @var array<string,mixed> */
@@ -72,7 +75,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
             $output = ob_get_clean();
 
             if ($output === false) {
-                throw new \RuntimeException("Failed to get output from cached file: $cachedFile");
+                throw new RuntimeException("Failed to get output from cached file: $cachedFile");
             }
 
             $this->debug("Output from cached file: " . substr($output, 0, 100));
@@ -81,7 +84,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         $filePath = $this->viewsDirectory . $templatePath;
         if (!file_exists($filePath)) {
-            throw new \RuntimeException("Template file not found: $filePath");
+            throw new RuntimeException("Template file not found: $filePath");
         }
 
         $code = $this->loadTemplate($filePath);
@@ -112,7 +115,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $this->filters[$name] = [
             'callback' => $callback, // Behåller callback för att kunna exekvera den
             'type' => $type,
-            'identifier' => spl_object_hash((object)$callback) // Identifiering utan serialization
+            'identifier' => spl_object_hash((object) $callback), // Identifiering utan serialization
         ];
     }
 
@@ -168,12 +171,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
     {
         if (!file_exists($filePath)) {
             // Debug-log för sökvägar
-            throw new \RuntimeException("Template file not found: $filePath. Check if the directory and file exist.");
+            throw new RuntimeException("Template file not found: $filePath. Check if the directory and file exist.");
         }
 
         $content = file_get_contents($filePath);
         if ($content === false) {
-            throw new \RuntimeException("Failed to read template file: $filePath");
+            throw new RuntimeException("Failed to read template file: $filePath");
         }
 
         return $content;
@@ -303,7 +306,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         if (!file_exists($componentFilePath)) {
             // Lägg till tydligare info vid saknad komponent
-            throw new \RuntimeException("Komponent fil saknas: $componentFilePath (komponent: $componentPath)");
+            throw new RuntimeException("Komponent fil saknas: $componentFilePath (komponent: $componentPath)");
         }
 
         $componentCode = $this->loadTemplate($componentFilePath);
@@ -374,36 +377,36 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     private function replaceVariableOutput(string $code): string
     {
-       // 1. Placeholder för slot
-       $code = preg_replace_callback(
-           "#{{\s*slot\s*}}#",
-           function () {
-               return '<?php echo trim($slot); ?>';
-           },
-           $code
-       ) ?? $code;
+        // 1. Placeholder för slot
+        $code = preg_replace_callback(
+            "#{{\s*slot\s*}}#",
+            function () {
+                return '<?php echo trim($slot); ?>';
+            },
+            $code
+        ) ?? $code;
 
-       // 2. Bearbeta uttryck med "|raw" för att undvika HTML-escaping
-       $code = preg_replace_callback(
-           "#{{\s*(.+?)\|raw\s*}}#",
-           function ($matches) {
-               // Casta till string så secure_output inte får mixed
-               return '<?php echo secure_output((string) (' . $matches[1] . '), true); ?>';
-           },
-           $code
-       ) ?? $code;
+        // 2. Bearbeta uttryck med "|raw" för att undvika HTML-escaping
+        $code = preg_replace_callback(
+            "#{{\s*(.+?)\|raw\s*}}#",
+            function ($matches) {
+                // Casta till string så secure_output inte får mixed
+                return '<?php echo secure_output((string) (' . $matches[1] . '), true); ?>';
+            },
+            $code
+        ) ?? $code;
 
-       // 3. Alla andra placeholders (inklusive variabler och funktioner)
-       $code = preg_replace_callback(
-           "#{{\s*(.+?)\s*}}#",
-           function ($matches) {
-               // Casta till string för säkert, escapat output
-               return '<?php echo secure_output((string) (' . $matches[1] . ')); ?>';
-           },
-           $code
-       ) ?? $code;
+        // 3. Alla andra placeholders (inklusive variabler och funktioner)
+        $code = preg_replace_callback(
+            "#{{\s*(.+?)\s*}}#",
+            function ($matches) {
+                // Casta till string för säkert, escapat output
+                return '<?php echo secure_output((string) (' . $matches[1] . ')); ?>';
+            },
+            $code
+        ) ?? $code;
 
-       return $code;
+        return $code;
     }
 
     /**
@@ -464,10 +467,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
         ob_start();
         try {
             eval('?>' . $code);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Behåll tydlig felhantering utan att påverka lyckade körningar
             ob_end_clean();
-            throw new \RuntimeException('Template evaluation failed: ' . $e->getMessage(), 0, $e);
+            throw new RuntimeException('Template evaluation failed: ' . $e->getMessage(), 0, $e);
         }
         $output = ob_get_clean();
 
@@ -502,7 +505,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         if (!is_dir($this->cachePath)) {
             $this->debug("Cache directory not found. Creating: $this->cachePath");
-            mkdir($this->cachePath, 0755, true);
+            mkdir($this->cachePath, 0o755, true);
         }
 
         // Kontrollera miljön från APP_ENV: Minifiera endast i production
@@ -567,8 +570,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $cssPath = ROOT_PATH . '/public/css/app.css';
         $jsPath = ROOT_PATH . '/public/js/app.js';
         $additionalHashes = [
-            'css' => file_exists($cssPath) ? (string)filemtime($cssPath) : 'no-css',
-            'js' => file_exists($jsPath) ? (string)filemtime($jsPath) : 'no-js',
+            'css' => file_exists($cssPath) ? (string) filemtime($cssPath) : 'no-css',
+            'js' => file_exists($jsPath) ? (string) filemtime($jsPath) : 'no-js',
         ];
 
         // Kombinera allt till en cache-nyckel
@@ -692,22 +695,22 @@ class RadixTemplateViewer implements TemplateViewerInterface
         if (!is_dir($this->cachePath)) {
             return;
         }
-    
+
         $now = time();
-    
+
         // Loopa igenom alla filer i cachekatalogen
         foreach (scandir($this->cachePath) as $file) {
             $filePath = "$this->cachePath/$file";
-    
+
             // Hoppa över "." och ".."
             if ($file === '.' || $file === '..') {
                 continue;
             }
-    
+
             // Kontrollera om det är en giltig fil
             if (is_file($filePath)) {
                 $fileAge = $now - filemtime($filePath);
-    
+
                 // Ta bort filen om den är äldre än tillåten ålder
                 if ($fileAge > $maxAgeInSeconds) {
                     unlink($filePath);

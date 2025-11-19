@@ -11,7 +11,7 @@ use Radix\Container\Exception\ContainerNotFoundException;
 use ReflectionClass;
 
 /**
- * @implements \ArrayAccess<string, object>
+ * @implements ArrayAccess<string, object>
  */
 class Container implements ContainerInterface, ArrayAccess
 {
@@ -39,7 +39,7 @@ class Container implements ContainerInterface, ArrayAccess
     private array $defaults = [
         'share' => false,
         'autowire' => true,
-        'autoregister' => true
+        'autoregister' => true,
     ];
     public function __construct()
     {
@@ -253,7 +253,7 @@ class Container implements ContainerInterface, ArrayAccess
      */
     public function findTaggedServiceIds(string $name): array
     {
-        $tags = array();
+        $tags = [];
         foreach ($this->definitions as $id => $definition) {
             if ($definition->hasTag($name)) {
                 $tags[$id] = $definition->getTag($name);

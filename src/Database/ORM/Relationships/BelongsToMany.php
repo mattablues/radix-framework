@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
+use Exception;
+use InvalidArgumentException;
+use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
+use RuntimeException;
 
 class BelongsToMany
 {
@@ -33,7 +37,7 @@ class BelongsToMany
         $this->connection = $connection;
         $resolved = $this->resolveModelClass($relatedModel);
         if (!is_subclass_of($resolved, Model::class)) {
-            throw new \LogicException("BelongsToMany related model '$resolved' must extend " . Model::class . '.');
+            throw new LogicException("BelongsToMany related model '$resolved' must extend " . Model::class . '.');
         }
         /** @var class-string<Model> $resolved */
         $this->relatedModelClass = $resolved;
@@ -120,7 +124,7 @@ class BelongsToMany
             $models = [];
             foreach ($modelsCollection as $m) {
                 if (!$m instanceof Model) {
-                    throw new \LogicException('BelongsToMany::get() expected Collection<Model>.');
+                    throw new LogicException('BelongsToMany::get() expected Collection<Model>.');
                 }
 
                 // Mappa pivot_* alias till relation 'pivot'
@@ -267,7 +271,7 @@ class BelongsToMany
         $ids = is_array($ids) ? $ids : [$ids];
         $normalized = [];
         foreach ($ids as $k => $v) {
-            $normalized[] = is_int($k) ? (int)$v : (int)$k;
+            $normalized[] = is_int($k) ? (int) $v : (int) $k;
         }
         if (empty($normalized)) {
             return;
@@ -353,7 +357,7 @@ class BelongsToMany
             return $singularClass;
         }
 
-        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
     /**
@@ -364,7 +368,7 @@ class BelongsToMany
         $modelClass = $this->resolveModelClass($classOrTable);
 
         if (!is_subclass_of($modelClass, Model::class)) {
-            throw new \LogicException(
+            throw new LogicException(
                 "BelongsToMany relation resolved model class '$modelClass' must extend " . Model::class . "."
             );
         }
@@ -383,15 +387,15 @@ class BelongsToMany
     private function requireParentId(): int
     {
         if ($this->parent === null) {
-            throw new \RuntimeException('Parent-modell måste vara satt via setParent() för pivot-operationer.');
+            throw new RuntimeException('Parent-modell måste vara satt via setParent() för pivot-operationer.');
         }
         $id = $this->parent->getAttribute($this->parentKeyName);
         if ($id === null) {
-            throw new \RuntimeException('Parent-modellen saknar primärnyckel.');
+            throw new RuntimeException('Parent-modellen saknar primärnyckel.');
         }
 
         if (!is_int($id) && !is_string($id)) {
-            throw new \RuntimeException('Parent-id måste vara int eller string, fick: ' . get_debug_type($id));
+            throw new RuntimeException('Parent-id måste vara int eller string, fick: ' . get_debug_type($id));
         }
 
         return (int) $id;
@@ -415,7 +419,7 @@ class BelongsToMany
             foreach ($ids as $id) {
                 // enligt phpdoc: int|array<string,mixed>; vi accepterar bara int
                 if (!is_int($id)) {
-                    throw new \InvalidArgumentException(
+                    throw new InvalidArgumentException(
                         'BelongsToMany ids-list måste innehålla heltal, fick ' . get_debug_type($id)
                     );
                 }
@@ -428,7 +432,7 @@ class BelongsToMany
         $out = [];
         foreach ($ids as $k => $v) {
             if (!is_int($k)) {
-                throw new \InvalidArgumentException(
+                throw new InvalidArgumentException(
                     'BelongsToMany ids-nycklar måste vara heltal, fick ' . get_debug_type($k)
                 );
             }
@@ -438,16 +442,16 @@ class BelongsToMany
         return $out;
     }
 
-   private function existsInPivot(int $parentId, int $relatedId): bool
+    private function existsInPivot(int $parentId, int $relatedId): bool
     {
         $sql = "SELECT 1 FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ? AND `$this->relatedPivotKey` = ? LIMIT 1";
         $row = $this->connection->fetchOne($sql, [$parentId, $relatedId]);
         return $row !== null;
     }
 
-     /**
-     * @return array<int, int>
-     */
+    /**
+    * @return array<int, int>
+    */
     private function getExistingRelatedIds(int $parentId): array
     {
         $sql = "SELECT `$this->relatedPivotKey` AS rid FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ?";
@@ -471,7 +475,7 @@ class BelongsToMany
                     }
                 }
 
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     'BelongsToMany::getExistingRelatedIds(): ogiltig rid-typ: ' . get_debug_type($rid)
                 );
             },
@@ -492,7 +496,7 @@ class BelongsToMany
 
         $trimmed = trim($id);
         if ($trimmed === '' || !ctype_digit($trimmed)) {
-            throw new \InvalidArgumentException('BelongsToMany id måste vara ett heltal eller numerisk sträng, fick: ' . $id);
+            throw new InvalidArgumentException('BelongsToMany id måste vara ett heltal eller numerisk sträng, fick: ' . $id);
         }
 
         return (int) $trimmed;

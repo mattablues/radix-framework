@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns\Aggregates;
 
+use InvalidArgumentException;
+use LogicException;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\Relationships\BelongsTo;
 use Radix\Database\ORM\Relationships\HasManyThrough;
 use Radix\Database\ORM\Relationships\HasOne;
 use Radix\Database\ORM\Relationships\HasOneThrough;
+use ReflectionClass;
+use Throwable;
 
 trait WithCount
 {
@@ -18,7 +22,7 @@ trait WithCount
     public function withCount(string|array $relations): self
     {
         if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling withCount().");
+            throw new LogicException("Model class is not set. Use setModelClass() before calling withCount().");
         }
 
         $relations = (array) $relations;
@@ -34,11 +38,11 @@ trait WithCount
     {
         /** @var \Radix\Database\ORM\Model $parent */
         $parent = new $this->modelClass();
-        $parentTable = trim((string)$this->table, '`');
+        $parentTable = trim((string) $this->table, '`');
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+            throw new InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
         }
 
         // snake_case alias av relationsnamnet
@@ -65,25 +69,25 @@ trait WithCount
                 } else {
                     $relatedTable = $relatedTableGuess;
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 $relatedTable = $relatedTableGuess;
             }
 
             /** @var \Radix\Database\ORM\Relationships\HasMany $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
             /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             /** @var HasOneThrough $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
@@ -106,13 +110,13 @@ trait WithCount
             $secondLocal = $secondLocalProp->getValue($rel);
 
             if (
-                !is_string($relatedClassOrTable) ||
-                !is_string($throughClassOrTable) ||
-                !is_string($firstKey) ||
-                !is_string($secondKey) ||
-                !is_string($secondLocal)
+                !is_string($relatedClassOrTable)
+                || !is_string($throughClassOrTable)
+                || !is_string($firstKey)
+                || !is_string($secondKey)
+                || !is_string($secondLocal)
             ) {
-                throw new \LogicException('HasOneThrough relation properties must be strings for withCount().');
+                throw new LogicException('HasOneThrough relation properties must be strings for withCount().');
             }
 
             $resolveTable = function (string $classOrTable): string {
@@ -128,14 +132,14 @@ trait WithCount
             $relatedTable = $resolveTable($relatedClassOrTable);
             $throughTable = $resolveTable($throughClassOrTable);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `{$snake}_count`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             /** @var HasManyThrough $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
@@ -158,13 +162,13 @@ trait WithCount
             $secondLocal = $secondLocalProp->getValue($rel);
 
             if (
-                !is_string($relatedClassOrTable) ||
-                !is_string($throughClassOrTable) ||
-                !is_string($firstKey) ||
-                !is_string($secondKey) ||
-                !is_string($secondLocal)
+                !is_string($relatedClassOrTable)
+                || !is_string($throughClassOrTable)
+                || !is_string($firstKey)
+                || !is_string($secondKey)
+                || !is_string($secondLocal)
             ) {
-                throw new \LogicException('HasManyThrough relation properties must be strings for withCount().');
+                throw new LogicException('HasManyThrough relation properties must be strings for withCount().');
             }
 
             $resolveTable = function (string $classOrTable): string {
@@ -180,8 +184,8 @@ trait WithCount
             $relatedTable = $resolveTable($relatedClassOrTable);
             $throughTable = $resolveTable($throughClassOrTable);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
@@ -191,14 +195,14 @@ trait WithCount
 
             /** @var string $pivotTable */
             /** @var string $foreignPivotKey */
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$pivotTable` WHERE `$pivotTable`.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$pivotTable` WHERE `$pivotTable`.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
             /** @var HasOne $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
@@ -214,14 +218,14 @@ trait WithCount
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `{$snake}_count`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
             /** @var BelongsTo $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $ownerKeyProp = $ref->getProperty('ownerKey');
             $ownerKeyProp->setAccessible(true);
@@ -236,30 +240,30 @@ trait WithCount
             $relatedTable = $tableProp->getValue($rel);
 
             if (!is_string($ownerKey) || !is_string($parentForeignKey) || !is_string($relatedTable)) {
-                throw new \LogicException('BelongsTo relation keys/tables must be strings for withCount().');
+                throw new LogicException('BelongsTo relation keys/tables must be strings for withCount().');
             }
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `{$snake}_count`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `{$snake}_count`";
             return;
         }
 
-        throw new \InvalidArgumentException("withCount() does not support relation type for '$relation'.");
+        throw new InvalidArgumentException("withCount() does not support relation type for '$relation'.");
     }
 
     public function withCountWhere(string $relation, string $column, mixed $value, ?string $alias = null): self
     {
         if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling withCountWhere().");
+            throw new LogicException("Model class is not set. Use setModelClass() before calling withCountWhere().");
         }
 
         /** @var \Radix\Database\ORM\Model $parent */
         $parent = new $this->modelClass();
-        $parentTable = trim((string)$this->table, '`');
+        $parentTable = trim((string) $this->table, '`');
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
+            throw new InvalidArgumentException("Relation '$relation' is not defined in model {$this->modelClass}.");
         }
 
         $rel = $parent->$relation();
@@ -274,7 +278,7 @@ trait WithCount
 
         // Bygg värde‑SQL utan att casta mixed direkt till string
         if (is_int($value) || is_float($value)) {
-            $valSql = (string)$value;
+            $valSql = (string) $value;
         } elseif (is_string($value)) {
             $valSql = "'" . addslashes($value) . "'";
         } elseif (is_bool($value)) {
@@ -282,7 +286,7 @@ trait WithCount
         } elseif ($value === null) {
             $valSql = 'NULL';
         } else {
-            throw new \InvalidArgumentException('withCountWhere() value must be scalar or null.');
+            throw new InvalidArgumentException('withCountWhere() value must be scalar or null.');
         }
 
         if ($alias !== null) {
@@ -292,7 +296,7 @@ trait WithCount
                 if (is_bool($value)) {
                     $suffix = $value ? 'true' : 'false';
                 } else {
-                    $suffix = (string)$value;
+                    $suffix = (string) $value;
                 }
             } else {
                 $suffix = 'value';
@@ -302,7 +306,7 @@ trait WithCount
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             /** @var \Radix\Database\ORM\Relationships\HasMany $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
             $relatedModelClassProp = $ref->getProperty('modelClass');
             $relatedModelClassProp->setAccessible(true);
             /** @var class-string<Model> $relatedClass */
@@ -320,15 +324,15 @@ trait WithCount
             /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             /** @var \Radix\Database\ORM\Relationships\HasOneThrough $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
@@ -351,13 +355,13 @@ trait WithCount
             $secondLocal = $secondLocalProp->getValue($rel);
 
             if (
-                !is_string($relatedClassOrTable) ||
-                !is_string($throughClassOrTable) ||
-                !is_string($firstKey) ||
-                !is_string($secondKey) ||
-                !is_string($secondLocal)
+                !is_string($relatedClassOrTable)
+                || !is_string($throughClassOrTable)
+                || !is_string($firstKey)
+                || !is_string($secondKey)
+                || !is_string($secondLocal)
             ) {
-                throw new \LogicException('HasOneThrough relation properties must be strings for withCountWhere().');
+                throw new LogicException('HasOneThrough relation properties must be strings for withCountWhere().');
             }
 
             $resolve = function (string $classOrTable): string {
@@ -373,8 +377,8 @@ trait WithCount
             $relatedTable = $resolve($relatedClassOrTable);
             $throughTable = $resolve($throughClassOrTable);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` AND r.`$column` = $valSql LIMIT 1) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` AND r.`$column` = $valSql LIMIT 1) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -382,7 +386,7 @@ trait WithCount
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             /** @var \Radix\Database\ORM\Relationships\HasManyThrough $rel */
 
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
@@ -405,13 +409,13 @@ trait WithCount
             $secondLocal = $secondLocalProp->getValue($rel);
 
             if (
-                !is_string($relatedClassOrTable) ||
-                !is_string($throughClassOrTable) ||
-                !is_string($firstKey) ||
-                !is_string($secondKey) ||
-                !is_string($secondLocal)
+                !is_string($relatedClassOrTable)
+                || !is_string($throughClassOrTable)
+                || !is_string($firstKey)
+                || !is_string($secondKey)
+                || !is_string($secondLocal)
             ) {
-                throw new \LogicException('HasManyThrough relation properties must be strings for withCountWhere().');
+                throw new LogicException('HasManyThrough relation properties must be strings for withCountWhere().');
             }
 
             $resolve = function (string $classOrTable): string {
@@ -427,15 +431,15 @@ trait WithCount
             $relatedTable = $resolve($relatedClassOrTable);
             $throughTable = $resolve($throughClassOrTable);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` AND r.`$column` = $valSql) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` AND r.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
             /** @var \Radix\Database\ORM\Relationships\HasOne $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
@@ -451,8 +455,8 @@ trait WithCount
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
@@ -464,7 +468,7 @@ trait WithCount
             $relatedClass = $rel->getRelatedModelClass();
 
             if (!is_subclass_of($relatedClass, Model::class)) {
-                throw new \LogicException(
+                throw new LogicException(
                     "Related model class '$relatedClass' must extend " . Model::class . " for withCount()."
                 );
             }
@@ -476,20 +480,20 @@ trait WithCount
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
+            $relatedPivotKeyProp = (new ReflectionClass($rel))->getProperty('relatedPivotKey');
             $relatedPivotKeyProp->setAccessible(true);
             /** @var string $relatedPivotKey */
             $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$pivotTable` AS pivot INNER JOIN `$relatedTable` AS related ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk` AND related.`$column` = $valSql) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$pivotTable` AS pivot INNER JOIN `$relatedTable` AS related ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk` AND related.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
             /** @var BelongsTo $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $ownerKeyProp = $ref->getProperty('ownerKey');
             $ownerKeyProp->setAccessible(true);
@@ -504,15 +508,15 @@ trait WithCount
             $relatedTable = $tableProp->getValue($rel);
 
             if (!is_string($ownerKey) || !is_string($parentForeignKey) || !is_string($relatedTable)) {
-                throw new \LogicException('BelongsTo relation keys/tables must be strings for withCountWhere().');
+                throw new LogicException('BelongsTo relation keys/tables must be strings for withCountWhere().');
             }
 
-            $this->columns[] =
-                "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT COUNT(*) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey` AND `$relatedTable`.`$column` = $valSql) AS `$aggAlias`";
             $this->withAggregateExpressions[] = $aggAlias;
             return $this;
         }
 
-        throw new \InvalidArgumentException("withCountWhere() does not support relation type for '$relation'.");
+        throw new InvalidArgumentException("withCountWhere() does not support relation type for '$relation'.");
     }
 }

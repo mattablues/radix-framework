@@ -19,8 +19,7 @@ readonly class RequestHandler implements RequestHandlerInterface
         private EventDispatcher $eventDispatcher,
         private array $args,
         private ?string $action = null
-    ) {
-    }
+    ) {}
 
     public function handle(Request $request): Response
     {

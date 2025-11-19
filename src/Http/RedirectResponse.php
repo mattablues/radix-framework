@@ -6,9 +6,7 @@ namespace Radix\Http;
 
 class RedirectResponse extends Response
 {
-    public function __construct(private readonly string $location)
-    {
-    }
+    public function __construct(private readonly string $location) {}
 
     public function send(): void
     {

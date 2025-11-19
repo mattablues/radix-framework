@@ -7,6 +7,7 @@ namespace Radix\Session;
 use InvalidArgumentException;
 use Radix\Session\Exception\CsrfTokenInvalidException;
 use Radix\Support\Token;
+use RuntimeException;
 
 class Session implements SessionInterface
 {
@@ -85,7 +86,7 @@ class Session implements SessionInterface
 
             $name = session_name();
             if ($name === false) {
-                throw new \RuntimeException('Unable to determine session name for cookie destruction.');
+                throw new RuntimeException('Unable to determine session name for cookie destruction.');
             }
 
             setcookie(

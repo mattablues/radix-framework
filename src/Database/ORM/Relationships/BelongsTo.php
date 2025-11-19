@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
+use Exception;
+use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
@@ -36,7 +38,7 @@ class BelongsTo
     /**
      * @param array<string, mixed>|callable|null $attributes
      */
-    public function withDefault(null|array|callable $attributes = null): self
+    public function withDefault(array|callable|null $attributes = null): self
     {
         $this->useDefault = true;
         $this->defaultAttributes = $attributes;
@@ -102,7 +104,7 @@ class BelongsTo
             return $this->parentModel->getAttribute($attribute);
         }
 
-        throw new \Exception("Unable to access the foreign key attribute '$attribute' on the parent model.");
+        throw new Exception("Unable to access the foreign key attribute '$attribute' on the parent model.");
     }
 
     private function resolveModelClass(string $classOrTable): string
@@ -118,7 +120,7 @@ class BelongsTo
             return $singularClass;
         }
 
-        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
     /**
@@ -129,7 +131,7 @@ class BelongsTo
         $modelClass = $this->resolveModelClass($classOrTable);
 
         if (!is_subclass_of($modelClass, Model::class)) {
-            throw new \LogicException(
+            throw new LogicException(
                 "BelongsTo relation resolved model class '$modelClass' måste ärva " . Model::class . "."
             );
         }

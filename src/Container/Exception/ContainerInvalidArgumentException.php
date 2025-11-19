@@ -6,7 +6,4 @@ namespace Radix\Container\Exception;
 
 use Exception;
 
-class ContainerInvalidArgumentException extends Exception
-{
-
-}
+class ContainerInvalidArgumentException extends Exception {}

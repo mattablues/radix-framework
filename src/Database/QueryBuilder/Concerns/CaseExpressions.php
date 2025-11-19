@@ -19,7 +19,7 @@ trait CaseExpressions
         foreach ($conditions as $c) {
             $cond = $c['cond'];
             $then = $c['then'] ?? 'NULL';
-            $bindings = (array)($c['bindings'] ?? []);
+            $bindings = (array) ($c['bindings'] ?? []);
             foreach ($bindings as $b) {
                 $this->addSelectBinding($b);
             }
@@ -46,10 +46,10 @@ trait CaseExpressions
         foreach ($whenMap as $value => $rank) {
             // bind value i order-bucket
             $this->addOrderBinding($value);
-            $parts[] = "WHEN ? THEN " . (int)$rank;
+            $parts[] = "WHEN ? THEN " . (int) $rank;
         }
         // Tvinga ELSE som citerad sträng (matchar testets förväntan)
-        $elseQuoted = "'" . str_replace("'", "''", (string)$else) . "'";
+        $elseQuoted = "'" . str_replace("'", "''", (string) $else) . "'";
         $parts[] = "ELSE " . $elseQuoted;
         $parts[] = "END";
         $dir = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';

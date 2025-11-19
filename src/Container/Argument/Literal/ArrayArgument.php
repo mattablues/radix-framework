@@ -30,9 +30,9 @@ class ArrayArgument extends LiteralArgument
     private function validateArray(array $value): void
     {
         // Exempel: Lägg till valideringslogik här om nödvändigt.
-         if (empty($value)) {
-             throw new ContainerInvalidArgumentException('Array cannot be empty.');
-         }
+        if (empty($value)) {
+            throw new ContainerInvalidArgumentException('Array cannot be empty.');
+        }
     }
 
     /**

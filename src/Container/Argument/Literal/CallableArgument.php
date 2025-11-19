@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Container\Argument\Literal;
 
+use Closure;
 use Radix\Container\Argument\LiteralArgument;
 use Radix\Container\Exception\ContainerInvalidArgumentException;
 
@@ -102,7 +103,7 @@ class CallableArgument extends LiteralArgument
             return 'Callable: unknown type';
         }
 
-        if ($value instanceof \Closure) {
+        if ($value instanceof Closure) {
             return 'Callable: anonymous function';
         }
 

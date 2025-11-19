@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Radix\Database\QueryBuilder\Concerns;
 
 use Radix\Database\QueryBuilder\QueryBuilder;
+use RuntimeException;
+use Stringable;
 
 trait CompilesSelect
 {
@@ -31,8 +33,10 @@ trait CompilesSelect
                 $parameters = $matches[2];
                 $alias = $matches[3];
 
-                $wrappedParameters = implode(', ',
-                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters))));
+                $wrappedParameters = implode(
+                    ', ',
+                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters)))
+                );
                 $wrappedAlias = $this->wrapAlias($alias);
 
                 return strtoupper($function) . "($wrappedParameters) AS $wrappedAlias";
@@ -81,7 +85,7 @@ trait CompilesSelect
         }
 
         if ($this->type !== 'SELECT') {
-            throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
+            throw new RuntimeException("Query type '$this->type' är inte implementerad.");
         }
 
         // Window expressions
@@ -95,10 +99,10 @@ trait CompilesSelect
         $columns = implode(', ', array_map(function ($col) {
             if (!is_string($col)) {
                 // Tillåt Stringable, annars kasta tydligt fel så vi inte jobbar på mixed
-                if ($col instanceof \Stringable) {
+                if ($col instanceof Stringable) {
                     $colStr = (string) $col;
                 } else {
-                    throw new \RuntimeException('Ogiltig kolumntyp i SELECT: ' . get_debug_type($col));
+                    throw new RuntimeException('Ogiltig kolumntyp i SELECT: ' . get_debug_type($col));
                 }
             } else {
                 $colStr = $col;
@@ -132,7 +136,7 @@ trait CompilesSelect
         $hasStandardWhere = !empty($where);
 
         // Rå WHERE-sträng (utan parenteser)
-        $rawWhere = is_string($this->whereRawString ?? null) ? trim((string)$this->whereRawString) : '';
+        $rawWhere = is_string($this->whereRawString ?? null) ? trim((string) $this->whereRawString) : '';
 
         if ($hasStandardWhere && $rawWhere !== '') {
             $sql .= " $where AND " . $rawWhere;

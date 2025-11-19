@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Routing;
 
+use Closure;
 use Exception;
 use Psr\Container\ContainerInterface;
 use Radix\Http\Exception\PageNotFoundException;
@@ -12,7 +13,6 @@ use Radix\Http\Request;
 use Radix\Http\RequestHandler;
 use Radix\Http\Response;
 use Radix\Middleware\MiddlewareRequestHandler;
-use Radix\Session\SessionInterface;
 use Radix\Viewer\TemplateViewerInterface;
 use ReflectionFunction;
 use ReflectionMethod;
@@ -58,9 +58,9 @@ readonly class Dispatcher
                 "errors" => [
                     [
                         "field" => "URI",
-                        "messages" => ["URI måste följa mönstret /api/v<number>, där <number> är ett heltal."]
-                    ]
-                ]
+                        "messages" => ["URI måste följa mönstret /api/v<number>, där <number> är ett heltal."],
+                    ],
+                ],
             ];
 
             $response = new JsonResponse();
@@ -107,7 +107,7 @@ readonly class Dispatcher
                 }
 
                 $reflection = new ReflectionMethod($objOrClass, $methodName);
-            } elseif ($handler instanceof \Closure || is_string($handler)) {
+            } elseif ($handler instanceof Closure || is_string($handler)) {
                 // Funktionsnamn eller anonym funktion
                 $reflection = new ReflectionFunction($handler);
             } else {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
+use Exception;
+use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
@@ -46,7 +48,7 @@ class HasOneThrough
     public function first(): ?Model
     {
         if ($this->parent === null) {
-            throw new \LogicException('HasOneThrough parent saknas.');
+            throw new LogicException('HasOneThrough parent saknas.');
         }
 
         $relatedClass = $this->resolveModelClass($this->related);
@@ -54,10 +56,10 @@ class HasOneThrough
 
         // Säkerställ att båda klasserna ärver Model
         if (!is_subclass_of($relatedClass, Model::class)) {
-            throw new \LogicException("HasOneThrough related class '$relatedClass' must extend " . Model::class . '.');
+            throw new LogicException("HasOneThrough related class '$relatedClass' must extend " . Model::class . '.');
         }
         if (!is_subclass_of($throughClass, Model::class)) {
-            throw new \LogicException("HasOneThrough through class '$throughClass' must extend " . Model::class . '.');
+            throw new LogicException("HasOneThrough through class '$throughClass' must extend " . Model::class . '.');
         }
 
         /** @var class-string<Model> $relatedClass */
@@ -100,7 +102,7 @@ class HasOneThrough
             return $singularClass;
         }
 
-        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Support;
 
 use DateInterval;
+use DateTimeImmutable;
 
 final class FileCache
 {
@@ -16,7 +17,7 @@ final class FileCache
         $base = $path ?? (rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'app');
 
         if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
+            @mkdir($base, 0o755, true);
         }
         $this->path = $base;
     }
@@ -57,7 +58,7 @@ final class FileCache
         }
         $ok = @file_put_contents($file, $payload) !== false;
         if ($ok) {
-            @chmod($file, 0640);
+            @chmod($file, 0o640);
         }
         return $ok;
     }
@@ -89,7 +90,7 @@ final class FileCache
             return 0;
         }
         if ($ttl instanceof DateInterval) {
-            $now = new \DateTimeImmutable();
+            $now = new DateTimeImmutable();
             return (int) $now->add($ttl)->format('U');
         }
         $seconds = (int) $ttl;

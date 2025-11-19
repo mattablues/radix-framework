@@ -7,6 +7,7 @@ namespace Radix\Http;
 use Radix\Session\SessionInterface;
 use Radix\Viewer\RadixTemplateViewer;
 use Radix\Viewer\TemplateViewerInterface;
+use RuntimeException;
 
 class Request implements RequestInterface
 {
@@ -27,8 +28,7 @@ class Request implements RequestInterface
         public array $files,
         public array $cookie,
         public array $server,
-    ) {
-    }
+    ) {}
 
     public static function createFromGlobals(): self
     {
@@ -146,7 +146,7 @@ class Request implements RequestInterface
     public function session(): SessionInterface
     {
         if (!isset($this->session)) {
-            throw new \RuntimeException('Session has not been initialized.');
+            throw new RuntimeException('Session has not been initialized.');
         }
 
         return $this->session;
@@ -160,7 +160,7 @@ class Request implements RequestInterface
         $viewer = app(RadixTemplateViewer::class);
 
         if (!$viewer instanceof TemplateViewerInterface) {
-            throw new \RuntimeException('Viewer resolver returned invalid instance.');
+            throw new RuntimeException('Viewer resolver returned invalid instance.');
         }
 
         return $viewer;

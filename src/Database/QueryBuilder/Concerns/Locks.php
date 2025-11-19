@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use InvalidArgumentException;
+
 trait Locks
 {
     /** @var null|'for_update'|'share' */
@@ -25,7 +27,7 @@ trait Locks
     {
         $mode = strtolower($mode);
         if (!in_array($mode, ['update', 'share'], true)) {
-            throw new \InvalidArgumentException("Ogiltigt låsläge: $mode");
+            throw new InvalidArgumentException("Ogiltigt låsläge: $mode");
         }
         $this->lockMode = $mode === 'update' ? 'for_update' : 'share';
         return $this;

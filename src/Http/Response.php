@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Http;
 
+use InvalidArgumentException;
+
 class Response
 {
     private string $body = '';
@@ -24,7 +26,7 @@ class Response
     public function setHeader(string $key, mixed $value): Response
     {
         if (!is_scalar($value)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Header value must be a scalar, ' . get_debug_type($value) . ' given.'
             );
         }

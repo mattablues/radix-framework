@@ -13,9 +13,7 @@ class ResponseEvent extends Event
     public function __construct(
         private readonly Request $request,
         private readonly Response $response
-    )
-    {
-    }
+    ) {}
 
     public function request(): Request
     {

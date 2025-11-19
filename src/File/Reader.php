@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\File;
 
 use RuntimeException;
+use SimpleXMLElement;
 use SplFileObject;
 
 final class Reader
@@ -37,7 +38,7 @@ final class Reader
     {
         $contents = file_get_contents($path);
         if ($contents === false) {
-            throw new \RuntimeException("Kunde inte läsa fil: {$path}");
+            throw new RuntimeException("Kunde inte läsa fil: {$path}");
         }
 
         $data = json_decode(
@@ -49,7 +50,7 @@ final class Reader
 
         if ($assoc) {
             if (!is_array($data)) {
-                throw new \RuntimeException("JSON-data i {$path} är inte ett objekt/array som kan tolkas associativt.");
+                throw new RuntimeException("JSON-data i {$path} är inte ett objekt/array som kan tolkas associativt.");
             }
 
             /** @var array<string,mixed> $data */
@@ -57,7 +58,7 @@ final class Reader
         }
 
         if (!is_object($data)) {
-            throw new \RuntimeException("JSON-data i {$path} är inte ett objekt.");
+            throw new RuntimeException("JSON-data i {$path} är inte ett objekt.");
         }
 
         return $data;
@@ -74,7 +75,7 @@ final class Reader
      *
      * @phpstan-return ($assoc is true ? array<string, mixed> : \SimpleXMLElement)
      */
-    public static function xml(string $path, bool $assoc = true, ?string $encoding = null): array|\SimpleXMLElement
+    public static function xml(string $path, bool $assoc = true, ?string $encoding = null): array|SimpleXMLElement
     {
         self::ensureFileReadable($path);
 
@@ -371,7 +372,7 @@ final class Reader
     /**
      * @return array<string, mixed>
      */
-    private static function xmlToArray(\SimpleXMLElement $xml): array
+    private static function xmlToArray(SimpleXMLElement $xml): array
     {
         $json = json_encode($xml, JSON_THROW_ON_ERROR);
         /** @var array<string, mixed> $arr */

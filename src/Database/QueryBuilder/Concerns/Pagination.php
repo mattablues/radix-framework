@@ -40,7 +40,7 @@ trait Pagination
      *     }
      * }
      */
-   public function simplePaginate(int $perPage = 10, int $currentPage = 1): array
+    public function simplePaginate(int $perPage = 10, int $currentPage = 1): array
     {
         $currentPage = ($currentPage > 0) ? $currentPage : 1;
         $offset = ($currentPage - 1) * $perPage;

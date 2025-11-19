@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Mailer;
 
 use App\Mail\PHPMailerMailer;
+use InvalidArgumentException;
 use Radix\Config\Config;
 use Radix\Viewer\TemplateViewerInterface;
 
@@ -24,7 +25,7 @@ class MailManager
     {
         // Om `From` skickas med, validera den
         if (!empty($options['from']) && !filter_var($options['from'], FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException('Invalid "from" email address.');
+            throw new InvalidArgumentException('Invalid "from" email address.');
         }
 
         return $this->mailer->send($to, $subject, $body, $options);

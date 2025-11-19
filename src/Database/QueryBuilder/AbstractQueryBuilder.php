@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder;
 
+use Closure;
+use InvalidArgumentException;
+use LogicException;
+use PDOStatement;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 
@@ -31,10 +35,10 @@ abstract class AbstractQueryBuilder
     /**
      * Kör SQL-frågan.
      */
-    public function execute(): \PDOStatement
+    public function execute(): PDOStatement
     {
         if ($this->connection === null) {
-            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
+            throw new LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
         }
 
         $sql = $this->toSql();
@@ -50,7 +54,7 @@ abstract class AbstractQueryBuilder
     public function get() /* Collection i QueryBuilder-override */
     {
         if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
+            throw new LogicException("Model class is not set. Use setModelClass() before calling get().");
         }
 
         $sql = $this->toSql();
@@ -76,11 +80,11 @@ abstract class AbstractQueryBuilder
                 foreach ($eagerLoadRelations as $relation) {
                     if (!is_string($relation)) {
                         // Skydda mot felaktiga värden i $eagerLoadRelations
-                        throw new \LogicException('Relation name in eagerLoadRelations must be a string.');
+                        throw new LogicException('Relation name in eagerLoadRelations must be a string.');
                     }
 
                     if (!method_exists($model, $relation)) {
-                        throw new \InvalidArgumentException(
+                        throw new InvalidArgumentException(
                             sprintf("Relation '%s' is not defined in the model '%s'.", $relation, $this->modelClass)
                         );
                     }
@@ -89,7 +93,7 @@ abstract class AbstractQueryBuilder
 
                     // Säkerställ att vi jobbar med objekt (relationer ska alltid returnera objekt)
                     if (!is_object($relObj)) {
-                        throw new \LogicException(
+                        throw new LogicException(
                             sprintf("Relation '%s' on model '%s' did not return an object.", $relation, $this->modelClass)
                         );
                     }
@@ -106,7 +110,7 @@ abstract class AbstractQueryBuilder
                         $qb = $relObj->query();
                     }
 
-                    if ($closure instanceof \Closure && $qb instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
+                    if ($closure instanceof Closure && $qb instanceof \Radix\Database\QueryBuilder\QueryBuilder) {
                         // Constraint via QueryBuilder
                         $closure($qb);
                         $relationData = method_exists($relObj, 'get') ? $relObj->get() : $qb->get();
@@ -144,7 +148,7 @@ abstract class AbstractQueryBuilder
     protected function getConnection(): Connection
     {
         if ($this->connection === null) {
-            throw new \LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
+            throw new LogicException('No Connection instance has been set. Use setConnection() to assign a database connection.');
         }
 
         return $this->connection;

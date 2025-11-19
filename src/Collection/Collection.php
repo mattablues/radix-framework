@@ -8,12 +8,13 @@ use ArrayAccess;
 use ArrayIterator;
 use Closure;
 use Countable;
+use InvalidArgumentException;
 use IteratorAggregate;
 use Traversable;
 
 /**
- * @implements \ArrayAccess<int|string,mixed>
- * @implements \IteratorAggregate<int|string,mixed>
+ * @implements ArrayAccess<int|string,mixed>
+ * @implements IteratorAggregate<int|string,mixed>
  */
 class Collection implements IteratorAggregate, Countable, ArrayAccess
 {
@@ -91,7 +92,7 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
         }
 
         if (!is_int($offset) && !is_string($offset)) {
-            throw new \InvalidArgumentException('Offset måste vara int eller string.');
+            throw new InvalidArgumentException('Offset måste vara int eller string.');
         }
 
         $this->set($offset, $value);

@@ -7,6 +7,7 @@ namespace Radix\Controller;
 use App\Models\Token;
 use Radix\Http\JsonResponse;
 use Radix\Support\Validator;
+use RuntimeException;
 
 abstract class ApiController extends AbstractController
 {
@@ -22,7 +23,7 @@ abstract class ApiController extends AbstractController
         $body = json_encode($data);
         if ($body === false) {
             // Här kan du logga felet om du vill
-            throw new \RuntimeException('Failed to encode response body to JSON.');
+            throw new RuntimeException('Failed to encode response body to JSON.');
         }
 
         $response->setStatusCode($status)
@@ -108,7 +109,7 @@ abstract class ApiController extends AbstractController
         }
 
         // Gör token till ren sträng
-        $token = (string)$apiToken;
+        $token = (string) $apiToken;
 
         if (!$this->isTokenValid($token)) {
             $this->respondWithErrors(['API-token' => ['Token är ogiltig eller valideringen misslyckades.']], 401);
@@ -138,7 +139,7 @@ abstract class ApiController extends AbstractController
         }
 
         // Säkerställ att vi skickar en ren sträng till strtotime
-        $expiresAt = (string)$existingToken->expires_at;
+        $expiresAt = (string) $existingToken->expires_at;
         if ($expiresAt === '' || strtotime($expiresAt) < time()) {
             return false;
         }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Config;
 
+use RuntimeException;
+
 class Dotenv
 {
     private string $path;
@@ -14,7 +16,7 @@ class Dotenv
     public function __construct(string $path, ?string $basePath = null)
     {
         if (!file_exists($path)) {
-            throw new \RuntimeException("The .env file does not exist at: $path");
+            throw new RuntimeException("The .env file does not exist at: $path");
         }
 
         $this->path = $path;
@@ -26,7 +28,7 @@ class Dotenv
         $lines = file($this->path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
         if ($lines === false) {
-            throw new \RuntimeException("Failed to read .env file at: {$this->path}");
+            throw new RuntimeException("Failed to read .env file at: {$this->path}");
         }
 
         /** @var list<string> $lines */
@@ -39,7 +41,7 @@ class Dotenv
 
             // Kontrollera om raden innehåller likhetstecknet
             if (!str_contains($line, '=')) {
-                throw new \RuntimeException("Invalid .env line (missing '='): '$line'");
+                throw new RuntimeException("Invalid .env line (missing '='): '$line'");
             }
 
             // Dela upp raden vid '=' till nyckel och värde
@@ -47,7 +49,7 @@ class Dotenv
 
             // Validera att både nyckel och värde inte är tomma
             if (empty($key)) {
-                throw new \RuntimeException("Invalid .env line (missing key): '$line'");
+                throw new RuntimeException("Invalid .env line (missing key): '$line'");
             }
 
             // Ta bort eventuella omslutande citationstecken vid behov

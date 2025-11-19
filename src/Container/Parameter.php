@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Container;
 
 use Dflydev\DotAccessData\Data;
+use InvalidArgumentException;
 
 final class Parameter extends Data
 {
@@ -24,7 +25,7 @@ final class Parameter extends Data
 
         foreach ($parameters as $key => $value) {
             if (!is_string($key) || empty($key)) {
-                throw new \InvalidArgumentException('Parameter keys must be non-empty strings.');
+                throw new InvalidArgumentException('Parameter keys must be non-empty strings.');
             }
 
             $this->parameters[$key] = $value;
@@ -40,7 +41,7 @@ final class Parameter extends Data
     {
         foreach ($parameters as $key => $value) {
             if (!is_string($key) || empty($key)) {
-                throw new \InvalidArgumentException('Parameter keys must be non-empty strings.');
+                throw new InvalidArgumentException('Parameter keys must be non-empty strings.');
             }
 
             $this->parameters[$key] = $value;
@@ -50,7 +51,7 @@ final class Parameter extends Data
     public function setParameter(string $name, mixed $value): void
     {
         if (empty($name)) {
-            throw new \InvalidArgumentException('Parameter name must be a non-empty string.');
+            throw new InvalidArgumentException('Parameter name must be a non-empty string.');
         }
 
         $this->parameters[$name] = $value;
@@ -61,7 +62,7 @@ final class Parameter extends Data
         if (!isset($this->parameters[$name])) {
             // Logga eller hantera att parametern saknas (valfritt)
             if ($default === null) {
-                throw new \InvalidArgumentException(sprintf('Parameter "%s" does not exist and no default value was provided.', $name));
+                throw new InvalidArgumentException(sprintf('Parameter "%s" does not exist and no default value was provided.', $name));
             }
 
             return $default;

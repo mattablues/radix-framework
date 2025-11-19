@@ -6,10 +6,11 @@ namespace Radix\Routing;
 
 use Closure;
 use InvalidArgumentException;
+use RuntimeException;
 
 class Router
 {
-            /** @var array<int,array<string,mixed>> */
+    /** @var array<int,array<string,mixed>> */
 
     private array $routes = [];
     private ?string $path = null;
@@ -138,7 +139,7 @@ class Router
             // Rensa eventuella dubbla snedstreck
             $normalized = preg_replace('#/+#', '/', $routePath);
             if (!is_string($normalized)) {
-                throw new \RuntimeException('Misslyckades med att normalisera route-path.');
+                throw new RuntimeException('Misslyckades med att normalisera route-path.');
             }
 
             $this->routes[$key]['path'] = $normalized;
@@ -171,7 +172,7 @@ class Router
         // Få det uppdaterade path som hanterar gruppens prefix
         $fullPath = $this->routes[$this->index]['path'] ?? null;
         if (!is_string($fullPath)) {
-            throw new \RuntimeException('Current route path must be a string before naming the route.');
+            throw new RuntimeException('Current route path must be a string before naming the route.');
         }
 
         // Lägg till det uppdaterade path i `routeNames`
@@ -361,12 +362,12 @@ class Router
                 );
 
                 if ($result === null) {
-                    throw new \RuntimeException('Misslyckades med att ersätta route-parametrar i URL: ' . $currentUrl);
+                    throw new RuntimeException('Misslyckades med att ersätta route-parametrar i URL: ' . $currentUrl);
                 }
 
                 // preg_replace med string‑subject ger string|array, här alltid string
                 if (!is_string($result)) {
-                    throw new \RuntimeException('Ovntat resultat från preg_replace vid route-generering.');
+                    throw new RuntimeException('Ovntat resultat från preg_replace vid route-generering.');
                 }
 
                 $currentUrl = $result;
@@ -382,11 +383,11 @@ class Router
         $segments = explode('/', $routePath);
 
         $segments = array_map(function (string $segment): string {
-            if(preg_match('#^\{([a-z][a-z0-9]*)}$#', $segment, $matches)) {
+            if (preg_match('#^\{([a-z][a-z0-9]*)}$#', $segment, $matches)) {
                 return '(?<' . $matches[1] . '>[^/]*)';
             }
 
-            if(preg_match('#^\{([a-z][a-z0-9]*):(.+)}$#', $segment, $matches)) {
+            if (preg_match('#^\{([a-z][a-z0-9]*):(.+)}$#', $segment, $matches)) {
                 return '(?<' . $matches[1] . '>' . $matches[2] . ')';
             }
 

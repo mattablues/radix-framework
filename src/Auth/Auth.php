@@ -7,12 +7,11 @@ namespace Radix\Auth;
 use App\Models\User;
 use Radix\Session\Session;
 use Radix\Session\SessionInterface;
+use RuntimeException;
 
 readonly class Auth
 {
-    public function __construct(private SessionInterface $session)
-    {
-    }
+    public function __construct(private SessionInterface $session) {}
 
     private function confirmIsValid(): void
     {
@@ -49,7 +48,7 @@ readonly class Auth
 
         // Tillåt endast int, annars är sessionen korrupt/ogiltig
         if (!is_int($userIdRaw)) {
-            throw new \RuntimeException('Invalid user id in session.');
+            throw new RuntimeException('Invalid user id in session.');
         }
 
         /** @var int $userIdRaw */

@@ -25,7 +25,7 @@ class Upload
         $this->uploadDirectory = $uploadDirectory;
 
         // Kontrollera att uppladdningsmappen finns, annars skapa den
-        if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0755, true) && !is_dir($uploadDirectory)) {
+        if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0o755, true) && !is_dir($uploadDirectory)) {
             throw new RuntimeException("Misslyckades med att skapa uppladdningsmappen: $uploadDirectory");
         }
     }

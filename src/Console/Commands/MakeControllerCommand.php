@@ -123,7 +123,7 @@ class MakeControllerCommand extends BaseCommand
     private function ensureDirectoryExists(string $directory): void
     {
         if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
+            mkdir($directory, 0o755, true);
         }
     }
 }

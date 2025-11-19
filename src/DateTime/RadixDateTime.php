@@ -9,7 +9,9 @@ use DatePeriod;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeZone;
+use InvalidArgumentException;
 use Radix\Config\Config;
+use RuntimeException;
 
 class RadixDateTime
 {
@@ -52,7 +54,7 @@ class RadixDateTime
     public function frame(string $date_time): string
     {
         if (!$this->validateDate($date_time)) {
-            throw new \InvalidArgumentException('Ogiltigt datumformat: ' . $date_time);
+            throw new InvalidArgumentException('Ogiltigt datumformat: ' . $date_time);
         }
         $start = $this->dateTimeImmutable($date_time);
         $end = $this->dateTimeImmutable('now');
@@ -115,13 +117,13 @@ class RadixDateTime
     public function fromRange(string $start, string $end, string $format = 'Y-m-d'): array
     {
         if (!$this->validateDate($start) || !$this->validateDate($end)) {
-            throw new \InvalidArgumentException('Ogiltigt datumformat i fromRange-metoden.');
+            throw new InvalidArgumentException('Ogiltigt datumformat i fromRange-metoden.');
         }
 
         $range = [];
-        $interval = new \DateInterval('P1D');
+        $interval = new DateInterval('P1D');
         $endDateTime = $this->dateTimeImmutable($end)->add($interval);
-        $period = new \DatePeriod($this->dateTimeImmutable($start), $interval, $endDateTime);
+        $period = new DatePeriod($this->dateTimeImmutable($start), $interval, $endDateTime);
 
         foreach ($period as $date) {
             $range[] = $date->format($format);
@@ -132,7 +134,7 @@ class RadixDateTime
     public function diffDate(string $start, string $end, string $format = '%a'): string
     {
         if (!$this->validateDate($start) || !$this->validateDate($end)) {
-            throw new \InvalidArgumentException('Ogiltigt datumformat i diffDate-metoden.');
+            throw new InvalidArgumentException('Ogiltigt datumformat i diffDate-metoden.');
         }
         $startDateTime = $this->dateTimeImmutable($start);
         $endDateTime = $this->dateTimeImmutable($end);
@@ -143,7 +145,7 @@ class RadixDateTime
     public function diffHours(string $start, string $end): float
     {
         if (!$this->validateDate($start) || !$this->validateDate($end)) {
-            throw new \InvalidArgumentException('Ogiltigt datumformat i diffHours-metoden.');
+            throw new InvalidArgumentException('Ogiltigt datumformat i diffHours-metoden.');
         }
         $startDateTime = $this->dateTimeImmutable($start);
         $endDateTime = $this->dateTimeImmutable($end);
@@ -153,11 +155,11 @@ class RadixDateTime
 
     private function validateDate(string $date_time): bool
     {
-        $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $date_time, $this->timezone);
+        $dt = DateTime::createFromFormat('Y-m-d H:i:s', $date_time, $this->timezone);
         if ($dt === false) {
             return false;
         }
-        $errors = \DateTime::getLastErrors();
+        $errors = DateTime::getLastErrors();
         return ($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0;
     }
 
@@ -169,7 +171,7 @@ class RadixDateTime
         $value = $this->datetimeConfig[$key] ?? null;
 
         if (!is_string($value)) {
-            throw new \RuntimeException("Saknar eller ogiltigt datetime-konfigvärde för nyckel: {$key}");
+            throw new RuntimeException("Saknar eller ogiltigt datetime-konfigvärde för nyckel: {$key}");
         }
 
         return $value;

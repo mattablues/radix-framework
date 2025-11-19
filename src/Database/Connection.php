@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Radix\Database;
 
-use Exception;
 use PDO;
 use PDOStatement;
+use RuntimeException;
+use Throwable;
 
 class Connection
 {
@@ -26,7 +27,7 @@ class Connection
     private function getPdoInternal(): PDO
     {
         if ($this->pdo === null) {
-            throw new \RuntimeException('PDO instance is not initialized in Connection (connection may be disconnected).');
+            throw new RuntimeException('PDO instance is not initialized in Connection (connection may be disconnected).');
         }
 
         return $this->pdo;
@@ -157,7 +158,7 @@ class Connection
         $id = $pdo->lastInsertId();
 
         if ($id === false) {
-            throw new \RuntimeException('No last insert id available for this connection.');
+            throw new RuntimeException('No last insert id available for this connection.');
         }
 
         return $id;
@@ -197,7 +198,7 @@ class Connection
         try {
             $this->getPdoInternal()->getAttribute(PDO::ATTR_CONNECTION_STATUS);
             return true;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return false;
         }
     }
@@ -213,7 +214,7 @@ class Connection
     /**
      * Hämta den underliggande PDO-instansen.
      */
-    public function getPDO(): \PDO
+    public function getPDO(): PDO
     {
         return $this->getPdoInternal();
     }

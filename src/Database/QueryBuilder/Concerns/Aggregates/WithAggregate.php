@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns\Aggregates;
 
+use InvalidArgumentException;
+use LogicException;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\Relationships\BelongsTo;
 use Radix\Database\ORM\Relationships\HasManyThrough;
 use Radix\Database\ORM\Relationships\HasOne;
 use Radix\Database\ORM\Relationships\HasOneThrough;
+use ReflectionClass;
 
 trait WithAggregate
 {
@@ -35,12 +38,12 @@ trait WithAggregate
     public function withAggregate(string $relation, string $column, string $fn, ?string $alias = null): self
     {
         if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling withAggregate().");
+            throw new LogicException("Model class is not set. Use setModelClass() before calling withAggregate().");
         }
 
         $fn = strtoupper($fn);
         if (!in_array($fn, ['SUM', 'AVG', 'MIN', 'MAX'], true)) {
-            throw new \InvalidArgumentException("Unsupported aggregate function: $fn");
+            throw new InvalidArgumentException("Unsupported aggregate function: $fn");
         }
 
         $computedAlias = $alias ?: "{$relation}_" . strtolower($fn);
@@ -55,11 +58,11 @@ trait WithAggregate
     {
         /** @var Model $parent */
         $parent = new $this->modelClass();
-        $parentTable = trim((string)$this->table, '`');
+        $parentTable = trim((string) $this->table, '`');
         $parentPk = $parent::getPrimaryKey();
 
         if (!method_exists($parent, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
+            throw new InvalidArgumentException("Relation '$relation' is not defined in model $this->modelClass.");
         }
 
         $rel = $parent->$relation();
@@ -67,7 +70,7 @@ trait WithAggregate
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             /** @var \Radix\Database\ORM\Relationships\HasMany $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
             $relatedModelClassProp = $ref->getProperty('modelClass');
             $relatedModelClassProp->setAccessible(true);
             /** @var class-string<Model> $relatedClass */
@@ -82,14 +85,14 @@ trait WithAggregate
             /** @var string $foreignKey */
             $foreignKey = $fkProp->getValue($rel);
 
-            $this->columns[] =
-                "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             /** @var HasOneThrough $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
@@ -129,14 +132,14 @@ trait WithAggregate
             $relatedTable = $resolveTable($relatedClassOrTable);
             $throughTable = $resolveTable($throughClassOrTable);
 
-            $this->columns[] =
-                "(SELECT $fn(`r`.`$column`) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT $fn(`r`.`$column`) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk` LIMIT 1) AS `$aggAlias`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             /** @var HasManyThrough $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $relatedProp = $ref->getProperty('related');
             $relatedProp->setAccessible(true);
@@ -176,14 +179,14 @@ trait WithAggregate
             $relatedTable = $resolveTable($relatedClassOrTable);
             $throughTable = $resolveTable($throughClassOrTable);
 
-            $this->columns[] =
-                "(SELECT $fn(`r`.`$column`) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT $fn(`r`.`$column`) FROM `$relatedTable` AS r INNER JOIN `$throughTable` AS t ON t.`$secondLocal` = r.`$secondKey` WHERE t.`$firstKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
             /** @var HasOne $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $fkProp = $ref->getProperty('foreignKey');
             $fkProp->setAccessible(true);
@@ -199,14 +202,14 @@ trait WithAggregate
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $this->columns[] =
-                "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
             /** @var BelongsTo $rel */
-            $ref = new \ReflectionClass($rel);
+            $ref = new ReflectionClass($rel);
 
             $ownerKeyProp = $ref->getProperty('ownerKey');
             $ownerKeyProp->setAccessible(true);
@@ -223,8 +226,8 @@ trait WithAggregate
             /** @var string $relatedTable */
             $relatedTable = $tableProp->getValue($rel);
 
-            $this->columns[] =
-                "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `$aggAlias`";
             return;
         }
 
@@ -235,7 +238,7 @@ trait WithAggregate
             $relatedClass = $rel->getRelatedModelClass();
 
             if (!is_subclass_of($relatedClass, Model::class)) {
-                throw new \LogicException(
+                throw new LogicException(
                     "Related model class '$relatedClass' must extend " . Model::class . " for withAggregate()."
                 );
             }
@@ -247,16 +250,16 @@ trait WithAggregate
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $relatedPivotKeyProp = (new \ReflectionClass($rel))->getProperty('relatedPivotKey');
+            $relatedPivotKeyProp = (new ReflectionClass($rel))->getProperty('relatedPivotKey');
             $relatedPivotKeyProp->setAccessible(true);
             /** @var string $relatedPivotKey */
             $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
 
-            $this->columns[] =
-                "(SELECT $fn(`related`.`$column`) FROM `$relatedTable` AS related INNER JOIN `$pivotTable` AS pivot ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
+            $this->columns[]
+                = "(SELECT $fn(`related`.`$column`) FROM `$relatedTable` AS related INNER JOIN `$pivotTable` AS pivot ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
             return;
         }
 
-        throw new \InvalidArgumentException("withAggregate() does not support relation type for '$relation'.");
+        throw new InvalidArgumentException("withAggregate() does not support relation type for '$relation'.");
     }
 }

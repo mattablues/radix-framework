@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Radix\Support;
 
+use DateTime;
 use InvalidArgumentException;
+use RuntimeException;
 
 class Validator
 {
@@ -101,7 +103,7 @@ class Validator
         $newId = $generator();
 
         if (!is_string($newId)) {
-            throw new \RuntimeException('Honeypot ID generator must return a string.');
+            throw new RuntimeException('Honeypot ID generator must return a string.');
         }
 
         $_SESSION['honeypot_id'] = $newId;
@@ -161,7 +163,7 @@ class Validator
     }
 
     protected function getErrorMessage(string $field, string $rule, mixed $parameter = null): string
-        {
+    {
         // Översätt huvudfältet
         $translatedField = $this->fieldTranslations[str_replace('hp_', 'honeypot', $field)] ?? $field;
 
@@ -314,7 +316,7 @@ class Validator
             throw new InvalidArgumentException("Valideringsregeln 'min' kräver en numerisk parameter.");
         }
 
-        $minValue = (float)$parameter;
+        $minValue = (float) $parameter;
 
         // Om värdet är null (nullable) eller en tom sträng, returnera alltid true
         if (is_null($value) || $value === '') {
@@ -323,12 +325,12 @@ class Validator
 
         // Kontrollera numeriska värden
         if (is_numeric($value)) {
-            return (float)$value >= $minValue;
+            return (float) $value >= $minValue;
         }
 
         // Kontrollera längden för strängvärden
         if (is_string($value)) {
-            return mb_strlen($value) >= (int)$minValue;
+            return mb_strlen($value) >= (int) $minValue;
         }
 
         // Om det inte är numeriskt eller en sträng, valideringen misslyckas
@@ -347,7 +349,7 @@ class Validator
             throw new InvalidArgumentException("Valideringsregeln 'max' kräver en numerisk parameter.");
         }
 
-        $maxValue = (float)$parameter;
+        $maxValue = (float) $parameter;
 
         // Om värdet är null (nullable) eller en tom sträng, returnera alltid true
         if (is_null($value) || $value === '') {
@@ -356,12 +358,12 @@ class Validator
 
         // Kontrollera numeriska värden
         if (is_numeric($value)) {
-            return (float)$value <= $maxValue;
+            return (float) $value <= $maxValue;
         }
 
         // Kontrollera längden för strängvärden
         if (is_string($value)) {
-            return mb_strlen($value) <= (int)$maxValue;
+            return mb_strlen($value) <= (int) $maxValue;
         }
 
         // Om det inte är numeriskt eller en sträng, valideringen misslyckas
@@ -494,7 +496,7 @@ class Validator
 
         return in_array($valueString, ['true', 'false', '1', '0'], true);
     }
-    
+
     protected function validateDate(mixed $value, ?string $parameter = null): bool
     {
         if (is_null($value) || $value === '') {
@@ -567,7 +569,7 @@ class Validator
         /** @var string $valueString */
         $valueString = (string) $value;
 
-        $date = \DateTime::createFromFormat($parameter, $valueString);
+        $date = DateTime::createFromFormat($parameter, $valueString);
 
         return $date && $date->format($parameter) === $valueString;
     }
@@ -749,6 +751,6 @@ class Validator
     // Konvertera bytes till MB
     protected function convertSizeToMB(int $sizeInBytes): float
     {
-        return round((float)$sizeInBytes / (1024 * 1024), 2, PHP_ROUND_HALF_UP);
+        return round((float) $sizeInBytes / (1024 * 1024), 2, PHP_ROUND_HALF_UP);
     }
 }

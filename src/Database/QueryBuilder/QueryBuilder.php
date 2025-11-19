@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder;
 
+use Closure;
+use DateTimeInterface;
+use Generator;
+use InvalidArgumentException;
+use LogicException;
+use PDO;
 use Radix\Collection\Collection;
 use Radix\Database\ORM\Model;
 use Radix\Database\QueryBuilder\Concerns\Aggregates\WithAggregate;
@@ -28,6 +34,7 @@ use Radix\Database\QueryBuilder\Concerns\Unions;
 use Radix\Database\QueryBuilder\Concerns\Windows;
 use Radix\Database\QueryBuilder\Concerns\WithCtes;
 use Radix\Database\QueryBuilder\Concerns\Wrapping;
+use RuntimeException;
 
 class QueryBuilder extends AbstractQueryBuilder
 {
@@ -111,10 +118,10 @@ class QueryBuilder extends AbstractQueryBuilder
     public function setModelClass(string $modelClass): self
     {
         if (!class_exists($modelClass)) {
-            throw new \InvalidArgumentException("Model class '$modelClass' does not exist.");
+            throw new InvalidArgumentException("Model class '$modelClass' does not exist.");
         }
         if (!is_subclass_of($modelClass, Model::class)) {
-            throw new \InvalidArgumentException("Model class '$modelClass' must extend " . Model::class . ".");
+            throw new InvalidArgumentException("Model class '$modelClass' must extend " . Model::class . ".");
         }
         $this->modelClass = $modelClass;
         return $this;
@@ -126,7 +133,7 @@ class QueryBuilder extends AbstractQueryBuilder
     public function first(): ?Model
     {
         if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling first().");
+            throw new LogicException("Model class is not set. Use setModelClass() before calling first().");
         }
 
         $this->limit(1);
@@ -144,7 +151,7 @@ class QueryBuilder extends AbstractQueryBuilder
         // I praktiken ska detta alltid vara en Model, eftersom AbstractQueryBuilder::get()
         // hydratiserar till $this->modelClass som är en subklass av Model.
         if (!$result instanceof Model) {
-            throw new \LogicException('QueryBuilder::first() expected instance of Model from Collection.');
+            throw new LogicException('QueryBuilder::first() expected instance of Model from Collection.');
         }
 
         /** @var Model $result */
@@ -158,7 +165,7 @@ class QueryBuilder extends AbstractQueryBuilder
     public function get(): Collection
     {
         if ($this->modelClass === null) {
-            throw new \LogicException("Model class is not set. Use setModelClass() before calling get().");
+            throw new LogicException("Model class is not set. Use setModelClass() before calling get().");
         }
 
         $rows = parent::get();
@@ -197,13 +204,13 @@ class QueryBuilder extends AbstractQueryBuilder
     {
         $table = trim($table);
         if (empty($table)) {
-            throw new \InvalidArgumentException("Table name cannot be empty.");
+            throw new InvalidArgumentException("Table name cannot be empty.");
         }
 
         if (preg_match('/\s+AS\s+/i', $table)) {
             $parts = preg_split('/\s+AS\s+/i', $table, 2);
             if ($parts === false) {
-                throw new \RuntimeException("Failed to parse table alias from '{$table}'.");
+                throw new RuntimeException("Failed to parse table alias from '{$table}'.");
             }
 
             [$tableName, $alias] = array_map('trim', $parts);
@@ -315,13 +322,13 @@ class QueryBuilder extends AbstractQueryBuilder
     {
         $model = $this->first();
         if ($model === null) {
-            throw new \RuntimeException('No records found for firstOrFail().');
+            throw new RuntimeException('No records found for firstOrFail().');
         }
         return $model;
     }
 
     // Villkorad chaining
-    public function when(bool $condition, \Closure $then, ?\Closure $else = null): self
+    public function when(bool $condition, Closure $then, ?Closure $else = null): self
     {
         if ($condition) {
             $then($this);
@@ -332,7 +339,7 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     // Tap/hook
-    public function tap(\Closure $callback): self
+    public function tap(Closure $callback): self
     {
         $callback($this);
         return $this;
@@ -355,10 +362,10 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     // Chunking: iterera i bitar och skicka Collection till callback
-    public function chunk(int $size, \Closure $callback): void
+    public function chunk(int $size, Closure $callback): void
     {
         if ($size <= 0) {
-            throw new \InvalidArgumentException('Chunk size must be greater than 0.');
+            throw new InvalidArgumentException('Chunk size must be greater than 0.');
         }
 
         $page = 1;
@@ -376,9 +383,9 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     /**
-     * @return \Generator<int, \Radix\Database\ORM\Model>
+     * @return Generator<int, \Radix\Database\ORM\Model>
      */
-    public function lazy(int $size = 1000): \Generator
+    public function lazy(int $size = 1000): Generator
     {
         $page = 1;
         while (true) {
@@ -414,7 +421,7 @@ class QueryBuilder extends AbstractQueryBuilder
     {
         $this->limit(1);
         $stmt = $this->execute();
-        $row = $stmt->fetch(\PDO::FETCH_NUM);
+        $row = $stmt->fetch(PDO::FETCH_NUM);
 
         // PDO::fetch kan returnera array|false
         if (!is_array($row) || !array_key_exists(0, $row)) {
@@ -442,7 +449,7 @@ class QueryBuilder extends AbstractQueryBuilder
         if (is_string($v)) {
             $trimmed = trim($v);
             if ($trimmed === '' || !is_numeric($trimmed)) {
-                throw new \RuntimeException('Cannot convert scalar() result to int: ' . $v);
+                throw new RuntimeException('Cannot convert scalar() result to int: ' . $v);
             }
             return (int) $trimmed;
         }
@@ -452,7 +459,7 @@ class QueryBuilder extends AbstractQueryBuilder
         }
 
         // Fallback: ej konverterbart -> kasta exception
-        throw new \RuntimeException('Cannot convert scalar() result to int: ' . get_debug_type($v));
+        throw new RuntimeException('Cannot convert scalar() result to int: ' . get_debug_type($v));
     }
 
     public function float(): ?float
@@ -474,13 +481,13 @@ class QueryBuilder extends AbstractQueryBuilder
             return $v ? 1.0 : 0.0;
         }
 
-        if ($v instanceof \DateTimeInterface) {
+        if ($v instanceof DateTimeInterface) {
             // t.ex. sekunder sedan epoch som float
             return (float) $v->getTimestamp();
         }
 
         // Fallback: ej konverterbart -> kasta exception
-        throw new \RuntimeException('Cannot convert scalar() result to float: ' . get_debug_type($v));
+        throw new RuntimeException('Cannot convert scalar() result to float: ' . get_debug_type($v));
     }
 
     public function string(): ?string
@@ -502,7 +509,7 @@ class QueryBuilder extends AbstractQueryBuilder
             return $v ? '1' : '0';
         }
 
-        if ($v instanceof \DateTimeInterface) {
+        if ($v instanceof DateTimeInterface) {
             return $v->format('Y-m-d H:i:s');
         }
 
@@ -538,7 +545,7 @@ class QueryBuilder extends AbstractQueryBuilder
                 $replacement = $binding ? '1' : '0';
             } elseif (is_int($binding) || is_float($binding)) {
                 $replacement = (string) $binding;
-            } elseif ($binding instanceof \DateTimeInterface) {
+            } elseif ($binding instanceof DateTimeInterface) {
                 $replacement = "'" . $binding->format('Y-m-d H:i:s') . "'";
             } else {
                 // Sista fallback: json_encode andra typer, eller 'NULL' om det misslyckas

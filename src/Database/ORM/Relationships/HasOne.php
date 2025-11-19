@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
+use Exception;
+use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
@@ -25,7 +27,7 @@ class HasOne
     {
         $resolvedClass = $this->resolveModelClass($modelClass);
         if (!class_exists($resolvedClass)) {
-            throw new \Exception("Model class '$resolvedClass' not found.");
+            throw new Exception("Model class '$resolvedClass' not found.");
         }
 
         $this->connection = $connection;
@@ -44,7 +46,7 @@ class HasOne
     /**
      * @param array<string, mixed>|callable|null $attributes
      */
-    public function withDefault(null|array|callable $attributes = null): self
+    public function withDefault(array|callable|null $attributes = null): self
     {
         $this->useDefault = true;
         $this->defaultAttributes = $attributes;
@@ -120,7 +122,7 @@ class HasOne
         $modelClass = $this->resolveModelClass($classOrTable);
 
         if (!is_subclass_of($modelClass, Model::class)) {
-            throw new \LogicException(
+            throw new LogicException(
                 "HasOne relation resolved model class '$modelClass' must extend " . Model::class . "."
             );
         }
@@ -149,6 +151,6 @@ class HasOne
             return $singularClass;
         }
 
-        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 }

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
-use Radix\Database\QueryBuilder\QueryBuilder;
+use Closure;
+use InvalidArgumentException;
+use LogicException;
 use Radix\Database\ORM\Model;
+use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait EagerLoad
 {
@@ -17,7 +20,7 @@ trait EagerLoad
      * - with(['comments', 'author'])
      * - with(['comments' => function (QueryBuilder $q) { ... }])
      *
-     * @param array<int,string>|array<string,\Closure>|string $relations
+     * @param array<int,string>|array<string,Closure>|string $relations
      */
     public function with(array|string $relations): self
     {
@@ -33,7 +36,7 @@ trait EagerLoad
             $constraint = null;
 
             // Assoc-array: ['relation' => Closure]
-            if (is_string($key) && $value instanceof \Closure) {
+            if (is_string($key) && $value instanceof Closure) {
                 $relation = $key;
                 $constraint = $value;
             } else {
@@ -49,18 +52,18 @@ trait EagerLoad
             // Kontrollera att relationen finns på modelklassen
             $modelClass = $this->modelClass ?? null;
             if ($modelClass === null || !is_subclass_of($modelClass, Model::class)) {
-                throw new \LogicException('Model class must be set and extend ' . Model::class . ' before calling with().');
+                throw new LogicException('Model class must be set and extend ' . Model::class . ' before calling with().');
             }
 
             if (!method_exists($modelClass, $relation)) {
-                throw new \InvalidArgumentException(
+                throw new InvalidArgumentException(
                     sprintf("Relation '%s' is not defined on model '%s'.", $relation, $modelClass)
                 );
             }
 
             $normalized[] = $relation;
 
-            if ($constraint instanceof \Closure) {
+            if ($constraint instanceof Closure) {
                 $this->eagerLoadConstraints[$relation] = $constraint;
             }
         }
@@ -74,7 +77,7 @@ trait EagerLoad
     /**
      * Lägg till/ändra constraint för en given relation.
      */
-    public function withConstraint(string $relation, \Closure $constraint): self
+    public function withConstraint(string $relation, Closure $constraint): self
     {
         $this->eagerLoadConstraints[$relation] = $constraint;
 

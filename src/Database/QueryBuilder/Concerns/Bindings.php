@@ -32,11 +32,11 @@ trait Bindings
     {
         // Slå ihop buckets var för sig
         $this->bindingsSelect = array_merge($this->bindingsSelect, $query->bindingsSelect ?? []);
-        $this->bindingsJoin   = array_merge($this->bindingsJoin,   $query->bindingsJoin   ?? []);
-        $this->bindingsWhere  = array_merge($this->bindingsWhere,  $query->bindingsWhere  ?? []);
+        $this->bindingsJoin   = array_merge($this->bindingsJoin, $query->bindingsJoin   ?? []);
+        $this->bindingsWhere  = array_merge($this->bindingsWhere, $query->bindingsWhere  ?? []);
         $this->bindingsHaving = array_merge($this->bindingsHaving, $query->bindingsHaving ?? []);
-        $this->bindingsOrder  = array_merge($this->bindingsOrder,  $query->bindingsOrder  ?? []);
-        $this->bindingsUnion  = array_merge($this->bindingsUnion,  $query->bindingsUnion  ?? []);
+        $this->bindingsOrder  = array_merge($this->bindingsOrder, $query->bindingsOrder  ?? []);
+        $this->bindingsUnion  = array_merge($this->bindingsUnion, $query->bindingsUnion  ?? []);
         $this->bindingsMutation = array_merge($this->bindingsMutation, $query->bindingsMutation ?? []);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Controller;
 
+use Exception;
 use Radix\Http\Request;
 use Radix\Http\Response;
 use Radix\Session\Exception\CsrfTokenInvalidException;
@@ -11,7 +12,7 @@ use Radix\Viewer\TemplateViewerInterface;
 
 abstract class AbstractController
 {
-   protected Request $request;
+    protected Request $request;
     protected TemplateViewerInterface $viewer;
 
     protected Response $response;
@@ -38,12 +39,12 @@ abstract class AbstractController
      */
     protected function view(string $template, array $data = []): Response
     {
-            // Kontrollera om det finns en `filters()`-metod i den aktuella kontrollern
-            if (method_exists($this, 'filters')) {
-                /** @var array<string, array{callback: callable(mixed): mixed, type?: string}> $filters */
-                $filters = $this->filters();
-                $this->registerFilters($filters);
-            }
+        // Kontrollera om det finns en `filters()`-metod i den aktuella kontrollern
+        if (method_exists($this, 'filters')) {
+            /** @var array<string, array{callback: callable(mixed): mixed, type?: string}> $filters */
+            $filters = $this->filters();
+            $this->registerFilters($filters);
+        }
 
         $defaultData = [
             'errors' => [], // Standardvärde för errors
@@ -107,7 +108,7 @@ abstract class AbstractController
 
         try {
             $this->request->session()->validateCsrfToken($formToken);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw $e;
         }
     }

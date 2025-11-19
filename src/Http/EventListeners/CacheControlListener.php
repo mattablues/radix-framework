@@ -18,4 +18,3 @@ class CacheControlListener
         $response->setHeader('Expires', '0');
     }
 }
-

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Console;
 
+use Exception;
+
 //use Psr\Container\ContainerInterface;
 
 class ConsoleApplication
@@ -54,7 +56,7 @@ class ConsoleApplication
 
             try {
                 call_user_func($this->commands[$command], $args);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 echo "Error: " . $e->getMessage() . "\n";
             }
         } else {

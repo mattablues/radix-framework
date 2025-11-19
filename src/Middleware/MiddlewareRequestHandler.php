@@ -17,9 +17,7 @@ class MiddlewareRequestHandler implements RequestHandlerInterface
     public function __construct(
         private array $middlewares,
         private readonly RequestHandler $requestHandler
-    )
-    {
-    }
+    ) {}
 
     public function handle(Request $request): Response
     {

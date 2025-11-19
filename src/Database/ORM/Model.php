@@ -4,15 +4,27 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM;
 
+use BadMethodCallException;
+use Closure;
+use Exception;
+use InvalidArgumentException;
 use JsonSerializable;
+use LogicException;
+use PDO;
 use Radix\Collection\Collection;
-use Radix\Database\DatabaseManager;
 use Radix\Database\ORM\Relationships\BelongsTo;
 use Radix\Database\ORM\Relationships\BelongsToMany;
 use Radix\Database\ORM\Relationships\HasMany;
 use Radix\Database\ORM\Relationships\HasManyThrough;
 use Radix\Database\ORM\Relationships\HasOne;
 use Radix\Database\QueryBuilder\QueryBuilder;
+use ReflectionClass;
+use ReflectionFunction;
+use ReflectionIntersectionType;
+use ReflectionMethod;
+use ReflectionNamedType;
+use ReflectionUnionType;
+use Throwable;
 
 /**
  * Dynamiska metoder som hämtas från QueryBuilder.
@@ -233,7 +245,7 @@ abstract class Model implements JsonSerializable
     public function fetchGuardedAttribute(string $field): mixed
     {
         if (!in_array($field, $this->guarded, true)) {
-            throw new \InvalidArgumentException("Fältet '$field' är inte markerat som guarded.");
+            throw new InvalidArgumentException("Fältet '$field' är inte markerat som guarded.");
         }
 
         // Hämta skyddat fält via direkt SQL
@@ -281,7 +293,7 @@ abstract class Model implements JsonSerializable
             return $query->$method(...$arguments);
         }
 
-        throw new \BadMethodCallException("Method $method does not exist in " . static::class);
+        throw new BadMethodCallException("Method $method does not exist in " . static::class);
     }
 
     protected function getConnection(): \Radix\Database\Connection
@@ -475,7 +487,7 @@ abstract class Model implements JsonSerializable
             return $this->$key();
         }
 
-        throw new \Exception("Undefined property or relation '$key' in model.");
+        throw new Exception("Undefined property or relation '$key' in model.");
     }
 
     /**
@@ -525,7 +537,7 @@ abstract class Model implements JsonSerializable
            ->from($instance->getTable());
 
         if ($instance->softDeletes && !$query->getWithSoftDeletes()) {
-           $query->whereNull('deleted_at');
+            $query->whereNull('deleted_at');
         }
 
         return $query;
@@ -534,20 +546,20 @@ abstract class Model implements JsonSerializable
     /**
      * Spara objektet i databasen (insert eller update).
      */
-        public function save(): bool
-        {
-            if ($this->timestamps) {
-                $this->attributes['updated_at'] = date('Y-m-d H:i:s');
-                if (!$this->exists) {
-                    $this->attributes['created_at'] = date('Y-m-d H:i:s');
-                }
+    public function save(): bool
+    {
+        if ($this->timestamps) {
+            $this->attributes['updated_at'] = date('Y-m-d H:i:s');
+            if (!$this->exists) {
+                $this->attributes['created_at'] = date('Y-m-d H:i:s');
             }
-
-            // Kontrollera om modellen ska uppdateras eller infogas
-            $this->exists = isset($this->attributes[$this->primaryKey]);
-
-            return $this->exists ? $this->persistUpdate() : $this->persistInsert();
         }
+
+        // Kontrollera om modellen ska uppdateras eller infogas
+        $this->exists = isset($this->attributes[$this->primaryKey]);
+
+        return $this->exists ? $this->persistUpdate() : $this->persistInsert();
+    }
 
     public function setTimestamps(bool $enable): void
     {
@@ -630,11 +642,11 @@ abstract class Model implements JsonSerializable
                 $stmt = $this->getConnection()
                     ->execute(
                         "SELECT deleted_at FROM `$this->table` WHERE `$this->primaryKey` = ?",
-                            [$this->attributes[$this->primaryKey]]
+                        [$this->attributes[$this->primaryKey]]
                     );
 
                 /** @var array<string, mixed>|false $row */
-                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 $this->attributes['deleted_at'] = is_array($row) ? ($row['deleted_at'] ?? null) : null;
             }
 
@@ -739,10 +751,10 @@ abstract class Model implements JsonSerializable
      */
     public function hasMany(string $relatedModel, string $foreignKey, ?string $localKey = null): HasMany
     {
-        $localKey = $localKey ?? $this->primaryKey;
+        $localKey ??= $this->primaryKey;
 
         if (!class_exists($relatedModel)) {
-            throw new \Exception("Relation model class '$relatedModel' not found.");
+            throw new Exception("Relation model class '$relatedModel' not found.");
         }
 
         // Skapa relationen med key-namnet, och koppla parent efteråt
@@ -791,8 +803,8 @@ abstract class Model implements JsonSerializable
         ?string $localKey = null,
         ?string $secondLocal = null
     ): HasManyThrough {
-        $localKey = $localKey ?? $this->primaryKey;
-        $secondLocal = $secondLocal ?? 'id';
+        $localKey ??= $this->primaryKey;
+        $secondLocal ??= 'id';
 
         $relation = new HasManyThrough(
             $this->getConnection(),
@@ -839,8 +851,8 @@ abstract class Model implements JsonSerializable
         ?string $localKey = null,
         ?string $secondLocal = null
     ): \Radix\Database\ORM\Relationships\HasOneThrough {
-        $localKey = $localKey ?? $this->primaryKey;
-        $secondLocal = $secondLocal ?? 'id';
+        $localKey ??= $this->primaryKey;
+        $secondLocal ??= 'id';
 
         $relation = new \Radix\Database\ORM\Relationships\HasOneThrough(
             $this->getConnection(),
@@ -862,10 +874,10 @@ abstract class Model implements JsonSerializable
      */
     public function hasOne(string $relatedModel, string $foreignKey, ?string $localKey = null): HasOne
     {
-        $localKey = $localKey ?? $this->primaryKey;
+        $localKey ??= $this->primaryKey;
 
         if (!class_exists($relatedModel)) {
-            throw new \Exception("Relation model class '$relatedModel' not found.");
+            throw new Exception("Relation model class '$relatedModel' not found.");
         }
 
         $relation = new HasOne(
@@ -886,10 +898,10 @@ abstract class Model implements JsonSerializable
         string $relatedPivotKey,
         ?string $parentKey = null
     ): BelongsToMany {
-        $parentKey = $parentKey ?? $this->primaryKey;
+        $parentKey ??= $this->primaryKey;
 
         if (!class_exists($relatedModel)) {
-            throw new \Exception("Relation model class '$relatedModel' not found.");
+            throw new Exception("Relation model class '$relatedModel' not found.");
         }
 
         $relation = new BelongsToMany(
@@ -911,16 +923,16 @@ abstract class Model implements JsonSerializable
      */
     public function belongsTo(string $relatedModel, string $foreignKey, ?string $ownerKey = null): BelongsTo
     {
-        $ownerKey = $ownerKey ?? $this->primaryKey;
+        $ownerKey ??= $this->primaryKey;
 
         if (!class_exists($relatedModel)) {
-            throw new \Exception("Relation model class '$relatedModel' not found.");
+            throw new Exception("Relation model class '$relatedModel' not found.");
         }
 
         $relatedInstance = new $relatedModel();
 
         if (!$relatedInstance instanceof self) {
-            throw new \LogicException(
+            throw new LogicException(
                 "belongsTo-relaterad klass '$relatedModel' måste ärva " . self::class . "."
             );
         }
@@ -956,7 +968,7 @@ abstract class Model implements JsonSerializable
     public static function describeQueryBuilderMethods(): array
     {
         $queryBuilderClass = \Radix\Database\QueryBuilder\QueryBuilder::class;
-        $ref = new \ReflectionClass($queryBuilderClass);
+        $ref = new ReflectionClass($queryBuilderClass);
 
         /** @var array<int, array{
          *     name: string,
@@ -966,7 +978,7 @@ abstract class Model implements JsonSerializable
          */
         $out = [];
 
-        foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+        foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             if (
                 $method->isConstructor()
                 || $method->getDeclaringClass()->getName() !== $queryBuilderClass
@@ -988,8 +1000,8 @@ abstract class Model implements JsonSerializable
             $out[] = [
                 'name' => $method->getName(),
                 'parameters' => $params,
-                'returnsSelf' =>
-                    $returnType instanceof \ReflectionNamedType
+                'returnsSelf'
+                    => $returnType instanceof ReflectionNamedType
                     && in_array(
                         $returnType->getName(),
                         ['self', 'static', $queryBuilderClass],
@@ -1007,7 +1019,7 @@ abstract class Model implements JsonSerializable
      *  $user->load(['posts', 'profile']);
      *  $user->load(['posts' => function (QueryBuilder $q) { $q->where('status', '=', 'published'); }]);
      *
-     * @param array<int, string>|array<string, \Closure>|string $relations
+     * @param array<int, string>|array<string, Closure>|string $relations
      */
     public function load(array|string $relations): self
     {
@@ -1018,7 +1030,7 @@ abstract class Model implements JsonSerializable
             if (is_int($key)) {
                 // numeriska nycklar: värdet ÄR relationsnamnet och ska vara string
                 if (!is_string($constraint)) {
-                    throw new \InvalidArgumentException('Relation name must be a string for numeric keys.');
+                    throw new InvalidArgumentException('Relation name must be a string for numeric keys.');
                 }
                 $name = $constraint;
                 $closure = null;
@@ -1029,7 +1041,7 @@ abstract class Model implements JsonSerializable
             }
 
             if (!$this->relationExists($name)) {
-                throw new \InvalidArgumentException("Relation '$name' är inte definierad i modellen " . static::class . ".");
+                throw new InvalidArgumentException("Relation '$name' är inte definierad i modellen " . static::class . ".");
             }
 
             $relObj = $this->$name();
@@ -1041,26 +1053,26 @@ abstract class Model implements JsonSerializable
 
             $relatedData = null;
 
-            if ($closure instanceof \Closure) {
-                $ref = new \ReflectionFunction($closure);
+            if ($closure instanceof Closure) {
+                $ref = new ReflectionFunction($closure);
                 // Säker typ-hämtning utan ReflectionType::getName()
                 $paramType = null;
                 if ($ref->getNumberOfParameters() === 1) {
                     $type = $ref->getParameters()[0]->getType();
-                    if ($type instanceof \ReflectionNamedType) {
+                    if ($type instanceof ReflectionNamedType) {
                         $paramType = $type->getName();
-                    } elseif ($type instanceof \ReflectionUnionType) {
+                    } elseif ($type instanceof ReflectionUnionType) {
                         $names = array_map(
-                            static fn($t) => $t instanceof \ReflectionNamedType ? $t->getName() : null,
+                            static fn($t) => $t instanceof ReflectionNamedType ? $t->getName() : null,
                             $type->getTypes()
                         );
                         $names = array_values(array_filter($names));
                         $paramType = in_array(\Radix\Database\QueryBuilder\QueryBuilder::class, $names, true)
                             ? \Radix\Database\QueryBuilder\QueryBuilder::class
                             : ($names[0] ?? null);
-                    } elseif (class_exists('\ReflectionIntersectionType') && $type instanceof \ReflectionIntersectionType) {
+                    } elseif (class_exists('\ReflectionIntersectionType') && $type instanceof ReflectionIntersectionType) {
                         $names = array_map(
-                            static fn($t) => $t instanceof \ReflectionNamedType ? $t->getName() : null,
+                            static fn($t) => $t instanceof ReflectionNamedType ? $t->getName() : null,
                             $type->getTypes()
                         );
                         $names = array_values(array_filter($names));
@@ -1093,7 +1105,7 @@ abstract class Model implements JsonSerializable
 
                         // HasMany/HasOne: har 'modelClass'
                         if (is_object($relObj) && property_exists($relObj, 'modelClass')) {
-                            $rc = new \ReflectionClass($relObj);
+                            $rc = new ReflectionClass($relObj);
                             if ($rc->hasProperty('modelClass')) {
                                 $p = $rc->getProperty('modelClass');
                                 $p->setAccessible(true);
@@ -1102,7 +1114,7 @@ abstract class Model implements JsonSerializable
                         }
                         // BelongsTo: har 'relatedTable'
                         if ($relatedModelClass === null && is_object($relObj) && property_exists($relObj, 'relatedTable')) {
-                            $rc = new \ReflectionClass($relObj);
+                            $rc = new ReflectionClass($relObj);
                             if ($rc->hasProperty('relatedTable')) {
                                 $p = $rc->getProperty('relatedTable');
                                 $p->setAccessible(true);
@@ -1120,7 +1132,7 @@ abstract class Model implements JsonSerializable
 
                         $tableForQuery = $relatedTable ?? $name;
                         if (!is_string($tableForQuery)) {
-                            throw new \LogicException('Related table name must be a string.');
+                            throw new LogicException('Related table name must be a string.');
                         }
 
                         $modelClassForQuery = is_string($relatedModelClass) ? $relatedModelClass : static::class;
@@ -1133,7 +1145,7 @@ abstract class Model implements JsonSerializable
                         // Applicera foreign key-filter om möjligt (för HasMany/HasOne)
                         try {
                             if (is_object($relObj)) {
-                                $rc = new \ReflectionClass($relObj);
+                                $rc = new ReflectionClass($relObj);
                                 if ($rc->hasProperty('foreignKey') && $rc->hasProperty('localKeyName')) {
                                     $pfk = $rc->getProperty('foreignKey');
                                     $pfk->setAccessible(true);
@@ -1144,7 +1156,7 @@ abstract class Model implements JsonSerializable
                                     $localKeyName = $plk->getValue($relObj);
 
                                     if (!is_string($foreignKey) || !is_string($localKeyName)) {
-                                        throw new \LogicException('Relation foreignKey/localKeyName must be strings.');
+                                        throw new LogicException('Relation foreignKey/localKeyName must be strings.');
                                     }
 
                                     $localValue = $this->getAttribute($localKeyName);
@@ -1153,7 +1165,7 @@ abstract class Model implements JsonSerializable
                                     }
                                 }
                             }
-                        } catch (\Throwable) {
+                        } catch (Throwable) {
                             // ignoreras
                         }
 
@@ -1213,7 +1225,7 @@ abstract class Model implements JsonSerializable
      *  $user->loadMissing(['posts', 'profile']);
      *  $user->loadMissing(['posts' => function (QueryBuilder $q) { $q->where('status', '=', 'published'); }]);
      *
-     * @param array<int, string>|array<string, \Closure>|string $relations
+     * @param array<int, string>|array<string, Closure>|string $relations
      */
     public function loadMissing(array|string $relations): self
     {
@@ -1329,6 +1341,6 @@ abstract class Model implements JsonSerializable
      */
     public function jsonSerialize(): array
     {
-       return $this->toArray();
+        return $this->toArray();
     }
 }

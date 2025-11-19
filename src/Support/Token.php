@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Radix\Support;
 
+use RuntimeException;
+
 class Token
 {
-   private string $token;
+    private string $token;
 
     public function __construct(?string $tokenValue = null)
     {
@@ -26,7 +28,7 @@ class Token
     {
         $key = getenv('SECURE_TOKEN_HMAC');
         if ($key === false || $key === '') {
-            throw new \RuntimeException('SECURE_TOKEN_HMAC env variable is not set.');
+            throw new RuntimeException('SECURE_TOKEN_HMAC env variable is not set.');
         }
 
         $hashHmac = hash_hmac('sha256', $this->token, $key);

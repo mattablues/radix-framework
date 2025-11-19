@@ -6,7 +6,6 @@ namespace Radix\Error;
 
 use ErrorException;
 use Radix\Http\Exception\HttpException;
-use Radix\Http\JsonResponse;
 use Throwable;
 
 class RadixErrorHandler
@@ -42,8 +41,8 @@ class RadixErrorHandler
         $methodRaw = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $method = is_string($methodRaw) && $methodRaw !== '' ? strtoupper($methodRaw) : 'GET';
 
-        $isApiRequest =
-            str_contains($requestUri, '/api/')
+        $isApiRequest
+            = str_contains($requestUri, '/api/')
             || str_contains($accept, 'application/json');
 
         $statusCode = $exception instanceof HttpException ? $exception->getStatusCode() : 500;

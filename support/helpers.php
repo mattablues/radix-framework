@@ -24,7 +24,7 @@ if (!function_exists('getApplicationTimezone')) {
 if (!function_exists('public_path')) {
     function public_path(string $path = ''): string
     {
-        return ROOT_PATH.'/public'.($path ? '/'.ltrim($path, '/') : '');
+        return ROOT_PATH . '/public' . ($path ? '/' . ltrim($path, '/') : '');
     }
 }
 
@@ -38,7 +38,7 @@ if (!function_exists('versioned_file')) {
 
         // Kontrollera om filen eller katalogen existerar beroende på flaggan
         if (($checkDirectories && is_dir($fullPath)) || file_exists($fullPath)) {
-            return $path.'?v='.filemtime($fullPath);
+            return $path . '?v=' . filemtime($fullPath);
         }
 
         return $default;
@@ -99,7 +99,7 @@ if (!function_exists('route')) {
 }
 
 if (!function_exists('redirect')) {
-    function redirect(string $url):  \Radix\Http\Response
+    function redirect(string $url): \Radix\Http\Response
     {
         return new \Radix\Http\RedirectResponse($url);
     }
@@ -298,7 +298,7 @@ if (!function_exists('replace_placeholder')) {
     {
         $placeholders = array_combine(
             array_map(
-                fn (string $placeholder): string => "{{$placeholder}}",
+                fn(string $placeholder): string => "{{$placeholder}}",
                 array_keys($data)
             ),
             $data
@@ -445,7 +445,7 @@ if (!function_exists('copyright')) {
     {
         $to_year = date('Y', time());
 
-        if ($to_year > (int)$year) {
+        if ($to_year > (int) $year) {
             $year = $year . ' - ' . $to_year;
         }
 
@@ -456,7 +456,7 @@ if (!function_exists('copyright')) {
 if (!function_exists('part_of_string')) {
     function part_of_string(string $string, int $length, int $break): string
     {
-        return (strlen($string) > $length) ? substr($string,0,$break) . '...' : $string;
+        return (strlen($string) > $length) ? substr($string, 0, $break) . '...' : $string;
     }
 }
 
@@ -465,30 +465,30 @@ if (!function_exists('generate_password')) {
     {
         $sets = [];
 
-        if(str_contains($available_sets, 'l')) {
+        if (str_contains($available_sets, 'l')) {
             $sets[] = 'abcdefghjkmnpqrstuvwxyz';
         }
-        if(str_contains($available_sets, 'u')) {
+        if (str_contains($available_sets, 'u')) {
             $sets[] = 'ABCDEFGHJKMNPQRSTUVWXYZ';
         }
-        if(str_contains($available_sets, 'd')) {
+        if (str_contains($available_sets, 'd')) {
             $sets[] = '123456789';
         }
-        if(str_contains($available_sets, 's')) {
+        if (str_contains($available_sets, 's')) {
             $sets[] = '!@#$%&*?';
         }
 
         $all = '';
         $password = '';
 
-        foreach($sets as $set) {
+        foreach ($sets as $set) {
             $password .= $set[array_rand(str_split($set))];
             $all .= $set;
         }
 
         $all = str_split($all);
 
-        for($i = 0; $i < $length - count($sets); $i++) {
+        for ($i = 0; $i < $length - count($sets); $i++) {
             $password .= $all[array_rand($all)];
         }
 
@@ -629,7 +629,7 @@ if (!function_exists('human_name')) {
             'von','van','de','da','del','della','di','la','le','du','den','af','av','och',
         ];
 
-        $words = explode(' ', (string)$name);
+        $words = explode(' ', (string) $name);
 
         foreach ($words as $i => &$w) {
             $w = mb_strtolower($w, 'UTF-8');
@@ -675,44 +675,44 @@ if (!function_exists('honeypot_field')) {
         $honeypotId = generate_honeypot_id() . ($formContext ? '_' . $formContext : '');
         request()->session()->set('honeypot_id', $honeypotId);
 
-        return '<label for="honeypot_' . secure_output($honeypotId) . '" style="display:none;"></label>' .
-               '<input type="text" name="' . secure_output($honeypotId) . '" id="honeypot_' . secure_output($honeypotId) . '" style="display:none;" value="">';
+        return '<label for="honeypot_' . secure_output($honeypotId) . '" style="display:none;"></label>'
+               . '<input type="text" name="' . secure_output($honeypotId) . '" id="honeypot_' . secure_output($honeypotId) . '" style="display:none;" value="">';
     }
 }
 
 if (!function_exists('secure_output')) {
-   /**
-    * Säker escapning av utdata.
-    *
-    * @param mixed $content Valfri typ som ska renderas.
-    * @param bool  $allowRaw Om true, returnera värdet utan htmlspecialchars (men alltid som sträng).
-    */
-   function secure_output(mixed $content, bool $allowRaw = false): string
-   {
-       if ($content instanceof \Stringable) {
-           $str = (string) $content;
-       } elseif (is_string($content)) {
-           $str = $content;
-       } elseif (is_int($content) || is_float($content) || is_bool($content) || $content === null) {
-           $str = (string) $content;
-       } else {
-           try {
-               $encoded = json_encode(
-                   $content,
-                   JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-               );
-           } catch (\JsonException) {
-               $encoded = '';
-           }
-           $str = $encoded;
-       }
+    /**
+     * Säker escapning av utdata.
+     *
+     * @param mixed $content Valfri typ som ska renderas.
+     * @param bool  $allowRaw Om true, returnera värdet utan htmlspecialchars (men alltid som sträng).
+     */
+    function secure_output(mixed $content, bool $allowRaw = false): string
+    {
+        if ($content instanceof \Stringable) {
+            $str = (string) $content;
+        } elseif (is_string($content)) {
+            $str = $content;
+        } elseif (is_int($content) || is_float($content) || is_bool($content) || $content === null) {
+            $str = (string) $content;
+        } else {
+            try {
+                $encoded = json_encode(
+                    $content,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+                );
+            } catch (\JsonException) {
+                $encoded = '';
+            }
+            $str = $encoded;
+        }
 
-       if ($allowRaw) {
-           return $str;
-       }
+        if ($allowRaw) {
+            return $str;
+        }
 
-       return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
-   }
+        return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+    }
 }
 
 
@@ -817,14 +817,14 @@ if (!function_exists('paginate_links')) {
     {
         $common = 'class="pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"';
         return match ($which) {
-            'chevrons-left' =>
-                "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"11 17 6 12 11 7\"></polyline><polyline points=\"18 17 13 12 18 7\"></polyline></svg>",
-            'chevron-left' =>
-                "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"15 18 9 12 15 6\"></polyline></svg>",
-            'chevron-right' =>
-                "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"9 18 15 12 9 6\"></polyline></svg>",
-            'chevrons-right' =>
-                "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"13 17 18 12 13 7\"></polyline><polyline points=\"6 17 11 12 6 7\"></polyline></svg>",
+            'chevrons-left'
+                => "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"11 17 6 12 11 7\"></polyline><polyline points=\"18 17 13 12 18 7\"></polyline></svg>",
+            'chevron-left'
+                => "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"15 18 9 12 15 6\"></polyline></svg>",
+            'chevron-right'
+                => "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"9 18 15 12 9 6\"></polyline></svg>",
+            'chevrons-right'
+                => "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" $common><polyline points=\"13 17 18 12 13 7\"></polyline><polyline points=\"6 17 11 12 6 7\"></polyline></svg>",
             default => '',
         };
     }
@@ -852,8 +852,12 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['first_page']]);
             $url = $baseUrl . ($query ? '?' . $query : '');
-            return sprintf('<a href="%s" class="%s" aria-label="Gå till första sidan" style="line-height:1">%s</a>',
-                secure_output($url), $cls . ' rounded-l-lg', $icon);
+            return sprintf(
+                '<a href="%s" class="%s" aria-label="Gå till första sidan" style="line-height:1">%s</a>',
+                secure_output($url),
+                $cls . ' rounded-l-lg',
+                $icon
+            );
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-l-lg', $icon);
     }
@@ -881,8 +885,12 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['current_page'] - 1]);
             $url = $baseUrl . ($query ? '?' . $query : '');
-            return sprintf('<a href="%s" class="%s" aria-label="Föregående sida" style="line-height:1">%s</a>',
-                secure_output($url), $cls, $icon);
+            return sprintf(
+                '<a href="%s" class="%s" aria-label="Föregående sida" style="line-height:1">%s</a>',
+                secure_output($url),
+                $cls,
+                $icon
+            );
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
     }
@@ -909,8 +917,12 @@ if (!function_exists('paginate_links')) {
             if ($page === $pagination['current_page']) {
                 $html .= sprintf('<span class="%s" aria-current="page" style="line-height:1">%d</span>', _pager_btn_classes(false, true), $page);
             } else {
-                $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
-                    secure_output($url), _pager_btn_classes(), $page);
+                $html .= sprintf(
+                    '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                    secure_output($url),
+                    _pager_btn_classes(),
+                    $page
+                );
             }
         }
 
@@ -941,8 +953,12 @@ if (!function_exists('paginate_links')) {
         if ($current > $first + $interval) {
             $query = http_build_query($currentQuery + ['page' => $first]);
             $url = $baseUrl . ($query ? '?' . $query : '');
-            $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
-                secure_output($url), _pager_btn_classes(), $first);
+            $html .= sprintf(
+                '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                secure_output($url),
+                _pager_btn_classes(),
+                $first
+            );
             if ($current > $first + $interval + 1) {
                 $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
             }
@@ -954,8 +970,12 @@ if (!function_exists('paginate_links')) {
             if ($page === $current) {
                 $html .= sprintf('<span class="%s" aria-current="page" style="line-height:1">%d</span>', _pager_btn_classes(false, true), $page);
             } else {
-                $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
-                    secure_output($url), _pager_btn_classes(), $page);
+                $html .= sprintf(
+                    '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                    secure_output($url),
+                    _pager_btn_classes(),
+                    $page
+                );
             }
         }
 
@@ -965,8 +985,12 @@ if (!function_exists('paginate_links')) {
             }
             $query = http_build_query($currentQuery + ['page' => $last]);
             $url = $baseUrl . ($query ? '?' . $query : '');
-            $html .= sprintf('<a href="%s" class="%s" style="line-height:1">%d</a>',
-                secure_output($url), _pager_btn_classes(), $last);
+            $html .= sprintf(
+                '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                secure_output($url),
+                _pager_btn_classes(),
+                $last
+            );
         }
 
         return $html;
@@ -995,8 +1019,12 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['current_page'] + 1]);
             $url = $baseUrl . ($query ? '?' . $query : '');
-            return sprintf('<a href="%s" class="%s" aria-label="Nästa sida" style="line-height:1">%s</a>',
-                secure_output($url), $cls, $icon);
+            return sprintf(
+                '<a href="%s" class="%s" aria-label="Nästa sida" style="line-height:1">%s</a>',
+                secure_output($url),
+                $cls,
+                $icon
+            );
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
     }
@@ -1026,8 +1054,12 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['last_page']]);
             $url = $baseUrl . ($query ? '?' . $query : '');
-            return sprintf('<a href="%s" class="%s" aria-label="Gå till sista sidan" style="line-height:1">%s</a>',
-                secure_output($url), $cls . ' rounded-r-lg', $icon);
+            return sprintf(
+                '<a href="%s" class="%s" aria-label="Gå till sista sidan" style="line-height:1">%s</a>',
+                secure_output($url),
+                $cls . ' rounded-r-lg',
+                $icon
+            );
         }
         return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-r-lg', $icon);
     }

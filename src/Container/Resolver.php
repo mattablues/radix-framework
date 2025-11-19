@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Radix\Container;
 
 use Closure;
-use ReflectionClass;
-use ReflectionException;
 use Radix\Container\Exception\ContainerConfigException;
 use Radix\Container\Exception\ContainerDependencyInjectionException;
+use ReflectionClass;
+use ReflectionNamedType;
+use ReflectionParameter;
 
 class Resolver
 {
@@ -17,9 +18,7 @@ class Resolver
      */
     private array $resolvedDependenciesCache = [];
 
-    public function __construct(private readonly Container $container)
-    {
-    }
+    public function __construct(private readonly Container $container) {}
 
     /**
      * @throws ContainerConfigException
@@ -82,7 +81,7 @@ class Resolver
                 throw new ContainerConfigException('Array concrete is not a valid factory.');
             }
 
-        } elseif ($concrete instanceof \Closure) {
+        } elseif ($concrete instanceof Closure) {
             // Closure är ett giltigt callable för fabriken
             $definition->setFactory($concrete);
 
@@ -149,7 +148,7 @@ class Resolver
      * @return mixed
      */
     private function createFromFactory(Definition $definition): mixed
-        {
+    {
         $factory = $definition->getFactory();
 
         if (is_array($factory) && count($factory) === 2 && is_string($factory[0]) && is_string($factory[1])) {
@@ -205,7 +204,7 @@ class Resolver
     /**
      * Lös parametrar för en reflektions-lista utifrån givna argument och container.
      *
-     * @param array<int, \ReflectionParameter> $dependencies
+     * @param array<int, ReflectionParameter> $dependencies
      * @param array<int|string, mixed>         $arguments
      * @return array<int, mixed>
      */
@@ -214,7 +213,7 @@ class Resolver
         $solved = [];
         foreach ($dependencies as $dependency) {
             $declaringClass = $dependency->getDeclaringClass();
-            $declaringClassName = $declaringClass instanceof \ReflectionClass
+            $declaringClassName = $declaringClass instanceof ReflectionClass
                 ? $declaringClass->getName()
                 : 'global';
 
@@ -232,7 +231,7 @@ class Resolver
             } else {
                 $type = $dependency->getType();
 
-                if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+                if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                     $className = $type->getName();
                     $solved[] = $this->container->get($className);
                 } elseif ($dependency->isDefaultValueAvailable()) {

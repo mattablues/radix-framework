@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
+use Exception;
+use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
@@ -78,7 +80,7 @@ class HasManyThrough
     public function get(): array
     {
         if ($this->parent === null) {
-            throw new \LogicException('HasManyThrough parent saknas.');
+            throw new LogicException('HasManyThrough parent saknas.');
         }
 
         $relatedClass = $this->resolveModelClass($this->related);
@@ -124,7 +126,7 @@ class HasManyThrough
             return $singularClass;
         }
 
-        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 
     /**

@@ -6,7 +6,4 @@ namespace Radix\Container\Exception;
 
 use Exception;
 
-class ContainerDependencyInjectionException extends Exception
-{
-
-}
+class ContainerDependencyInjectionException extends Exception {}

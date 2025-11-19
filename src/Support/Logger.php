@@ -21,7 +21,7 @@ final class Logger
         $root = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 3);
         $base = $baseDir ?: (rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'logs');
         if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
+            @mkdir($base, 0o755, true);
         }
         $this->dir = $base;
         $this->channel = $channel ?: 'app';
@@ -141,7 +141,7 @@ final class Logger
         $replace = [];
         foreach ($context as $k => $v) {
             if (is_scalar($v) || $v === null) {
-                $replace['{' . $k . '}'] = (string)$v;
+                $replace['{' . $k . '}'] = (string) $v;
             }
         }
         return strtr($message, $replace);
@@ -157,7 +157,7 @@ final class Logger
         }
         // Ta bort värden som redan interpolerats
         $rest = array_filter($context, function ($k) use ($context) {
-            return str_contains($this->interpolate('{'.$k.'}', $context), '{'.$k.'}');
+            return str_contains($this->interpolate('{' . $k . '}', $context), '{' . $k . '}');
         }, ARRAY_FILTER_USE_KEY);
         if ($rest === []) {
             return '';

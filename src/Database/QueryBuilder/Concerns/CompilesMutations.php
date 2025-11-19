@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use InvalidArgumentException;
+use RuntimeException;
+use Stringable;
+
 trait CompilesMutations
 {
     protected array $withAggregateExpressions = [];
@@ -86,7 +90,7 @@ trait CompilesMutations
 
         if ($this->type === 'UPSERT') {
             if (empty($this->upsertUnique)) {
-                throw new \RuntimeException('Upsert kräver unika kolumner.');
+                throw new RuntimeException('Upsert kräver unika kolumner.');
             }
 
             $columns = implode(
@@ -139,7 +143,7 @@ trait CompilesMutations
             return "INSERT INTO $this->table ($columns) VALUES ($placeholders) ON CONFLICT ($conflict) DO UPDATE SET $updateSql";
         }
 
-        throw new \RuntimeException("Query type '$this->type' är inte implementerad.");
+        throw new RuntimeException("Query type '$this->type' är inte implementerad.");
     }
 
     /**
@@ -151,13 +155,13 @@ trait CompilesMutations
             return $col;
         }
 
-        if ($col instanceof \Stringable) {
+        if ($col instanceof Stringable) {
             return (string) $col;
         }
 
         // Om du vill tillåta int som indexerade kolumner kan du göra t.ex. "col_$col",
         // men i din kod används kolumner som faktiska namnssträngar.
-        throw new \RuntimeException('Ogiltigt kolumnnamn: ' . get_debug_type($col));
+        throw new RuntimeException('Ogiltigt kolumnnamn: ' . get_debug_type($col));
     }
 
     /**
@@ -166,7 +170,7 @@ trait CompilesMutations
     public function insert(array $data): self
     {
         if (empty($data)) {
-            throw new \InvalidArgumentException("Data for INSERT cannot be empty.");
+            throw new InvalidArgumentException("Data for INSERT cannot be empty.");
         }
 
         $this->type = 'INSERT';
@@ -192,7 +196,7 @@ trait CompilesMutations
     public function delete(): self
     {
         if (empty($this->where)) {
-            throw new \RuntimeException("DELETE operation requires a WHERE clause.");
+            throw new RuntimeException("DELETE operation requires a WHERE clause.");
         }
 
         $this->type = 'DELETE';
@@ -205,7 +209,7 @@ trait CompilesMutations
     public function insertOrIgnore(array $data): self
     {
         if (empty($data)) {
-            throw new \InvalidArgumentException("Data for INSERT OR IGNORE cannot be empty.");
+            throw new InvalidArgumentException("Data for INSERT OR IGNORE cannot be empty.");
         }
         $this->type = 'INSERT_IGNORE';
         $this->columns = array_keys($data);
@@ -221,7 +225,7 @@ trait CompilesMutations
     public function upsert(array $data, array $uniqueBy, ?array $update = null): self
     {
         if (empty($data) || empty($uniqueBy)) {
-            throw new \InvalidArgumentException('Upsert kräver data och uniqueBy.');
+            throw new InvalidArgumentException('Upsert kräver data och uniqueBy.');
         }
         $this->type = 'UPSERT';
         $this->columns = array_keys($data);
@@ -234,7 +238,7 @@ trait CompilesMutations
     public function setModelClass(string $modelClass): self
     {
         if (!class_exists($modelClass)) {
-            throw new \InvalidArgumentException("Model class '$modelClass' does not exist.");
+            throw new InvalidArgumentException("Model class '$modelClass' does not exist.");
         }
         $this->modelClass = $modelClass;
         return $this;

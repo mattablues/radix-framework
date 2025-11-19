@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use PDO;
+use RuntimeException;
+use Stringable;
+use Throwable;
+
 trait JsonFunctions
 {
     protected ?string $whereRawString = null;
@@ -14,12 +19,12 @@ trait JsonFunctions
         try {
             $connection = $this->getConnection(); // garanterar Connection, ej null
 
-            /** @var \PDO $pdo */
+            /** @var PDO $pdo */
             $pdo = $connection->getPDO(); // Connection har alltid getPDO()
-            $name = $pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+            $name = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 
             return is_string($name) && $name !== '' ? $name : 'mysql';
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Vid fel: fallback till mysql
             return 'mysql';
         }
@@ -51,7 +56,7 @@ trait JsonFunctions
             // Normalisera $needle till sträng på ett säkert sätt
             if (is_scalar($needle)) {
                 $needleStr = (string) $needle;
-            } elseif ($needle instanceof \Stringable) {
+            } elseif ($needle instanceof Stringable) {
                 $needleStr = (string) $needle;
             } else {
                 // Fallback: json_encode, annars tom sträng
@@ -64,7 +69,7 @@ trait JsonFunctions
             $expr = "JSON_CONTAINS($wrapped, ?)";
             $json = json_encode($needle, JSON_UNESCAPED_UNICODE);
             if (!is_string($json)) {
-                throw new \RuntimeException('Failed to JSON-encode value for whereJsonContains().');
+                throw new RuntimeException('Failed to JSON-encode value for whereJsonContains().');
             }
             $binding = $json;
         }

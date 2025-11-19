@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Database;
 
 use Psr\Container\ContainerInterface;
+use RuntimeException;
 
 class DatabaseManager
 {
@@ -20,7 +21,7 @@ class DatabaseManager
         $connection = $this->container->get(Connection::class);
 
         if (!$connection instanceof Connection) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Container did not return a ' . Connection::class . ' instance.'
             );
         }

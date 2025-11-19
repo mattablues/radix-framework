@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Radix\Container;
 
+use InvalidArgumentException;
+use LogicException;
+use OutOfBoundsException;
+
 class Definition
 {
     private mixed $concrete;
@@ -40,7 +44,7 @@ class Definition
     public function setConcrete(mixed $concrete): void
     {
         if (!is_object($concrete) && !is_string($concrete) && !is_callable($concrete)) {
-            throw new \InvalidArgumentException('Concrete must be a class name, an object, or a callable.');
+            throw new InvalidArgumentException('Concrete must be a class name, an object, or a callable.');
         }
 
         $this->concrete = $concrete;
@@ -94,7 +98,7 @@ class Definition
                 || !is_string($factory[0])
                 || !is_string($factory[1])
             ) {
-                throw new \InvalidArgumentException('Factory array must be [class-string, method].');
+                throw new InvalidArgumentException('Factory array must be [class-string, method].');
             }
 
             /** @var array{class-string, string} $factory */
@@ -111,7 +115,7 @@ class Definition
             return $this;
         }
 
-        throw new \InvalidArgumentException('Factory must be [class-string, method], callable, or null.');
+        throw new InvalidArgumentException('Factory must be [class-string, method], callable, or null.');
     }
 
     /**
@@ -157,7 +161,7 @@ class Definition
     public function addArgument(mixed $value): Definition
     {
         if ($value === null) {
-            throw new \InvalidArgumentException('Argument value cannot be null.');
+            throw new InvalidArgumentException('Argument value cannot be null.');
         }
 
         $this->arguments[] = $value;
@@ -175,7 +179,7 @@ class Definition
     public function getArgument(int|string $index): mixed
     {
         if (!array_key_exists($index, $this->arguments)) {
-            throw new \OutOfBoundsException(sprintf('Argument at index "%s" does not exist.', $index));
+            throw new OutOfBoundsException(sprintf('Argument at index "%s" does not exist.', $index));
         }
 
         return $this->arguments[$index];
@@ -211,7 +215,7 @@ class Definition
     public function addMethodCall(string $method, array|string $arguments): Definition
     {
         if (empty($method)) {
-            throw new \InvalidArgumentException('Method name must be a non-empty string.');
+            throw new InvalidArgumentException('Method name must be a non-empty string.');
         }
 
         $this->calls[] = [
@@ -288,7 +292,7 @@ class Definition
      */
     public function getTag(string $name): array
     {
-        return $this->tags[$name] ?? array();
+        return $this->tags[$name] ?? [];
     }
 
     /**
@@ -299,7 +303,7 @@ class Definition
     public function addTag(string $name, array $attributes = []): Definition
     {
         if (empty($name)) {
-            throw new \InvalidArgumentException('Tag name must be a non-empty string.');
+            throw new InvalidArgumentException('Tag name must be a non-empty string.');
         }
 
         $this->tags[$name][] = $attributes;
@@ -315,7 +319,7 @@ class Definition
     public function clearTag(string $name): Definition
     {
         if (!isset($this->tags[$name])) {
-            throw new \InvalidArgumentException(sprintf('Tag "%s" does not exist.', $name));
+            throw new InvalidArgumentException(sprintf('Tag "%s" does not exist.', $name));
         }
 
         unset($this->tags[$name]);
@@ -324,12 +328,12 @@ class Definition
 
     public function clearTags(): Definition
     {
-        $this->tags = array();
+        $this->tags = [];
 
         return $this;
     }
 
-        public function isAutowired(): bool
+    public function isAutowired(): bool
     {
         return $this->autowired;
     }
@@ -342,7 +346,7 @@ class Definition
     public function getResolved(): ?object
     {
         if (!is_null($this->resolved) && !is_object($this->resolved)) {
-            throw new \LogicException('Resolved instance must be an object or null.');
+            throw new LogicException('Resolved instance must be an object or null.');
         }
 
         return $this->resolved;

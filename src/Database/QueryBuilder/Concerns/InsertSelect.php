@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Database\QueryBuilder\Concerns;
 
+use InvalidArgumentException;
 use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait InsertSelect
@@ -14,7 +15,7 @@ trait InsertSelect
     public function insertSelect(string $table, array $columns, QueryBuilder $select): self
     {
         if (empty($table) || empty($columns)) {
-            throw new \InvalidArgumentException('Table and columns are required for insertSelect.');
+            throw new InvalidArgumentException('Table and columns are required for insertSelect.');
         }
 
         $this->type = 'INSERT';

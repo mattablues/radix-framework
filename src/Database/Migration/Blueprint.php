@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Radix\Database\Migration;
 
+use InvalidArgumentException;
+use LogicException;
+
 class Blueprint
 {
     private string $table;
@@ -57,16 +60,16 @@ class Blueprint
         } else {
             if (preg_match('/^FLOAT\(\d+,\s?\d+\)$/i', $type)) {
                 // Exempel: 'FLOAT(10, 2)' är giltig
-            } elseif (!array_key_exists($type, $typeMapping) &&
-                !preg_match('/^(ENUM|SET)\([\'"].+?[\'"](?:,\s?[\'"].+?[\'"])*\)$/i', $type) &&
-                !preg_match('/^[A-Z][A-Z0-9]*(\(\d+(,\s?\d+)?\))?( UNSIGNED)?$/', $type)) {
-                throw new \InvalidArgumentException("Unsupported column type: '$type'");
+            } elseif (!array_key_exists($type, $typeMapping)
+                && !preg_match('/^(ENUM|SET)\([\'"].+?[\'"](?:,\s?[\'"].+?[\'"])*\)$/i', $type)
+                && !preg_match('/^[A-Z][A-Z0-9]*(\(\d+(,\s?\d+)?\))?( UNSIGNED)?$/', $type)) {
+                throw new InvalidArgumentException("Unsupported column type: '$type'");
             }
         }
 
         foreach (array_keys($options) as $attribute) {
             if (!in_array($attribute, $validAttributes, true)) {
-                throw new \InvalidArgumentException("Unsupported column attribute: '$attribute'");
+                throw new InvalidArgumentException("Unsupported column attribute: '$attribute'");
             }
         }
 
@@ -84,7 +87,7 @@ class Blueprint
                     $defaultStr = $default; // Behåll originalform.
                 } else {
                     if (!is_scalar($default)) {
-                        throw new \InvalidArgumentException("Default value must be a scalar or string.");
+                        throw new InvalidArgumentException("Default value must be a scalar or string.");
                     }
                     /** @var int|float|string $default */
                     $defaultStr = strtoupper((string) $default); // Konvertera till versaler.
@@ -102,33 +105,33 @@ class Blueprint
 
         if (isset($options['onUpdate'])) {
             if (!is_string($options['onUpdate'])) {
-                throw new \InvalidArgumentException("Option 'onUpdate' must be a string.");
+                throw new InvalidArgumentException("Option 'onUpdate' must be a string.");
             }
             $definition .= ' ON UPDATE ' . $options['onUpdate'];
         }
 
         if (isset($options['collation'])) {
             if (!is_string($options['collation'])) {
-                throw new \InvalidArgumentException("Option 'collation' must be a string.");
+                throw new InvalidArgumentException("Option 'collation' must be a string.");
             }
             $definition .= ' COLLATE ' . $options['collation'];
         }
 
         if (isset($options['comment'])) {
             if (!is_string($options['comment'])) {
-                throw new \InvalidArgumentException("Option 'comment' must be a string.");
+                throw new InvalidArgumentException("Option 'comment' must be a string.");
             }
             $definition .= " COMMENT '" . addslashes($options['comment']) . "'";
         }
 
         if (isset($options['before'])) {
             if (!is_string($options['before'])) {
-                throw new \InvalidArgumentException("Option 'before' must be a string.");
+                throw new InvalidArgumentException("Option 'before' must be a string.");
             }
             $definition .= ' BEFORE `' . $options['before'] . '`';
         } elseif (isset($options['after'])) {
             if (!is_string($options['after'])) {
-                throw new \InvalidArgumentException("Option 'after' must be a string.");
+                throw new InvalidArgumentException("Option 'after' must be a string.");
             }
             $definition .= ' AFTER `' . $options['after'] . '`';
         } elseif (!empty($options['first'])) {
@@ -150,7 +153,7 @@ class Blueprint
     public function dropColumn(string $name): self
     {
         if (!$this->isAlter) {
-            throw new \LogicException('dropColumn can only be used in ALTER TABLE context.');
+            throw new LogicException('dropColumn can only be used in ALTER TABLE context.');
         }
         $this->alterOperations[] = 'DROP COLUMN `' . $name . '`';
         return $this;
@@ -386,7 +389,7 @@ class Blueprint
     public function modifyPrimary(array $columns): self
     {
         if (!$this->isAlter) {
-            throw new \LogicException('modifyPrimary can only be used in ALTER TABLE context.');
+            throw new LogicException('modifyPrimary can only be used in ALTER TABLE context.');
         }
         $this->alterOperations[] = 'DROP PRIMARY KEY';
         $this->alterOperations[] = 'ADD PRIMARY KEY (' . $this->formatColumnList($columns) . ')';
@@ -439,7 +442,7 @@ class Blueprint
     public function toRollbackSql(): array
     {
         if (empty($this->alterOperations)) {
-            throw new \LogicException('No operations to rollback.');
+            throw new LogicException('No operations to rollback.');
         }
 
         $rollbackStatements = [];
@@ -447,7 +450,7 @@ class Blueprint
         foreach (array_reverse($this->alterOperations) as $operation) {
             // Kontrollera om vi försöker återställa borttagning av en kolumn.
             if (str_starts_with($operation, 'DROP COLUMN')) {
-                throw new \LogicException('Cannot rollback a dropped column automatically. Column details are missing.');
+                throw new LogicException('Cannot rollback a dropped column automatically. Column details are missing.');
             }
 
             // Lägg till rollback-logik för andra operationer beroende på dina behov.

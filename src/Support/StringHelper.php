@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Support;
 
 use Radix\Config\Config;
+use RuntimeException;
 
 class StringHelper
 {
@@ -17,7 +18,7 @@ class StringHelper
         $pluralConfig = include dirname(__DIR__, 3) . '/config/pluralization.php';
 
         if (!is_array($pluralConfig)) {
-            throw new \RuntimeException('pluralization.php måste returnera en array.');
+            throw new RuntimeException('pluralization.php måste returnera en array.');
         }
 
         /** @var array<string,mixed> $pluralConfig */
@@ -58,7 +59,7 @@ class StringHelper
         $pluralConfig = include dirname(__DIR__, 3) . '/config/pluralization.php';
 
         if (!is_array($pluralConfig)) {
-            throw new \RuntimeException('pluralization.php måste returnera en array.');
+            throw new RuntimeException('pluralization.php måste returnera en array.');
         }
 
         /** @var array<string,mixed> $pluralConfig */

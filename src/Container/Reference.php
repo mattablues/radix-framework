@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Container;
 
+use InvalidArgumentException;
+
 final class Reference
 {
     private string $id;
@@ -17,12 +19,12 @@ final class Reference
      * Sätter referensens ID.
      *
      * @param string $id
-     * @throws \InvalidArgumentException Om ID inte är giltigt.
+     * @throws InvalidArgumentException Om ID inte är giltigt.
      */
     public function setId(string $id): void
     {
         if (empty($id)) {
-            throw new \InvalidArgumentException('Reference ID must be a non-empty string.');
+            throw new InvalidArgumentException('Reference ID must be a non-empty string.');
         }
 
         $this->id = $id;

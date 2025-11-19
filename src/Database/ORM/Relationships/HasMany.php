@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
+use Exception;
+use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Support\StringHelper;
+use ReflectionClass;
 
 class HasMany
 {
@@ -21,7 +24,7 @@ class HasMany
     {
         $resolvedClass = $this->resolveModelClass($modelClass);
         if (!class_exists($resolvedClass) || !is_subclass_of($resolvedClass, Model::class)) {
-            throw new \Exception("Model class '$resolvedClass' must exist and extend " . Model::class . '.');
+            throw new Exception("Model class '$resolvedClass' must exist and extend " . Model::class . '.');
         }
 
         $this->connection   = $connection;
@@ -88,7 +91,7 @@ class HasMany
         $modelClass = $this->resolveModelClass($classOrTable);
 
         if (!is_subclass_of($modelClass, Model::class)) {
-            throw new \LogicException(
+            throw new LogicException(
                 "HasMany relation resolved model class '$modelClass' must extend " . Model::class . '.'
             );
         }
@@ -102,7 +105,7 @@ class HasMany
         if ($this->parent !== null) {
             // Koppla tillbaka parent som relation
             $model->setRelation(
-                strtolower((new \ReflectionClass($this->parent))->getShortName()),
+                strtolower((new ReflectionClass($this->parent))->getShortName()),
                 $this->parent
             );
         }
@@ -124,6 +127,6 @@ class HasMany
             return $singularClass;
         }
 
-        throw new \Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
     }
 }

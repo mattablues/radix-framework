@@ -45,7 +45,7 @@ class EventDispatcher implements EventDispatcherInterface
      *   An iterable (array, iterator, or generator) of callables.  Each
      *   callable MUST be type-compatible with $event.
      */
-    public function getListenersForEvent(object $event) : iterable
+    public function getListenersForEvent(object $event): iterable
     {
         $eventName = get_class($event);
 

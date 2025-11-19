@@ -36,7 +36,7 @@ class Image
         $this->width = imagesx($this->image);
         $this->height = imagesy($this->image);
     }
-    
+
     public function getImageResized(): ?GdImage
     {
         return $this->imageResized;
@@ -94,9 +94,9 @@ class Image
 
     public function saveImage(string $path, ?int $quality = null): void
     {
-        $quality = $quality ?? $this->defaultQuality;
+        $quality ??= $this->defaultQuality;
 
-        if (!$this->imageResized instanceof \GdImage) {
+        if (!$this->imageResized instanceof GdImage) {
             throw new RuntimeException('Ingen ändrad bild att spara. Anropa resizeImage() innan saveImage().');
         }
 
@@ -119,7 +119,7 @@ class Image
             case 'png':
                 // Säkerställ att $invertScaleQuality är en heltal
                 $scaleQuality = round(($quality / 100) * 9);
-                $invertScaleQuality = max(0, min(9, (int)(9 - $scaleQuality)));
+                $invertScaleQuality = max(0, min(9, (int) (9 - $scaleQuality)));
 
                 if (!imagepng($this->imageResized, $path, $invertScaleQuality)) {
                     throw new RuntimeException("Misslyckades med att spara som PNG till \"$path\".");
@@ -251,7 +251,7 @@ class Image
 
     protected function getSizeByRatio(int $targetDimension, int $primaryDimension, int $secondaryDimension): int
     {
-        return (int)round($targetDimension * ($primaryDimension / $secondaryDimension));
+        return (int) round($targetDimension * ($primaryDimension / $secondaryDimension));
     }
 
     /**
@@ -265,7 +265,7 @@ class Image
     protected function getSizeByAuto(int $newWidth, int $newHeight): array
     {
         if ($this->width > $this->height) {
-            $scaledHeight = (int)round($newWidth * ($this->height / $this->width));
+            $scaledHeight = (int) round($newWidth * ($this->height / $this->width));
             return [
                 'optimalWidth' => $newWidth,
                 'optimalHeight' => $scaledHeight,
@@ -273,7 +273,7 @@ class Image
         }
 
         if ($this->width < $this->height) {
-            $scaledWidth = (int)round($newHeight * ($this->width / $this->height));
+            $scaledWidth = (int) round($newHeight * ($this->width / $this->height));
             return [
                 'optimalWidth' => $scaledWidth,
                 'optimalHeight' => $newHeight,
@@ -301,8 +301,8 @@ class Image
         $optimalRatio = min($widthRatio, $heightRatio);
 
         return [
-            'optimalWidth' => (int)round($this->width / $optimalRatio),
-            'optimalHeight' => (int)round($this->height / $optimalRatio),
+            'optimalWidth' => (int) round($this->width / $optimalRatio),
+            'optimalHeight' => (int) round($this->height / $optimalRatio),
         ];
     }
 
@@ -314,15 +314,15 @@ class Image
             );
         }
 
-        $cropStartX = (int)round(($optimalWidth - $newWidth) / 2);
-        $cropStartY = (int)round(($optimalHeight - $newHeight) / 2);
+        $cropStartX = (int) round(($optimalWidth - $newWidth) / 2);
+        $cropStartY = (int) round(($optimalHeight - $newHeight) / 2);
 
         $crop = imagecreatetruecolor($newWidth, $newHeight);
-        if (!$crop instanceof \GdImage) {
+        if (!$crop instanceof GdImage) {
             throw new RuntimeException('Kunde inte skapa canvas för beskärd bild.');
         }
 
-        if (!$this->imageResized instanceof \GdImage) {
+        if (!$this->imageResized instanceof GdImage) {
             throw new RuntimeException('Ingen ändrad bild att beskära.');
         }
 
