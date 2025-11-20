@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Support;
 
-final class Logger
+class Logger
 {
     private string $dir;
     private string $channel;
