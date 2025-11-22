@@ -74,21 +74,65 @@ abstract class ApiController extends AbstractController
      */
     protected function validateRequest(array $rules = []): void
     {
-        // Validera JSON-data först
         $this->request->post = $this->getJsonPayload();
-
-        // Validera regler om några skickats
         if (!empty($rules)) {
-            /** @var array<string, array<int, string>|string> $rules */
             $validator = new Validator($this->request->post, $rules);
-
             if (!$validator->validate()) {
                 $this->respondWithErrors($validator->errors(), 422);
             }
         }
-
-        // Kontrollera API-token
+        // Strikt token som standard
         $this->validateApiToken();
+    }
+
+    /**
+     * Validera request där session ELLER Bearer-token accepteras.
+     *
+     * @param array<string, array<int, string>|string> $rules
+     */
+    protected function validateRequestAllowingSession(array $rules = []): void
+    {
+        $this->request->post = $this->getJsonPayload();
+        if (!empty($rules)) {
+            /** @var array<string, array<int, string>|string> $rules */
+            $validator = new Validator($this->request->post, $rules);
+            if (!$validator->validate()) {
+                $this->respondWithErrors($validator->errors(), 422);
+            }
+        }
+        $this->validateApiTokenOrSession();
+    }
+
+    /**
+     * Acceptera antingen giltig Bearer-token, eller en aktiv autentiserad session.
+     */
+    private function validateApiTokenOrSession(): void
+    {
+        $apiToken = $this->request->header('Authorization');
+
+        // Ta bort "Bearer "
+        if (!empty($apiToken) && str_starts_with($apiToken, 'Bearer ')) {
+            $apiToken = str_replace('Bearer ', '', $apiToken);
+        }
+
+        // Finns header -> kör befintlig tokenvalidering
+        if (!empty($apiToken)) {
+            $token = (string) $apiToken;
+            if (!$this->isTokenValid($token)) {
+                $this->respondWithErrors(['API-token' => ['Token är ogiltig eller valideringen misslyckades.']], 401);
+            }
+            return;
+        }
+
+        // Ingen Authorization-header -> tillåt om sessionen är inloggad
+        $session = $this->request->session();
+        $authId = $session->get(\Radix\Session\Session::AUTH_KEY);
+
+        if (is_int($authId) || is_string($authId)) {
+            return; // inloggad session godkänns
+        }
+
+        $this->respondWithErrors(['API-token' => ['Token saknas eller är ogiltig.']], 401);
     }
 
     /**
