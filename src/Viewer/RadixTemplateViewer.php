@@ -557,14 +557,28 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     private function generateCacheKey(string $templatePath, array $data, string $version = ''): string
     {
+        // Beräkna absolut filsökväg till templaten (säker för både tests och prod)
+        $absoluteTemplateFile = rtrim($this->viewsDirectory, '/\\') . DIRECTORY_SEPARATOR . ltrim($templatePath, '/\\');
+        $templateSig = [
+            'path' => realpath($absoluteTemplateFile) ?: $absoluteTemplateFile,
+            'mtime' => file_exists($absoluteTemplateFile) ? (int) filemtime($absoluteTemplateFile) : 0,
+            'hash' => file_exists($absoluteTemplateFile) ? md5((string) file_get_contents($absoluteTemplateFile)) : 'missing',
+        ];
+
         // Skapa en liten representation av relevanta delar
         $relevantParts = [
-            'template' => $templatePath,
+            'template' => $templateSig,
             'pagination' => $this->getPaginationKey($data),
-            'search' => $this->getSearchKey($data), // Inkludera sök-data
+            'search' => $this->getSearchKey($data),
             'filters' => $this->getFilterKey(),
             'version' => $version ?: 'default_version',
         ];
+
+        // Inkludera en körningsunik id om satt (hindrar kollisioner mellan separata jobb)
+        $runId = getenv('RADIX_RUN_ID') ?: '';
+        if ($runId !== '') {
+            $relevantParts['run_id'] = $runId;
+        }
 
         // Lägg till ändringstider från CSS och JS
         $cssPath = ROOT_PATH . '/public/css/app.css';
@@ -574,7 +588,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
             'js' => file_exists($jsPath) ? (string) filemtime($jsPath) : 'no-js',
         ];
 
-        // Kombinera allt till en cache-nyckel
         return md5(serialize($relevantParts) . serialize($additionalHashes));
     }
 
