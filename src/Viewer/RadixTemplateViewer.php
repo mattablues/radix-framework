@@ -23,7 +23,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
     public function __construct(string $viewsDirectory = null)
     {
         $this->viewsDirectory = $viewsDirectory ?? dirname(__DIR__, 3) . '/views/';
-        $envCachePath = getenv('CACHE_PATH') ?: '';
+        $envCachePath = getenv('VIEWS_CACHE_PATH') ?: '';
         $root = defined('ROOT_PATH') ? (string) ROOT_PATH : (string) dirname(__DIR__, 4);
         if ($root === '' || $root === DIRECTORY_SEPARATOR) {
             $root = sys_get_temp_dir();
