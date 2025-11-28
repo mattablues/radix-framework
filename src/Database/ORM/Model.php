@@ -544,6 +544,68 @@ abstract class Model implements JsonSerializable
     }
 
     /**
+     * Skapa eller hämta första matchande rad.
+     *
+     * @param array<string,mixed> $attributes
+     * @param array<string,mixed> $values
+     * @return static
+     */
+    public static function firstOrCreate(array $attributes, array $values = []): static
+    {
+        $query = static::query();
+        foreach ($attributes as $col => $val) {
+            $query->where($col, '=', $val);
+        }
+
+        /** @var static|null $existing */
+        $existing = $query->first();
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $instance = self::newStatic();
+        foreach (array_merge($attributes, $values) as $col => $val) {
+            $instance->setAttribute($col, $val);
+        }
+        $instance->save();
+
+        return $instance;
+    }
+
+    /**
+     * Skapa eller uppdatera första matchande rad.
+     *
+     * @param array<string,mixed> $attributes
+     * @param array<string,mixed> $values
+     * @return static
+     */
+    public static function updateOrCreate(array $attributes, array $values = []): static
+    {
+        $query = static::query();
+        foreach ($attributes as $col => $val) {
+            $query->where($col, '=', $val);
+        }
+
+        /** @var static|null $existing */
+        $existing = $query->first();
+        if ($existing !== null) {
+            foreach ($values as $col => $val) {
+                $existing->setAttribute($col, $val);
+            }
+            $existing->save();
+            return $existing;
+        }
+
+        $instance = self::newStatic();
+        foreach (array_merge($attributes, $values) as $col => $val) {
+            $instance->setAttribute($col, $val);
+        }
+        $instance->save();
+
+        return $instance;
+    }
+
+    /**
      * Spara objektet i databasen (insert eller update).
      */
     public function save(): bool
@@ -1342,5 +1404,18 @@ abstract class Model implements JsonSerializable
     public function jsonSerialize(): array
     {
         return $this->toArray();
+    }
+
+    /**
+     * Skapar en ny instans av den anropade subklassen.
+     * @return static
+     */
+    private static function newStatic(): static
+    {
+        /** @var class-string<static> $cls */
+        $cls = static::class;
+        /** @var static $instance */
+        $instance = new $cls();
+        return $instance;
     }
 }
