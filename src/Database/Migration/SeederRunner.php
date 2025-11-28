@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Database\Migration;
 
-use Radix\Database\Connection;
 use PDO;
+use Radix\Database\Connection;
 use RuntimeException;
 
 final class SeederRunner
@@ -99,14 +99,14 @@ final class SeederRunner
         if ($partialName !== null) {
             $seedFiles = array_filter(
                 $seedFiles,
-                fn (string $file) => stripos(basename($file), $partialName) !== false
+                fn(string $file) => stripos(basename($file), $partialName) !== false
             );
         }
 
         // Exkludera DatabaseSeeder i rollback av partials
         $seedFiles = array_filter(
             $seedFiles,
-            fn (string $file) => stripos(basename($file), 'database_seeder.php') === false
+            fn(string $file) => stripos(basename($file), 'database_seeder.php') === false
         );
 
         // Kör barn först: sortera alfabetiskt och kör i omvänd ordning
