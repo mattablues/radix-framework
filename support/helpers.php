@@ -45,7 +45,21 @@ if (!function_exists('versioned_file')) {
     }
 }
 
-
+if (!function_exists('csp_nonce')) {
+    /**
+     * Returnerar en per-process nonce (enkel variant utan Request-attribut/Container).
+     * Om du behöver per-request nonce, bär den via vydata istället för Request.
+     */
+    function csp_nonce(): string
+    {
+        static $nonce = null;
+        if (is_string($nonce) && $nonce !== '') {
+            return $nonce;
+        }
+        $nonce = bin2hex(random_bytes(16));
+        return $nonce;
+    }
+}
 
 if (!function_exists('app')) {
     function app(?string $abstract = null): mixed

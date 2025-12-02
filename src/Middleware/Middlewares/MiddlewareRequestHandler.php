@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Radix\Middleware;
+namespace Radix\Middleware\Middlewares;
 
 use Radix\Http\Request;
 use Radix\Http\RequestHandler;
 use Radix\Http\RequestHandlerInterface;
 use Radix\Http\Response;
+use Radix\Middleware\MiddlewareInterface;
 
 class MiddlewareRequestHandler implements RequestHandlerInterface
 {
