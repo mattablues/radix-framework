@@ -100,7 +100,9 @@ final class EnvValidator
     private function boolLike(string $key, bool $allowEmpty = false): void
     {
         $v = strtolower($this->get($key));
-        if ($v === '' && $allowEmpty) return;
+        if ($v === '' && $allowEmpty) {
+            return;
+        }
         if (!in_array($v, ['1','0','true','false'], true)) {
             $this->errors[] = "$key must be boolean-like (0/1/true/false)";
         }
@@ -109,14 +111,20 @@ final class EnvValidator
     private function intLike(string $key, bool $allowEmpty = false, ?int $min = null, ?int $max = null): void
     {
         $v = $this->get($key);
-        if ($v === '' && $allowEmpty) return;
+        if ($v === '' && $allowEmpty) {
+            return;
+        }
         if ($v === '' || !ctype_digit(ltrim($v, '+'))) {
             $this->errors[] = "$key must be integer";
             return;
         }
         $i = (int) $v;
-        if ($min !== null && $i < $min) $this->errors[] = "$key must be >= $min";
-        if ($max !== null && $i > $max) $this->errors[] = "$key must be <= $max";
+        if ($min !== null && $i < $min) {
+            $this->errors[] = "$key must be >= $min";
+        }
+        if ($max !== null && $i > $max) {
+            $this->errors[] = "$key must be <= $max";
+        }
     }
 
     private function url(string $key): void
@@ -130,7 +138,9 @@ final class EnvValidator
     private function email(string $key, bool $allowEmpty = false): void
     {
         $v = $this->get($key);
-        if ($v === '' && $allowEmpty) return;
+        if ($v === '' && $allowEmpty) {
+            return;
+        }
         if ($v === '' || filter_var($v, FILTER_VALIDATE_EMAIL) === false) {
             $this->errors[] = "$key must be a valid email";
         }
@@ -150,7 +160,7 @@ final class EnvValidator
             return;
         }
         if (!is_dir($abs)) {
-            @mkdir($abs, 0755, true);
+            @mkdir($abs, 0o755, true);
         }
         if (!is_dir($abs) || !is_writable($abs)) {
             $this->errors[] = "$key must be an existing writable directory (got: $abs)";
