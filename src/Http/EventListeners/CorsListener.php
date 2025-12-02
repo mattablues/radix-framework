@@ -26,8 +26,15 @@ class CorsListener
 
         $response->setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
         $response->setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With');
+
+        // Bygg upp Expose-Headers dynamiskt och inkludera rate limit-headers
+        $existingExpose = $response->getHeaders()['Access-Control-Expose-Headers'] ?? '';
+        $expose = array_filter(array_map('trim', explode(',', $existingExpose)));
+        $wanted = ['X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'];
+        $expose = array_values(array_unique(array_merge($expose, $wanted)));
+        $response->setHeader('Access-Control-Expose-Headers', implode(',', $expose));
+
         $response->setHeader('Access-Control-Max-Age', '600');
-        $response->setHeader('Access-Control-Expose-Headers', 'X-Request-Id');
 
         $allowCredentials = (getenv('CORS_ALLOW_CREDENTIALS') === '1');
         if ($allowCredentials) {
