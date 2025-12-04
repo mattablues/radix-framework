@@ -12,7 +12,7 @@ use Radix\Http\JsonResponse;
 use Radix\Http\Request;
 use Radix\Http\RequestHandler;
 use Radix\Http\Response;
-use Radix\Middleware\Middlewares\MiddlewareRequestHandler;
+use Radix\Middleware\MiddlewareRequestHandler;
 use Radix\Viewer\TemplateViewerInterface;
 use ReflectionFunction;
 use ReflectionMethod;
