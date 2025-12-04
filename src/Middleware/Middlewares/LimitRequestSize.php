@@ -18,8 +18,7 @@ class LimitRequestSize implements MiddlewareInterface
      */
     public function __construct(
         private readonly int $maxBytes = 2 * self::BYTES_IN_MB
-    ) {
-    }
+    ) {}
 
     public function process(Request $request, RequestHandlerInterface $next): Response
     {
