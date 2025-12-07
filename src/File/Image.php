@@ -241,7 +241,8 @@ class Image
             ],
             'landscape' => [
                 'optimalWidth' => $newWidth,
-                'optimalHeight' => $this->getSizeByRatio($newWidth, $this->width, $this->height),
+                // här var det fel ordning tidigare
+                'optimalHeight' => $this->getSizeByRatio($newWidth, $this->height, $this->width),
             ],
             'auto' => $this->getSizeByAuto($newWidth, $newHeight),
             'crop' => $this->getOptimalCrop($newWidth, $newHeight),
@@ -264,25 +265,26 @@ class Image
      */
     protected function getSizeByAuto(int $newWidth, int $newHeight): array
     {
-        if ($this->width > $this->height) {
-            $scaledHeight = (int) round($newWidth * ($this->height / $this->width));
-            return [
-                'optimalWidth' => $newWidth,
-                'optimalHeight' => $scaledHeight,
-            ];
-        }
+        $width  = $this->width;
+        $height = $this->height;
 
-        if ($this->width < $this->height) {
-            $scaledWidth = (int) round($newHeight * ($this->width / $this->height));
-            return [
-                'optimalWidth' => $scaledWidth,
-                'optimalHeight' => $newHeight,
-            ];
+        if ($width > $height) {
+            // Landscape: behåll bredden, skala höjden proportionellt
+            $optimalWidth  = $newWidth;
+            $optimalHeight = (int) round($newWidth * ($height / $width));
+        } elseif ($width < $height) {
+            // Portrait: behåll höjden, skala bredden proportionellt
+            $optimalHeight = $newHeight;
+            $optimalWidth  = (int) round($newHeight * ($width / $height));
+        } else {
+            // Square
+            $optimalWidth  = $newWidth;
+            $optimalHeight = $newHeight;
         }
 
         return [
-            'optimalWidth' => $newWidth,
-            'optimalHeight' => $newHeight,
+            'optimalWidth'  => $optimalWidth,
+            'optimalHeight' => $optimalHeight,
         ];
     }
 

@@ -260,7 +260,7 @@ final class Writer
     {
         $dir = dirname($path);
         if ($dir !== '' && !is_dir($dir)) {
-            if (!mkdir($dir, 0o775, true) && !is_dir($dir)) {
+            if (!@mkdir($dir, 0o775, true) && !is_dir($dir)) {
                 throw new RuntimeException("Kunde inte skapa katalog: {$dir}");
             }
         }
