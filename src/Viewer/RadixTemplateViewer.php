@@ -32,11 +32,30 @@ class RadixTemplateViewer implements TemplateViewerInterface
         if ($envCachePath !== '') {
             $isAbsolute = str_starts_with($envCachePath, DIRECTORY_SEPARATOR)
                 || preg_match('#^[A-Za-z]:[\\\\/]#', $envCachePath) === 1;
+
             $this->cachePath = $isAbsolute
                 ? rtrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR
                 : rtrim($root, '/\\') . DIRECTORY_SEPARATOR . ltrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR;
         } else {
-            $this->cachePath = rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+            $this->cachePath = rtrim($root, '/\\') . DIRECTORY_SEPARATOR
+                . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+        }
+
+        // Normalisera och säkerställ att vi aldrig använder projektroten eller bara "cache" som cache-katalog
+        $rootNormalized = rtrim($root, '/\\') . DIRECTORY_SEPARATOR;
+        $cacheRoot      = $rootNormalized . 'cache' . DIRECTORY_SEPARATOR;
+
+        // Se till att cachePath alltid slutar med DIRECTORY_SEPARATOR
+        $this->cachePath = rtrim($this->cachePath, '/\\') . DIRECTORY_SEPARATOR;
+
+        // Om någon konfigurering pekar direkt på projektroten → styr om till ROOT_PATH/cache/views
+        if ($this->cachePath === $rootNormalized) {
+            $this->cachePath = $cacheRoot . 'views' . DIRECTORY_SEPARATOR;
+        }
+
+        // Om någon konfigurering pekar direkt på ROOT_PATH/cache → styr om till ROOT_PATH/cache/views
+        if ($this->cachePath === $cacheRoot) {
+            $this->cachePath = $cacheRoot . 'views' . DIRECTORY_SEPARATOR;
         }
     }
 
@@ -501,8 +520,48 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     private function cacheTemplate(string $key, string $compiledCode): void
     {
-        $cacheFile = $this->cachePath . $key . '.php';
+        // Börja från den konfigurerade cachePath
+        $baseDir = $this->cachePath;
 
+        // Säkerhetsvakt: skriv aldrig vy-cache direkt i projektroten eller nuvarande arbetskatalog
+        $realBase = realpath($baseDir) ?: $baseDir;
+
+        $cwdRaw = getcwd();
+        if ($cwdRaw === false) {
+            $cwd = sys_get_temp_dir();
+        } else {
+            $cwd = realpath($cwdRaw) ?: $cwdRaw;
+        }
+
+        $rootRaw = defined('ROOT_PATH') ? (string) ROOT_PATH : $cwd;
+        $root    = $rootRaw !== '' ? $rootRaw : $cwd;
+
+        $realRoot = realpath($root) ?: $root;
+
+        if (
+            $realBase === ''
+            || $realBase === DIRECTORY_SEPARATOR
+            || $realBase === $cwd
+            || $realBase === $realRoot
+        ) {
+            // Styr om till ROOT_PATH/cache/views som säker fallback
+            $safeRoot = rtrim($root, '/\\');
+            $baseDir  = $safeRoot
+                . DIRECTORY_SEPARATOR . 'cache'
+                . DIRECTORY_SEPARATOR . 'views'
+                . DIRECTORY_SEPARATOR;
+        }
+
+        // Se till att bas-katalogen vi faktiskt ska skriva i finns
+        if (!is_dir($baseDir)) {
+            @mkdir($baseDir, 0o755, true);
+        }
+
+        // Bygg full sökväg till cachefilen utifrån den säkra katalogen
+        $cacheFile = rtrim($baseDir, '/\\') . DIRECTORY_SEPARATOR . $key . '.php';
+
+        // Behåll även den gamla logiken som ser till att this->cachePath existerar,
+        // eftersom andra delar av koden kan förlita sig på den.
         if (!is_dir($this->cachePath)) {
             $this->debug("Cache directory not found. Creating: $this->cachePath");
             mkdir($this->cachePath, 0o755, true);
@@ -510,9 +569,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         // Kontrollera miljön från APP_ENV: Minifiera endast i production
         $appEnv = strtolower((string) (getenv('APP_ENV') ?: 'production'));
-        $codeToWrite = $appEnv === 'production' ? $this->minifyPHP($compiledCode) : $compiledCode;
+        $codeToWrite = $appEnv === 'production'
+            ? $this->minifyPHP($compiledCode)
+            : $compiledCode;
 
-        $this->debug("Writing cache file to: $cacheFile (Minify: " . ($appEnv === 'production' ? 'YES' : 'NO') . ")");
+        $this->debug(
+            "Writing cache file to: $cacheFile (Minify: "
+            . ($appEnv === 'production' ? 'YES' : 'NO') . ")"
+        );
 
         // Skriv ut koden till fil
         if (file_put_contents($cacheFile, $codeToWrite) === false) {
@@ -702,14 +766,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
      *
      * @param int $maxAgeInSeconds The maximum age (in seconds) a cache file is allowed to have.
      */
-    private function clearOldCacheFiles(int $maxAgeInSeconds = 86400): void // 1 day by default
+    private function clearOldCacheFiles(int $maxAgeInSeconds = 86400, ?int $now = null): void // 1 day by default
     {
         // Kontrollera om cache-katalogen finns innan du rensar
         if (!is_dir($this->cachePath)) {
             return;
         }
 
-        $now = time();
+        $now ??= time();
 
         // Loopa igenom alla filer i cachekatalogen
         foreach (scandir($this->cachePath) as $file) {

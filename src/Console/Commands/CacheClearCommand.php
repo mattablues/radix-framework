@@ -82,6 +82,36 @@ final class CacheClearCommand extends BaseCommand
             return true;
         }
 
+        // Säkerhetsvakt: rensa aldrig projektroten eller nuvarande arbetskatalog
+        $realDir = realpath($dir);
+
+        $cwdRaw = getcwd();
+        if ($cwdRaw === false) {
+            $cwd = sys_get_temp_dir();
+        } else {
+            $cwd = realpath($cwdRaw) ?: $cwdRaw;
+        }
+
+        if ($realDir === false) {
+            return false;
+        }
+
+        // Om ROOT_PATH är definierad, skydda även den
+        if (defined('ROOT_PATH')) {
+            $rootPath = realpath((string) ROOT_PATH);
+        } else {
+            $rootPath = null;
+        }
+
+        if ($realDir === $cwd || ($rootPath !== false && $rootPath !== null && $realDir === $rootPath)) {
+            // Vi loggar hellre en varning än att råka ta bort hela projektet
+            $this->coloredOutput(
+                "VARNING: Försök att rensa cache i '$realDir' avbröts (för brett område).",
+                "red"
+            );
+            return false;
+        }
+
         $ok = true;
         $items = @scandir($dir) ?: [];
         foreach ($items as $item) {
