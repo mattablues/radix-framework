@@ -1293,27 +1293,12 @@ abstract class Model implements JsonSerializable
     {
         $relations = is_array($relations) ? $relations : [$relations];
 
-        foreach ($relations as $key => $constraint) {
-            if (is_int($key)) {
-                if (!is_string($constraint)) {
-                    // enligt signaturen ska värdet här vara string; hoppa annars
-                    continue;
-                }
-                $name = $constraint;
-            } else {
-                $name = $key;
-            }
-
-            if (array_key_exists($name, $this->relations)) {
-                continue; // redan laddad
-            }
-        }
-
-        // Kör load() med full uppsättning, men filtrera bort redan laddade
+        // Bygg upp lista av relationer som faktiskt saknas
         $toLoad = [];
         foreach ($relations as $key => $constraint) {
             if (is_int($key)) {
                 if (!is_string($constraint)) {
+                    // enligt signaturen ska värdet här vara string; hoppa annars
                     continue;
                 }
                 $name = $constraint;
@@ -1332,6 +1317,110 @@ abstract class Model implements JsonSerializable
 
         return $this;
     }
+
+    //    public function loadMissing(array|string $relations): self
+    //    {
+    //        $relations = is_array($relations) ? $relations : [$relations];
+    //
+    //        foreach ($relations as $key => $constraint) {
+    //            if (is_int($key)) {
+    //                if (!is_string($constraint)) {
+    //                    // enligt signaturen ska värdet här vara string; hoppa annars
+    //                    continue;
+    //                }
+    //                $name = $constraint;
+    //            } else {
+    //                $name = $key;
+    //            }
+    //
+    //            if (array_key_exists($name, $this->relations)) {
+    //                continue; // redan laddad
+    //            }
+    //        }
+    //
+    //        // Kör load() med full uppsättning, men filtrera bort redan laddade
+    //        $toLoad = [];
+    //        foreach ($relations as $key => $constraint) {
+    //            if (is_int($key)) {
+    //                if (!is_string($constraint)) {
+    //                    continue;
+    //                }
+    //                $name = $constraint;
+    //            } else {
+    //                $name = $key;
+    //            }
+    //
+    //            if (!array_key_exists($name, $this->relations)) {
+    //                $toLoad[$key] = $constraint;
+    //            }
+    //        }
+    //
+    //        if (!empty($toLoad)) {
+    //            $this->load($toLoad);
+    //        }
+    //
+    //        return $this;
+    //    }
+
+    //    /**
+    //     * @return array<string, mixed>
+    //     */
+    //    public function toArray(): array
+    //    {
+    //        $array = [];
+    //
+    //        foreach ($this->attributes as $key => $value) {
+    //            $array[$key] = $this->getAttribute($key);
+    //        }
+    //
+    //        foreach ($this->relations as $relationKey => $relationValue) {
+    //            if ($relationValue instanceof Collection) {
+    //                $array[$relationKey] = $relationValue->map(
+    //                    fn($item) => $item instanceof self ? $item->toArray() : $item
+    //                )->values()->toArray();
+    //            } elseif (is_array($relationValue)) {
+    //                $array[$relationKey] = array_map(
+    //                    fn($item) => $item instanceof self ? $item->toArray() : $item,
+    //                    $relationValue
+    //                );
+    //            } elseif ($relationValue instanceof self) {
+    //                $array[$relationKey] = $relationValue->toArray();
+    //            } else {
+    //                $array[$relationKey] = $relationValue;
+    //            }
+    //        }
+    //
+    //        if (!empty($this->autoloadRelations)) {
+    //            foreach ($this->autoloadRelations as $relation) {
+    //                if (!isset($array[$relation]) && $this->relationExists($relation)) {
+    //                    $relObj = $this->$relation();
+    //
+    //                    if (is_object($relObj) && method_exists($relObj, 'get')) {
+    //                        $relatedData = $relObj->get();
+    //                    } else {
+    //                        $relatedData = null;
+    //                    }
+    //
+    //                    if ($relatedData instanceof Collection) {
+    //                        $array[$relation] = $relatedData->map(
+    //                            fn($item) => $item instanceof self ? $item->toArray() : $item
+    //                        )->values()->toArray();
+    //                    } elseif (is_array($relatedData)) {
+    //                        $array[$relation] = array_map(
+    //                            fn($item) => $item instanceof self ? $item->toArray() : $item,
+    //                            $relatedData
+    //                        );
+    //                    } elseif ($relatedData instanceof self) {
+    //                        $array[$relation] = $relatedData->toArray();
+    //                    } else {
+    //                        $array[$relation] = $relatedData;
+    //                    }
+    //                }
+    //            }
+    //        }
+    //
+    //        return $array;
+    //    }
 
     /**
      * @return array<string, mixed>
@@ -1355,7 +1444,9 @@ abstract class Model implements JsonSerializable
                     $relationValue
                 );
             } elseif ($relationValue instanceof self) {
-                $array[$relationKey] = $relationValue->toArray();
+                // UNDVIK oändlig rekursion (t.ex. child -> parent -> child ...)
+                // Genom att bara ta modellens attribut, inte dess egna relationer.
+                $array[$relationKey] = $relationValue->getAttributes();
             } else {
                 $array[$relationKey] = $relationValue;
             }
