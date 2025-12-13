@@ -39,16 +39,7 @@ class LimitRequestSize implements MiddlewareInterface
     {
         $value = $server['CONTENT_LENGTH'] ?? $server['HTTP_CONTENT_LENGTH'] ?? null;
 
-        if ($value === null) {
-            return null;
-        }
-
-        if (!is_string($value)) {
-            return null;
-        }
-
-        // Content-Length ska vara heltal i textform
-        if ($value === '' || !ctype_digit($value)) {
+        if (!is_string($value) || $value === '' || !ctype_digit($value)) {
             return null;
         }
 
