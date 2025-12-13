@@ -10,7 +10,7 @@ trait CaseExpressions
      * @param array<int, array{
      *     cond: string,
      *     then?: string,
-     *     bindings?: array<int, mixed>
+     *     bindings?: array<int, mixed>|mixed
      * }> $conditions
      */
     public function caseWhen(array $conditions, ?string $else = null, ?string $alias = null): self
@@ -37,7 +37,7 @@ trait CaseExpressions
     /**
      * ORDER BY CASE helper.
      *
-     * @param array<string, int> $whenMap  Map värde => sorteringsrank
+     * @param array<string, int|string> $whenMap  Map värde => sorteringsrank (castas till int)
      */
     public function orderByCase(string $column, array $whenMap, string $else = 'ZZZ', string $direction = 'ASC'): self
     {

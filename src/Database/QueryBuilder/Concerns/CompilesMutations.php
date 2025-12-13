@@ -10,10 +10,19 @@ use Stringable;
 
 trait CompilesMutations
 {
+    /** @var array<int, string> */
     protected array $withAggregateExpressions = [];
+
+    /** @var array<int, string>|null */
     protected ?array $upsertUnique = null; // för UPSERT
+
+    /** @var array<string, mixed>|null */
     protected ?array $upsertUpdate = null;  // för UPSERT
+
+    /** @var array<int, mixed> */
     protected array $bindingsUnion = [];
+
+    /** @var array<int, mixed> */
     protected array $bindingsMutation = [];
 
     // Håller färdigbyggd SQL för mutations (används av t.ex. InsertSelect)

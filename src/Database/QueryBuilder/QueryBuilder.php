@@ -213,7 +213,8 @@ class QueryBuilder extends AbstractQueryBuilder
                 throw new RuntimeException("Failed to parse table alias from '{$table}'.");
             }
 
-            [$tableName, $alias] = array_map('trim', $parts);
+            // trim är i praktiken redundant här då regexen redan ger rena delar
+            [$tableName, $alias] = $parts;
 
             $this->table = $this->wrapColumn($tableName) . ' AS ' . $this->wrapAlias($alias);
         } else {
