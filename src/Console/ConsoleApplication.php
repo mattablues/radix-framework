@@ -9,6 +9,12 @@ use Exception;
 class ConsoleApplication
 {
     /**
+     * Max antal argv-tokens (efter script-namnet) vi skannar efter ett kommando.
+     * Detta är en säkerhetsventil mot oändliga loopar vid mutationer/buggar.
+     */
+    private const int MAX_ARG_SCAN = 1000;
+
+    /**
      * @var array<string, callable>
      */
     private array $commands = [];
@@ -29,19 +35,34 @@ class ConsoleApplication
 
         $asMarkdown = in_array('--md', $argv, true) || in_array('--markdown', $argv, true);
 
+        // Säkerställ CLI-kontrakt: script-namn måste finnas på index 0.
+        // Detta gör array_values() semantiskt viktig om någon skickar en "holey" argv.
+        $script = $argv[0] ?? null;
+        if (!is_string($script) || $script === '') {
+            $this->displayHelp($asMarkdown);
+            return;
+        }
+
         // Hitta första "riktiga" token som inte är en flagga (börjar med "-")
         $command = null;
         $commandIndex = null;
 
-        $argc = count($argv);
-        for ($i = 1; $i < $argc; $i++) {
-            $token = $argv[$i];
+        // Skanna argv[1..] men aldrig mer än MAX_ARG_SCAN tokens
+        $steps = 0;
+        $tail = array_slice($argv, 1);
+
+        foreach ($tail as $offset => $token) {
+            $steps++;
+
+            // Cap ska trigga EXAKT en gång (på MAX+1), så break vs continue blir testbart.
+            if ($steps === self::MAX_ARG_SCAN + 1) {
+                break;
+            }
 
             if ($token === '') {
                 continue;
             }
 
-            // Extra defensivt (PHPStan + framtidssäkert)
             if (!is_string($token)) {
                 continue;
             }
@@ -51,12 +72,18 @@ class ConsoleApplication
             }
 
             $command = $token;
-            $commandIndex = $i;
+            $commandIndex = $offset + 1; // +1 pga array_slice startar från argv[1]
             break;
         }
 
         // Ingen command => visa global help (ev. i Markdown)
-        if ($command === null || $commandIndex === null) {
+        if ($command === null) {
+            $this->displayHelp($asMarkdown);
+            return;
+        }
+
+        // Extra defensivt: ska aldrig hända om $command hittades, men skyddar mot inkonsekvent state.
+        if ($commandIndex === null) {
             $this->displayHelp($asMarkdown);
             return;
         }
