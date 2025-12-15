@@ -25,8 +25,18 @@ final class CacheClearCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'cache:clear';
+        $options = [
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+        $examples = [
+            'cache:clear',
+            'cache:clear --help',
+            'cache:clear --help --md',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
             return;
         }
 
@@ -65,15 +75,6 @@ final class CacheClearCommand extends BaseCommand
         }
 
         $this->coloredOutput("\nKlar.\n", "green");
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  cache:clear                Rensar applikations- och ratelimit-cache.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  --help                     Visa denna hjälp.", "yellow");
-        echo PHP_EOL;
     }
 
     private function deleteCacheDirectory(string $dir): bool

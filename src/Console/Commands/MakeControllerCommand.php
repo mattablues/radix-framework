@@ -32,14 +32,32 @@ class MakeControllerCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        // Visa hjälp om ingen input ges
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:controller [namespace]/[controller_name]';
+        $options = [
+            '[namespace]' => 'Optional folder(s) under Controllers (e.g. Admin/Auth).',
+            '[controller_name]' => 'Controller class name (without .php).',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+        $examples = [
+            'make:controller UserController',
+            'make:controller Admin/DashboardController',
+            'make:controller Api/V1/UserController',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
             return;
         }
 
-        // Kontrollera att controller-namnet har skickats in
-        $controllerName = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $controllerName = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $controllerName = $arg;
+            break;
+        }
 
         if (!$controllerName) {
             $this->coloredOutput("Error: 'controller_name' is required.", "red");
@@ -49,17 +67,6 @@ class MakeControllerCommand extends BaseCommand
 
         // Skapa controller-filen
         $this->createControllerFile($controllerName);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:controller [namespace]/[controller_name] Create a new controller.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [namespace]                                   The namespace of the controller to create. (optional)", "yellow");
-        $this->coloredOutput("  [controller_name]                             The name of the controller to create.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createControllerFile(string $controllerName): void

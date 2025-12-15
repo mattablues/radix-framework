@@ -32,30 +32,40 @@ class MakeTestCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:test [namespace]/[TestName]';
+        $options = [
+            '[namespace]' => 'Optional folder(s) under tests/ (e.g. Api/Auth).',
+            '[TestName]' => 'Test class name (without .php).',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+        $examples = [
+            'make:test Container/ContainerTest',
+            'make:test Api/UserControllerTest',
+            'make:test Database/QueryBuilderTest',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
             return;
         }
 
-        $name = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $name = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $name = $arg;
+            break;
+        }
+
         if (!$name) {
-            $this->coloredOutput("Error: 'test_name' is required.", "red");
+            $this->coloredOutput("Error: 'test_name' is required.", 'red');
             echo "Tip: Use '--help' for usage information.\n";
             return;
         }
 
         $this->createTestFile($name);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:test [namespace]/[TestName]              Create a new test class.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [namespace]                                   Optional folder(s) under tests/ (e.g. Api/Auth)", "yellow");
-        $this->coloredOutput("  [TestName]                                    Test class name (without .php)", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createTestFile(string $testName): void

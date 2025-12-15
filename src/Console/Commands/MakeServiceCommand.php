@@ -32,36 +32,35 @@ class MakeServiceCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        // Kontrollera om hjälp ska visas
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:service [service_name]';
+        $options = [
+            '[service_name]' => 'The name of the service to create.',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
-        // Kontrollera om service_name skickats
-        $serviceName = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $serviceName = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $serviceName = $arg;
+            break;
+        }
 
         if (!$serviceName) {
-            $this->coloredOutput("Error: 'service_name' is required.", "red");
-            $this->showHelp(); // Visa hjälp om inget namn skickas
+            $this->coloredOutput("Error: 'service_name' is required.", 'red');
+            echo "Tip: Use '--help' to see how to use this command.\n";
             return;
         }
 
         // Skapa servicefilén
         $this->createServiceFile($serviceName);
-    }
-
-    /**
-     * Visa hjälpinformation.
-     */
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:service [service_name]                   Create a new service.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [service_name]                                The name of the service to create.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createServiceFile(string $serviceName): void

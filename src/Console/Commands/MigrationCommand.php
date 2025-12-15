@@ -35,6 +35,37 @@ class MigrationCommand extends BaseCommand
         // Hämta vilket kommando som körs
         $command = $args['_command'] ?? null;
 
+        $usage = ($command === 'migrations:rollback')
+            ? 'migrations:rollback [migration_name?]'
+            : 'migrations:migrate';
+
+        $options = [
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        $examples = [];
+        if ($command === 'migrations:rollback') {
+            $options = [
+                '[migration_name?]' => 'Optional partial migration name filter.',
+                '--help, -h' => 'Display this help message.',
+                '--md, --markdown' => 'Output help as Markdown.',
+            ];
+            $examples = [
+                'migrations:rollback',
+                'migrations:rollback create_users',
+                'migrations:rollback users',
+            ];
+        } else {
+            $examples = [
+                'migrations:migrate',
+            ];
+        }
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
+            return;
+        }
+
         switch ($command) {
             case 'migrations:migrate':
                 $this->runMigrate(); // Kör migreringar
@@ -46,7 +77,22 @@ class MigrationCommand extends BaseCommand
                 break;
 
             default:
-                $this->showHelp(); // Visa hjälp vid okänt kommando
+                // Om någon kör "migration" utan subcommand: visa en generell help
+                $this->displayHelp(
+                    'migrations:migrate | migrations:rollback [migration_name?]',
+                    [
+                        'migrations:migrate' => 'Run new migrations.',
+                        'migrations:rollback [migration_name?]' => 'Rollback migrations (partial name supported).',
+                        '--help, -h' => 'Display this help message.',
+                        '--md, --markdown' => 'Output help as Markdown.',
+                    ],
+                    in_array('--md', $args, true) || in_array('--markdown', $args, true),
+                    [
+                        'migrations:migrate',
+                        'migrations:rollback',
+                        'migrations:rollback users',
+                    ]
+                );
                 break;
         }
     }
@@ -73,16 +119,5 @@ class MigrationCommand extends BaseCommand
 
         // Skriv ut alla rollback-meddelanden på separata rader utan extra mellanrum
         $this->coloredOutput(implode("\n", $rolledBackMigrations), "yellow");
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  migrations:migrate                            Run new migrations.", "yellow");
-        $this->coloredOutput("  migrations:rollback                           Rollback migrations.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [migration_name]                              Rollback migrations (partial name is supported).", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 }

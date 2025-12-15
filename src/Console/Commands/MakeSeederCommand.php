@@ -24,12 +24,27 @@ final class MakeSeederCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:seeder [Name]';
+        $options = [
+            '[Name]' => 'Seeder base name, e.g. Users (will generate UsersSeeder class).',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
-        $name = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $name = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $name = $arg;
+            break;
+        }
+
         if (!$name) {
             $this->coloredOutput("Error: seeder name is required.", "red");
             echo "Tip: make:seeder Users\n";
@@ -37,15 +52,6 @@ final class MakeSeederCommand extends BaseCommand
         }
 
         $this->createSeederFile($name);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:seeder [Name]                            Create a new seeder.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createSeederFile(string $name): void

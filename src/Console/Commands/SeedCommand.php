@@ -27,6 +27,35 @@ final class SeedCommand extends BaseCommand
     {
         $command = $args['_command'] ?? null;
 
+        $usage = ($command === 'seeds:rollback')
+            ? 'seeds:rollback [name?]'
+            : 'seeds:run [name?]';
+
+        $options = [
+            '[name?]' => 'Optional partial seeder name filter.',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        $examples = [];
+        if ($command === 'seeds:rollback') {
+            $examples = [
+                'seeds:rollback',
+                'seeds:rollback users',
+                'seeds:rollback UserSeeder',
+            ];
+        } else {
+            $examples = [
+                'seeds:run',
+                'seeds:run users',
+                'seeds:run UserSeeder',
+            ];
+        }
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
+            return;
+        }
+
         switch ($command) {
             case 'seeds:run':
                 $name = $args[0] ?? null;
@@ -39,7 +68,24 @@ final class SeedCommand extends BaseCommand
                 break;
 
             default:
-                $this->showHelp();
+                // Om någon kör "seed" utan subcommand: visa en generell help
+                $this->displayHelp(
+                    'seeds:run [name?] | seeds:rollback [name?]',
+                    [
+                        'seeds:run [name?]' => 'Run seeders (partial name supported).',
+                        'seeds:rollback [name?]' => 'Rollback seeders if down() is implemented.',
+                        '--help, -h' => 'Display this help message.',
+                        '--md, --markdown' => 'Output help as Markdown.',
+                    ],
+                    in_array('--md', $args, true) || in_array('--markdown', $args, true),
+                    [
+                        'seeds:run',
+                        'seeds:run users',
+                        'seeds:rollback',
+                        'seeds:rollback users',
+                    ]
+                );
+                break;
         }
     }
 
@@ -67,15 +113,5 @@ final class SeedCommand extends BaseCommand
 
         $this->coloredOutput("Rolled back seeders:", 'green');
         $this->coloredOutput(implode("\n", $rolled), 'yellow');
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  seeds:run [name?]                             Run seeders (partial name supported).", "yellow");
-        $this->coloredOutput("  seeds:rollback [name?]                        Rollback seeders if down() is implemented.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 }

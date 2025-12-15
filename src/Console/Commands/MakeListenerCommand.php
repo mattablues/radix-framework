@@ -32,33 +32,35 @@ class MakeListenerCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        // Hantera hjälpinformation
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:listener [listener_name]';
+        $options = [
+            '[listener_name]' => 'The name of the listener to create.',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
-        // Kontrollera om listener_name skickats
-        $listenerName = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $listenerName = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $listenerName = $arg;
+            break;
+        }
 
         if (!$listenerName) {
-            $this->coloredOutput("Error: 'listener_name' is required.", "red");
+            $this->coloredOutput("Error: 'listener_name' is required.", 'red');
             echo "Tip: Use '--help' to see how to use this command.\n";
             return;
         }
 
         // Skapa listener filen
         $this->createListenerFile($listenerName);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:listener [listener_name]                 Create a new listener.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [listener_name]                               The name of the listener to create.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createListenerFile(string $listenerName): void

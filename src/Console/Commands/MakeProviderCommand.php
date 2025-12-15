@@ -32,33 +32,35 @@ class MakeProviderCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        // Hantera hjälpinformation
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:provider [provider_name]';
+        $options = [
+            '[provider_name]' => 'The name of the provider to create.',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
-        // Kontrollera om provider_name skickats
-        $providerName = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $providerName = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $providerName = $arg;
+            break;
+        }
 
         if (!$providerName) {
-            $this->coloredOutput("Error: 'provider_name' is required.", "red");
+            $this->coloredOutput("Error: 'provider_name' is required.", 'red');
             echo "Tip: Use '--help' to see how to use this command.\n";
             return;
         }
 
         // Skapa provider filen
         $this->createServiceFile($providerName);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:provider [provider_name]                 Create a new provider.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [provider_name]                               The name of the provider to create.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createServiceFile(string $providerName): void

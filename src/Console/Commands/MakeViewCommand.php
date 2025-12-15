@@ -30,13 +30,35 @@ class MakeViewCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:view <path> [--layout=main|sidebar|admin|auth] [--ext=ratio.php]';
+        $options = [
+            '<path>' => "View path, e.g. 'about/index' or 'docs/guide/intro'.",
+            '--layout=main|sidebar|admin|auth' => 'Choose layout (default: main).',
+            '--ext=ratio.php' => 'File extension (default: ratio.php).',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+        $examples = [
+            'make:view about/index --layout=main',
+            'make:view auth/login --layout=auth',
+            'make:view admin/dashboard --layout=admin',
+            'make:view docs/guide/intro --layout=sidebar --ext=ratio.php',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
             return;
         }
 
         // Ta path exakt som MakeController tar controllerName
-        $viewPath = $args[0] ?? null;
+        $viewPath = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $viewPath = $arg;
+            break;
+        }
+
         if (!$viewPath) {
             $this->coloredOutput("Error: You must provide a view path, e.g. 'test/index'.", "red");
             echo "Tip: Use '--help' for usage information.\n";
@@ -90,18 +112,6 @@ class MakeViewCommand extends BaseCommand
         }
 
         $this->coloredOutput("View created: $targetFile", "green");
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:view <path> [--layout=main|sidebar|admin|auth] [--ext=ratio.php]", "yellow");
-        $this->coloredOutput("Examples:", "green");
-        $this->coloredOutput("  make:view about/index --layout=main", "yellow");
-        $this->coloredOutput("  make:view auth/login --layout=auth", "yellow");
-        $this->coloredOutput("  make:view admin/dashboard --layout=admin", "yellow");
-        $this->coloredOutput("  make:view docs/guide/intro --layout=sidebar --ext=ratio.php", "yellow");
-        echo PHP_EOL;
     }
 
     /**

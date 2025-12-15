@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+// ... existing code ...
+
 class MakeMigrationCommand extends BaseCommand
 {
     private string $migrationPath;
@@ -23,7 +25,6 @@ class MakeMigrationCommand extends BaseCommand
     public function execute(array $args): void
     {
         $this->__invoke($args); // Anropa __invoke-logiken
-
     }
 
     /**
@@ -33,15 +34,34 @@ class MakeMigrationCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        // Hantera hjälpinformation
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:migration [operation] [table_name]';
+        $options = [
+            '[operation]' => 'Migration operation (e.g. create, alter). Must have a matching stub: {operation}_table.stub.',
+            '[table_name]' => 'Table name (for create: will be lowercased).',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+        $examples = [
+            'make:migration create users',
+            'make:migration alter users',
+            'make:migration create blog_posts',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
             return;
         }
 
-        // Kontrollera om argument tillhandahålls
-        $operation = $args[0] ?? null;
-        $tableName = $args[1] ?? null;
+        // Plocka "riktiga" argument (ignorera flags som börjar med -)
+        $positionals = [];
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $positionals[] = $arg;
+        }
+
+        $operation = $positionals[0] ?? null;
+        $tableName = $positionals[1] ?? null;
 
         if (!$operation || !$tableName) {
             $this->coloredOutput("Error: Both 'operation' and 'table_name' are required.", "red");
@@ -53,17 +73,7 @@ class MakeMigrationCommand extends BaseCommand
         $this->createMigrationFile($operation, $tableName);
     }
 
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:migration [operation] [table_name]       Create a new migration.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [operation]                                   The migration operation (e.g., create, alter.", "yellow");
-        $this->coloredOutput("  [table_name]                                  The name of the table to create or alter.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
-    }
-
+    // ... existing code ...
     private function createMigrationFile(string $operation, string $tableName): void
     {
         $timestamp = date('YmdHis');

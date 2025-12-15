@@ -32,33 +32,35 @@ class MakeMiddlewareCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        // Hantera hjälpinformation
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:middleware [middleware_name]';
+        $options = [
+            '[middleware_name]' => 'The name of the middleware to create.',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
-        // Kontrollera om middleware_name skickats
-        $middlewareName = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $middlewareName = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $middlewareName = $arg;
+            break;
+        }
 
         if (!$middlewareName) {
-            $this->coloredOutput("Error: 'middleware_name' is required.", "red");
+            $this->coloredOutput("Error: 'middleware_name' is required.", 'red');
             echo "Tip: Use '--help' to see how to use this command.\n";
             return;
         }
 
         // Skapa middleware filen
         $this->createMiddlewareFile($middlewareName);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:middleware [middleware_name]             Create a new middleware.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [middleware_name]                             The name of the middleware to create.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createMiddlewareFile(string $middlewareName): void

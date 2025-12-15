@@ -32,32 +32,35 @@ class MakeEventCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'make:event [event_name]';
+        $options = [
+            '[event_name]' => 'The name of the event to create.',
+            '--help, -h' => 'Display this help message.',
+            '--md, --markdown' => 'Output help as Markdown.',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
-        // Kontrollera om event_name skickats
-        $eventName = $args[0] ?? null;
+        // Plocka första "riktiga" argumentet (ignorera flags som börjar med -)
+        $eventName = null;
+        foreach ($args as $arg) {
+            if ($arg === '' || $arg[0] === '-') {
+                continue;
+            }
+            $eventName = $arg;
+            break;
+        }
 
         if (!$eventName) {
-            $this->coloredOutput("Error: 'event_name' is required.", "red");
+            $this->coloredOutput("Error: 'event_name' is required.", 'red');
             echo "Tip: Use '--help' to see how to use this command.\n";
             return;
         }
 
         // Skapa event filen
         $this->createEventFile($eventName);
-    }
-
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:event [event_name]                       Create a new event.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [event_name]                                  The name of the event to create.", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
     }
 
     private function createEventFile(string $eventName): void

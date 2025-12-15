@@ -35,8 +35,15 @@ class MakeModelCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        if (in_array('--help', $args, true)) {
-            $this->showHelp();
+        $usage = 'php radix make:model [model_name] [--table=table_name] [--plural]';
+        $options = [
+            '--help, -h' => 'Visa denna hjälp.',
+            '--md' => 'Skriv hjälp i Markdown-format.',
+            '--table=table_name' => 'Override inferred table name.',
+            '--plural' => 'Pluralize inferred table name (uses config/pluralization.php).',
+        ];
+
+        if ($this->handleHelpFlag($args, $usage, $options)) {
             return;
         }
 
@@ -60,18 +67,7 @@ class MakeModelCommand extends BaseCommand
         $this->createModelFile($modelName, $explicitTable, $usePlural);
     }
 
-    private function showHelp(): void
-    {
-        $this->coloredOutput("Usage:", "green");
-        $this->coloredOutput("  make:model [model_name] [--table=table_name] [--plural]  Create a new model.", "yellow");
-        $this->coloredOutput("Options:", "green");
-        $this->coloredOutput("  [model_name]                                  The name of the model to create.", "yellow");
-        $this->coloredOutput("  --table=table_name                            Override inferred table name.", "yellow");
-        $this->coloredOutput("  --plural                                      Pluralize inferred table name (uses config/pluralization.php).", "yellow");
-        $this->coloredOutput("  --help                                        Display this help message.", "yellow");
-        echo PHP_EOL;
-    }
-
+    // ... existing code ...
     private function createModelFile(string $modelName, ?string $explicitTable = null, bool $usePlural = false): void
     {
         $filename = "$modelName.php";
