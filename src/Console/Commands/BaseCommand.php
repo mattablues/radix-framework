@@ -54,13 +54,9 @@ abstract class BaseCommand
         if ($options !== []) {
             echo "Options:\n";
 
-            $maxLen = 0;
-            foreach ($options as $option => $_description) {
-                $len = strlen((string) $option);
-                if ($len > $maxLen) {
-                    $maxLen = $len;
-                }
-            }
+            // Beräkna max-längd utan “>”-jämförelse (tar bort GreaterThan/DecrementInteger-mutantfamiljen)
+            $keyLengths = array_map(static fn(string $k): int => strlen($k), array_keys($options));
+            $maxLen = max($keyLengths);
 
             foreach ($options as $option => $description) {
                 $opt = str_pad((string) $option, $maxLen, ' ');
@@ -84,21 +80,28 @@ abstract class BaseCommand
     /**
      * Hantera --help/-h-flaggan för ett kommando.
      *
-     * @param array<int, string>    $args     Råa argv-argument.
+     * @param array<int, string>    $args     Råa argv-argument (lista).
      * @param array<string, string> $options  Nyckel = flagga, värde = beskrivning.
-     * @param list<string>         $examples Exempelkommandon (utan "php radix").
+     * @param list<string>          $examples Exempelkommandon (utan "php radix").
      */
     public function handleHelpFlag(array $args, string $usage, array $options, array $examples = []): bool
     {
-        $asMarkdown = in_array('--md', $args, true) || in_array('--markdown', $args, true);
+        $asMarkdown = false;
 
-        // Kontrollera om --help flaggan finns bland argumenten
-        if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
-            $this->displayHelp($usage, $options, $asMarkdown, $examples);
-            return true; // Returnera true för att indikera att hjälpen visades
+        foreach ($args as $arg) {
+            if ($arg === '--md' || $arg === '--markdown') {
+                $asMarkdown = true;
+            }
         }
 
-        return false; // Ingen hjälpflagga funnen
+        foreach ($args as $arg) {
+            if ($arg === '--help' || $arg === '-h') {
+                $this->displayHelp($usage, $options, $asMarkdown, $examples);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

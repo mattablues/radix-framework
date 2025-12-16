@@ -6,6 +6,7 @@ namespace Radix\Console\Commands;
 
 class MakeViewCommand extends BaseCommand
 {
+    private const int DIR_MODE = 0o755;
     private string $viewsBasePath;
     private string $templatePath;
 
@@ -18,7 +19,7 @@ class MakeViewCommand extends BaseCommand
     /**
      * Kör kommandot med givna argument.
      *
-     * @param array<int, string> $args
+     * @param array<int|string, string> $args
      */
     public function execute(array $args): void
     {
@@ -26,7 +27,10 @@ class MakeViewCommand extends BaseCommand
     }
 
     /**
-     * @param array<int,string> $args
+     * @param array<int|string, string> $args
+     */
+    /**
+     * @param array<int|string, string> $args
      */
     public function __invoke(array $args): void
     {
@@ -45,13 +49,20 @@ class MakeViewCommand extends BaseCommand
             'make:view docs/guide/intro --layout=sidebar --ext=ratio.php',
         ];
 
-        if ($this->handleHelpFlag($args, $usage, $options, $examples)) {
+        $argv = array_filter($args, static fn($k): bool => is_int($k), ARRAY_FILTER_USE_KEY);
+        /** @var array<int,string> $argv */
+
+        if ($this->handleHelpFlag($argv, $usage, $options, $examples)) {
             return;
         }
 
         // Ta path exakt som MakeController tar controllerName
+        // OBS: ignorera assoc keys som "_command"
         $viewPath = null;
-        foreach ($args as $arg) {
+        foreach ($args as $key => $arg) {
+            if (!is_int($key)) {
+                continue;
+            }
             if ($arg === '' || $arg[0] === '-') {
                 continue;
             }
@@ -60,8 +71,8 @@ class MakeViewCommand extends BaseCommand
         }
 
         if (!$viewPath) {
-            $this->coloredOutput("Error: You must provide a view path, e.g. 'test/index'.", "red");
-            echo "Tip: Use '--help' for usage information.\n";
+            $asMarkdown = in_array('--md', $argv, true) || in_array('--markdown', $argv, true);
+            $this->displayHelp($usage, $options, $asMarkdown, $examples);
             return;
         }
 
@@ -82,7 +93,7 @@ class MakeViewCommand extends BaseCommand
         $targetDir  = dirname($targetFile);
 
         if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0o755, true);
+            mkdir($targetDir, self::DIR_MODE, true);
         }
 
         if (file_exists($targetFile)) {
@@ -96,7 +107,12 @@ class MakeViewCommand extends BaseCommand
             return;
         }
 
-        $stub   = (string) file_get_contents($stubFile);
+        $stub = file_get_contents($stubFile);
+        if ($stub === false) {
+            $this->coloredOutput("Error: Failed reading stub: $stubFile", "red");
+            return;
+        }
+
         $title  = $this->deriveTitle(basename($normalizedPath));
         $pageId = $this->derivePageId($normalizedPath);
 
@@ -115,7 +131,11 @@ class MakeViewCommand extends BaseCommand
     }
 
     /**
-     * @param array<int,string> $args
+     * @param array<int|string, string> $args
+     * @return array<string,string>
+     */
+    /**
+     * @param array<int|string,string> $args
      * @return array<string,string>
      */
     private function parseOptions(array $args): array
