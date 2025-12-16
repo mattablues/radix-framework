@@ -105,21 +105,6 @@ abstract class BaseCommand
     }
 
     /**
-     * Hämta värdet för en flagga/option från argv-listan.
-     *
-     * @param array<int, string> $options
-     */
-    protected function getOptionValue(array $options, string $key): ?string
-    {
-        foreach ($options as $option) {
-            if (str_starts_with($option, "$key=")) {
-                return substr($option, strlen($key) + 1);
-            }
-        }
-        return null;
-    }
-
-    /**
      * Färgad terminal-output för bättre läsbarhet.
      */
     protected function coloredOutput(string $message, string $color): void
