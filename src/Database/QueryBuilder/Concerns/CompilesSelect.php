@@ -72,7 +72,7 @@ trait CompilesSelect
 
     public function toSql(): string
     {
-        if ($this->type === 'INSERT' || $this->type === 'UPDATE' || $this->type === 'DELETE') {
+        if (in_array($this->type, ['INSERT', 'UPDATE', 'DELETE', 'INSERT_IGNORE', 'UPSERT'], true)) {
             $cte = $this->compileCtePrefix();
             $sql = (is_string($this->mutationSql ?? null) && $this->mutationSql !== '')
                 ? $this->mutationSql
