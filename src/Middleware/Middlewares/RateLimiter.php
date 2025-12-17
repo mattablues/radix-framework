@@ -78,7 +78,8 @@ class RateLimiter implements MiddlewareInterface
             if ((int) $val === 1) {
                 $redis->expire($key, $ttl);
             }
-            error_log(sprintf("[Redis] Key: %s, Value: %d, TTL: %d", $key, $val, $ttl));
+
+            //error_log(sprintf("[Redis] Key: %s, Value: %d, TTL: %d", $key, $val, $ttl));
             return (int) $val;
         }
 

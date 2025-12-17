@@ -74,20 +74,9 @@ readonly class Dispatcher
 
         $params = $this->router->match($path, $request->method);
 
-        $method = $request->method;
-        if (in_array($method, ['HEAD', 'OPTIONS'], true)) {
-            error_log("Converting method {$method} to GET");
-            $method = 'GET'; // Omvandla HEAD/OPTIONS till GET för att matcha rutter
-        }
-
         if ($params === false) {
             throw new PageNotFoundException("No route matched for '$path' with method '$request->method'");
         }
-
-        $routeHandler = null;
-        /** @var array<string,mixed> $args */
-        $args = [];
-        $action = null;
 
         // Bygg handler + args
         if (is_callable($params[0])) {
@@ -237,7 +226,7 @@ readonly class Dispatcher
             }
 
             if (!array_key_exists($alias, $this->middlewareClasses)) {
-                throw new UnexpectedValueException("Middleware class alias '{$alias}' does not exist.");
+                throw new UnexpectedValueException("Middleware class alias '$alias' does not exist.");
             }
 
             $instance = $this->container->get($this->middlewareClasses[$alias]);
