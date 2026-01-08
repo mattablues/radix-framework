@@ -254,8 +254,8 @@ if (!function_exists('is_assoc')) {
     }
 }
 
-if (!function_exists('mb_ucfirst')) {
-    function mb_ucfirst(string $str, string $encoding = "UTF-8", bool $lower_str_end = false): string
+if (!function_exists('radix_mb_ucfirst')) {
+    function radix_mb_ucfirst(string $str, string $encoding = "UTF-8", bool $lower_str_end = false): string
     {
         $first_letter = mb_strtoupper(mb_substr($str, 0, 1, $encoding), $encoding);
         $str_end = $lower_str_end
@@ -663,7 +663,7 @@ if (!function_exists('human_name')) {
                         continue;
                     }
                     // Versalisera del med vår mb_ucfirst, resten gemen
-                    $ap = mb_ucfirst($ap, 'UTF-8', true);
+                    $ap = radix_mb_ucfirst($ap, 'UTF-8', true);
                 }
                 unset($ap);
                 $hp = implode("'", $apostParts);
@@ -739,7 +739,7 @@ if (!function_exists('optional')) {
      *
      * @return mixed|null
      */
-    function optional(mixed $value, Closure $callback = null): mixed
+    function optional(mixed $value, ?Closure $callback = null): mixed
     {
         if (is_null($value)) {
             return null;

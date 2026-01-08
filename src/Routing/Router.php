@@ -27,7 +27,7 @@ class Router
      *
      * @return array<int|string,mixed>|false
      */
-    public function match(string $path, string $method = null): array|bool
+    public function match(string $path, ?string $method = null): array|bool
     {
         $path = urldecode($path);
         $path = trim($path, '/');

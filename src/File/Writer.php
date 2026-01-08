@@ -118,7 +118,7 @@ final class Writer
                 unset($v);
             }
 
-            fputcsv($fp, $normalized, $delimiter);
+            fputcsv($fp, $normalized, $delimiter, '"', "");
         };
 
         try {
@@ -197,7 +197,7 @@ final class Writer
                 unset($v);
             }
 
-            fputcsv($fp, $normalized, $delimiter);
+            fputcsv($fp, $normalized, $delimiter, '"', "");
         };
 
         try {

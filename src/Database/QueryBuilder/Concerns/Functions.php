@@ -6,17 +6,17 @@ namespace Radix\Database\QueryBuilder\Concerns;
 
 trait Functions
 {
-    public function count(string $column = '*', string $alias = 'count'): self
+    public function count(string $column = '*', ?string $alias = 'count'): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
         }
         $column = $this->wrapColumn($column);
-        $this->columns[] = "COUNT($column) AS `" . addslashes($alias) . "`";
+        $this->columns[] = "COUNT($column) AS `" . addslashes((string) $alias) . "`";
         return $this;
     }
 
-    public function avg(string $column, string $alias = 'average'): self
+    public function avg(string $column, ?string $alias = 'average'): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -26,7 +26,7 @@ trait Functions
         return $this;
     }
 
-    public function sum(string $column, string $alias = 'sum'): self
+    public function sum(string $column, ?string $alias = 'sum'): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -36,7 +36,7 @@ trait Functions
         return $this;
     }
 
-    public function max(string $column, string $alias = 'max'): self
+    public function max(string $column, ?string $alias = 'max'): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -46,7 +46,7 @@ trait Functions
         return $this;
     }
 
-    public function min(string $column, string $alias = 'min'): self
+    public function min(string $column, ?string $alias = 'min'): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -74,7 +74,7 @@ trait Functions
     /**
      * @param array<int, string> $columns
      */
-    public function concat(array $columns, string $alias): self
+    public function concat(array $columns, ?string $alias): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -92,7 +92,7 @@ trait Functions
         return $this;
     }
 
-    public function upper(string $column, string $alias = null): self
+    public function upper(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -103,7 +103,7 @@ trait Functions
         return $this;
     }
 
-    public function lower(string $column, string $alias = null): self
+    public function lower(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -114,7 +114,7 @@ trait Functions
         return $this;
     }
 
-    public function year(string $column, string $alias = null): self
+    public function year(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -125,7 +125,7 @@ trait Functions
         return $this;
     }
 
-    public function month(string $column, string $alias = null): self
+    public function month(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -136,7 +136,7 @@ trait Functions
         return $this;
     }
 
-    public function date(string $column, string $alias = null): self
+    public function date(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -147,7 +147,7 @@ trait Functions
         return $this;
     }
 
-    public function round(string $column, int $decimals = 0, string $alias = null): self
+    public function round(string $column, int $decimals = 0, ?string $alias = null): self
     {
         $column = $this->wrapColumn($column);
         $alias = $alias ?: "round_$column";
@@ -155,7 +155,7 @@ trait Functions
         return $this;
     }
 
-    public function ceil(string $column, string $alias = null): self
+    public function ceil(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -166,7 +166,7 @@ trait Functions
         return $this;
     }
 
-    public function floor(string $column, string $alias = null): self
+    public function floor(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];
@@ -177,7 +177,7 @@ trait Functions
         return $this;
     }
 
-    public function abs(string $column, string $alias = null): self
+    public function abs(string $column, ?string $alias = null): self
     {
         if ($this->columns === ['*']) {
             $this->columns = [];

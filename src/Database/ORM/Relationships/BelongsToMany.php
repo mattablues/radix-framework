@@ -257,7 +257,7 @@ class BelongsToMany
      *        - [1,2] => ta bort flera
      *        - [1 => ['ignored']] är tillåtet för backcompat, värdena används inte
      */
-    public function detach(array|int $ids = null): void
+    public function detach(array|int|null $ids = null): void
     {
         $parentId = $this->requireParentId();
 

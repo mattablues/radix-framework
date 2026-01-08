@@ -349,7 +349,7 @@ class Blueprint
      *
      * @param array<int,string> $columns
      */
-    public function unique(array $columns, string $name = null): self
+    public function unique(array $columns, ?string $name = null): self
     {
         $indexName = $name ?: 'unique_' . implode('_', $columns);
         $this->keys[] = 'UNIQUE INDEX `' . $indexName . '` (' . $this->formatColumnList($columns) . ')';
@@ -361,7 +361,7 @@ class Blueprint
      *
      * @param array<int,string> $columns
      */
-    public function index(array $columns, string $name = null): self
+    public function index(array $columns, ?string $name = null): self
     {
         $indexName = $name ?: 'index_' . implode('_', $columns);
         $this->keys[] = 'INDEX `' . $indexName . '` (' . $this->formatColumnList($columns) . ')';

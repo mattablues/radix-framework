@@ -25,7 +25,7 @@ class LiteralArgument implements LiteralArgumentInterface
      * @param mixed $value Värdet av argumentet.
      * @param string|null $type Typen för värdet (valfritt).
      */
-    public function __construct(mixed $value, string $type = null)
+    public function __construct(mixed $value, ?string $type = null)
     {
         $this->type = $type;
 

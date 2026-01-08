@@ -178,7 +178,7 @@ final class Reader
 
         $spl = new SplFileObject($path, 'r');
         $spl->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY);
-        $spl->setCsvControl(self::detectDelimiter($path, $delimiter));
+        $spl->setCsvControl(self::detectDelimiter($path, $delimiter), '"', "");
 
         $headers = null;
 

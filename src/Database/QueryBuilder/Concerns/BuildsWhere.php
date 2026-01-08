@@ -11,7 +11,7 @@ use Radix\Database\QueryBuilder\QueryBuilder;
 
 trait BuildsWhere
 {
-    public function where(string|Closure $column, string $operator = null, mixed $value = null, string $boolean = 'AND'): self
+    public function where(string|Closure $column, ?string $operator = null, mixed $value = null, string $boolean = 'AND'): self
     {
         if ($column instanceof Closure) {
             $query = new \Radix\Database\QueryBuilder\QueryBuilder();

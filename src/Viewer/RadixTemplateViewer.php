@@ -20,7 +20,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
     private array $filters = [];
     private ?\Radix\Support\Logger $logger = null;
 
-    public function __construct(string $viewsDirectory = null)
+    public function __construct(?string $viewsDirectory = null)
     {
         $this->viewsDirectory = $viewsDirectory ?? dirname(__DIR__, 3) . '/views/';
         $envCachePath = getenv('VIEWS_CACHE_PATH') ?: '';
