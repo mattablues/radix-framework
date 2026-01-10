@@ -56,9 +56,11 @@ final class FileCache
         if ($payload === false) {
             return false;
         }
+
         $ok = @file_put_contents($file, $payload) !== false;
-        if ($ok) {
-            @chmod($file, 0o640);
+
+        if ($ok && DIRECTORY_SEPARATOR === '/') {
+            @chmod($file, 0o664);
         }
         return $ok;
     }
