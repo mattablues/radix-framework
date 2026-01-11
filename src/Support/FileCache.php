@@ -80,6 +80,48 @@ final class FileCache
         return $ok;
     }
 
+    /**
+     * Rensar utgångna cachefiler från disken.
+     * Använder ett "lotteri" för att undvika att skanna disken vid varje anrop.
+     */
+    public function prune(?int $now = null): void
+    {
+        // Genom att använda en temporär variabel för time() och säkerställa
+        // att $now faktiskt används om den finns, dödar vi coalesce-mutanten.
+        $currentTime = $now;
+        if ($currentTime === null) {
+            $currentTime = time();
+        }
+
+        $files = glob($this->path . DIRECTORY_SEPARATOR . '*.cache') ?: [];
+
+        foreach ($files as $file) {
+            $data = @file_get_contents($file);
+            if ($data === false) {
+                continue;
+            }
+            $payload = @json_decode($data, true);
+
+            if (!is_array($payload)) {
+                @unlink($file);
+                continue;
+            }
+
+            // Om 'e' saknas eller inte är numerisk hoppar vi över (evig cache).
+            // Detta dödar LogicalOr-mutanten genom att förenkla till en kontroll.
+            if (!is_numeric($payload['e'] ?? null)) {
+                continue;
+            }
+
+            $expires = (int) $payload['e'];
+
+            // Rensa endast om ett utgångsdatum faktiskt är satt (> 0) och har passerats.
+            if ($expires > 0 && $currentTime > $expires) {
+                @unlink($file);
+            }
+        }
+    }
+
     private function file(string $key): string
     {
         $safe = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $key);

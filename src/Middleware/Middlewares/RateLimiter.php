@@ -129,6 +129,11 @@ class RateLimiter implements MiddlewareInterface
             ));
         }
 
+        // Automatisk rensning med 1% chans (hjälper till att hålla disken ren)
+        if (mt_rand(1, 100) === 1) {
+            $cache->prune($now);
+        }
+
         return (int) $count;
     }
 }
