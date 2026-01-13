@@ -45,6 +45,14 @@ class HasOneThrough
         return $this;
     }
 
+    /**
+     * Lägg till denna metod för att stödja eager loading via QueryBuilder
+     */
+    public function get(): ?Model
+    {
+        return $this->first();
+    }
+
     public function first(): ?Model
     {
         if ($this->parent === null) {
