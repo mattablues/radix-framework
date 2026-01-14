@@ -49,6 +49,7 @@ class Blueprint
             'json'        => 'JSON',
             'time'        => 'TIME',
             'datetime'    => 'DATETIME',
+            'date'        => 'DATE',
             'float'       => 'FLOAT',
             'decimal'     => 'DECIMAL',
             'enum'        => 'ENUM',
@@ -271,6 +272,16 @@ class Blueprint
     public function datetime(string $name, array $options = []): self
     {
         return $this->addColumn('DATETIME', $name, $options);
+    }
+
+    /**
+     * Lägg till en DATE‑kolumn.
+     *
+     * @param array<string,mixed> $options
+     */
+    public function date(string $name, array $options = []): self
+    {
+        return $this->addColumn('DATE', $name, $options);
     }
 
     /**
