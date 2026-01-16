@@ -28,6 +28,10 @@ class Validator
         'honeypot' => 'honeypot',
         'category' => 'kategori',
         'description' => 'beskrivning',
+        'id' => 'bana',
+        'course' => 'bana',
+        'profit' => 'vinst',
+        'amount_per_share' => 'kostnad per andel',
     ];
 
     /**

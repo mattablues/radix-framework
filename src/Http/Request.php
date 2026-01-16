@@ -37,10 +37,22 @@ class Request implements RequestInterface
             $uri = '/';
         }
 
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        if (!is_string($method) || $method === '') {
-            $method = 'GET';
+        // Ta bort query string (?foo=bar) om den finns
+        if (false !== $pos = strpos($uri, '?')) {
+            $uri = substr($uri, 0, $pos);
         }
+
+        // Ta bort /index.php från början av URI:n (fix för vissa Apache-miljöer)
+        if (str_starts_with($uri, '/index.php')) {
+            $uri = (string) substr($uri, 10);
+        }
+
+        // Säkerställ att den börjar med / och inte är tom
+        $uri = '/' . ltrim($uri, '/');
+
+        // PHPStan fix: Garantera att $method är en sträng
+        $rawMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $method = is_string($rawMethod) ? $rawMethod : 'GET';
 
         /** @var array<string,mixed> $get */
         $get = $_GET;

@@ -520,6 +520,33 @@ class QueryBuilder extends AbstractQueryBuilder
     }
 
     /**
+     * Returnerar resultatet som en float avrundad till ett specifikt antal decimaler.
+     */
+    public function decimal(int $precision = 2): ?float
+    {
+        $value = $this->float();
+
+        if ($value === null) {
+            return null;
+        }
+
+        return round($value, $precision);
+    }
+
+    /**
+     * Returnerar resultatet som en formaterad sträng med fast antal decimaler.
+     */
+    public function format(int $precision = 2, string $decimalSeparator = '.', string $thousandsSeparator = ''): ?string
+    {
+        $value = $this->float();
+        if ($value === null) {
+            return null;
+        }
+
+        return number_format($value, $precision, $decimalSeparator, $thousandsSeparator);
+    }
+
+    /**
      * Returnera SQL med värden insatta för debug.
      *
      * @return string

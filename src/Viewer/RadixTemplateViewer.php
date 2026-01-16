@@ -65,12 +65,34 @@ class RadixTemplateViewer implements TemplateViewerInterface
     public function render(string $template, array $data = [], string $version = ''): string
     {
         $this->debug("Attempting to render template: $template");
+
+        // 1. Ladda mallkoden först för att kunna extrahera block direkt
+        $templatePath = $this->resolveTemplatePath($template);
+        $filePath = $this->viewsDirectory . $templatePath;
+        if (!file_exists($filePath)) {
+            throw new RuntimeException("Template file not found: $filePath");
+        }
+        $rawCode = $this->loadTemplate($filePath);
+
+        // 2. Extrahera block (pageId, pageClass etc.) och lägg till i data-arrayen
+        // Detta görs INNAN vi kollar cachen så att variablerna alltid finns tillgängliga.
+        $blocks = $this->getBlocks($rawCode);
+        $injectableBlocks = ['pageId', 'pageClass', 'searchId'];
+        foreach ($injectableBlocks as $blockName) {
+            if (isset($blocks[$blockName])) {
+                $data[$blockName] = trim($blocks[$blockName]);
+            } elseif (!isset($data[$blockName])) {
+                // Sätt ett standardvärde (tom sträng) om variabeln inte finns alls
+                $data[$blockName] = '';
+            }
+        }
+
+        // 3. Merga global data
         $data = $this->mergeData($data);
 
         // Rensa gamla cachefiler
         $this->clearOldCacheFiles(3600);
 
-        $templatePath = $this->resolveTemplatePath($template);
         $this->debug("Template resolved to: $templatePath");
 
         $data = $this->applyFilters($data);
@@ -90,7 +112,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
             ob_start();
             include $cachedFile;
 
-
             $output = ob_get_clean();
 
             if ($output === false) {
@@ -101,12 +122,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
             return $output;
         }
 
-        $filePath = $this->viewsDirectory . $templatePath;
-        if (!file_exists($filePath)) {
-            throw new RuntimeException("Template file not found: $filePath");
-        }
-
-        $code = $this->loadTemplate($filePath);
+        // Om ingen cache finns, fortsätt kompilera koden
+        $code = $rawCode;
         $code = $this->processExtends($code, $this->viewsDirectory);
         $code = $this->loadIncludes($this->viewsDirectory, $code);
         $code = $this->replacePlaceholders($code);
