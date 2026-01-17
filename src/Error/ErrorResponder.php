@@ -6,6 +6,7 @@ namespace Radix\Error;
 
 use Radix\Http\Request;
 use Radix\Http\Response;
+use Throwable;
 
 final class ErrorResponder
 {
@@ -34,15 +35,28 @@ final class ErrorResponder
         $resp->setHeader('Content-Type', 'text/html; charset=UTF-8');
 
         ob_start();
-        $errorFile = ROOT_PATH . "/views/errors/{$status}.php";
-        $fallback = ROOT_PATH . '/views/errors/500.php';
-        if (is_file($errorFile)) {
-            include $errorFile;
-        } else {
-            include $fallback;
+        try {
+            $errorFile = ROOT_PATH . "/views/errors/{$status}.php";
+            $fallback = ROOT_PATH . '/views/errors/500.php';
+
+            // Vi använder unika nycklar för att särskilja dem från metodens argument
+            $data = ['errorStatus' => $status, 'errorMessage' => $message];
+            extract($data);
+
+            if (is_file($errorFile)) {
+                include $errorFile;
+            } else {
+                include $fallback;
+            }
+        } catch (Throwable $e) {
+            // Om vyn kraschar i testmiljön, stäng bufferten och kör fallback-text
+            ob_end_clean();
+            $resp->setBody("<h1>{$status} | {$message}</h1>");
+            return $resp;
         }
+
         $html = ob_get_clean();
-        $resp->setBody(is_string($html) ? $html : "<h1>{$status} | {$message}</h1>");
+        $resp->setBody(is_string($html) && $html !== '' ? $html : "<h1>{$status} | {$message}</h1>");
 
         return $resp;
     }
