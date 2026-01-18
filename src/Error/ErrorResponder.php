@@ -10,6 +10,8 @@ use Throwable;
 
 final class ErrorResponder
 {
+    /** @var string|null Alternativ sökväg för vyer (används främst i tester) */
+    public static ?string $viewPath = null;
     /**
      * Returnera ett Response beroende på API eller Web.
      * - API: JSON { error, details? } med status
@@ -36,8 +38,10 @@ final class ErrorResponder
 
         ob_start();
         try {
-            $errorFile = ROOT_PATH . "/views/errors/{$status}.php";
-            $fallback = ROOT_PATH . '/views/errors/500.php';
+            $basePath = self::$viewPath ?? ROOT_PATH . '/views/errors';
+            $errorFile = rtrim($basePath, '/\\') . "/{$status}.php";
+            $fallback = rtrim($basePath, '/\\') . '/500.php';
+
 
             // Vi använder unika nycklar för att särskilja dem från metodens argument
             $data = ['errorStatus' => $status, 'errorMessage' => $message];
