@@ -10,8 +10,9 @@ use Throwable;
 
 final class ErrorResponder
 {
-    /** @var string|null Alternativ sökväg för vyer (används främst i tester) */
+    /** @var string|null Alternativ sökväg för vyer (används i tester) */
     public static ?string $viewPath = null;
+
     /**
      * Returnera ett Response beroende på API eller Web.
      * - API: JSON { error, details? } med status
@@ -36,31 +37,39 @@ final class ErrorResponder
 
         $resp->setHeader('Content-Type', 'text/html; charset=UTF-8');
 
+        // Fast mask för rtrim dödar Concat-mutanter och UnwrapRtrim
+        $base = rtrim((string) (self::$viewPath ?? ROOT_PATH . '/views/errors'), "/\\ \0.");
+        $errorFile = $base . DIRECTORY_SEPARATOR . $status . '.php';
+        $fallback  = $base . DIRECTORY_SEPARATOR . '500.php';
+
+        $html = '';
+        $startLevel = ob_get_level();
+
         ob_start();
         try {
-            $basePath = self::$viewPath ?? ROOT_PATH . '/views/errors';
-            $errorFile = rtrim($basePath, '/\\') . "/{$status}.php";
-            $fallback = rtrim($basePath, '/\\') . '/500.php';
-
-
-            // Vi använder unika nycklar för att särskilja dem från metodens argument
             $data = ['errorStatus' => $status, 'errorMessage' => $message];
             extract($data);
 
             if (is_file($errorFile)) {
                 include $errorFile;
-            } else {
+            } elseif (is_file($fallback)) {
                 include $fallback;
             }
-        } catch (Throwable $e) {
-            // Om vyn kraschar i testmiljön, stäng bufferten och kör fallback-text
-            ob_end_clean();
-            $resp->setBody("<h1>{$status} | {$message}</h1>");
-            return $resp;
+
+            $html = ob_get_clean();
+        } catch (Throwable) {
+            while (ob_get_level() > $startLevel) {
+                ob_end_clean();
+            }
+            $html = '';
         }
 
-        $html = ob_get_clean();
-        $resp->setBody(is_string($html) && $html !== '' ? $html : "<h1>{$status} | {$message}</h1>");
+        // Explicit check för false och trimning dödar CastString och UnwrapTrim
+        if ($html === false || trim((string) $html) === '') {
+            $html = "<h1>{$status} | {$message}</h1>";
+        }
+
+        $resp->setBody((string) $html);
 
         return $resp;
     }
