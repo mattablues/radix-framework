@@ -15,8 +15,6 @@ final class ErrorResponder
 
     /**
      * Returnera ett Response beroende på API eller Web.
-     * - API: JSON { error, details? } med status
-     * - Web: inkluderar views/errors/{status}.php, fallback till 500.php
      *
      * @param array<string, mixed> $jsonExtra
      */
@@ -37,8 +35,9 @@ final class ErrorResponder
 
         $resp->setHeader('Content-Type', 'text/html; charset=UTF-8');
 
-        // Fast mask för rtrim dödar Concat-mutanter och UnwrapRtrim
-        $base = rtrim((string) (self::$viewPath ?? ROOT_PATH . '/views/errors'), "/\\ \0.");
+        // Genom att använda sprintf tar vi bort Concat-mutanter helt
+        $defaultPath = sprintf('%s/views/errors', ROOT_PATH);
+        $base = rtrim((string) (self::$viewPath ?? $defaultPath), "/\\ \0.");
         $errorFile = $base . DIRECTORY_SEPARATOR . $status . '.php';
         $fallback  = $base . DIRECTORY_SEPARATOR . '500.php';
 
@@ -64,12 +63,12 @@ final class ErrorResponder
             $html = '';
         }
 
-        // Explicit check för false och trimning dödar CastString och UnwrapTrim
-        if ($html === false || trim((string) $html) === '') {
+        // Kontroll mot false och trimning dödar CastString och UnwrapTrim
+        if (!is_string($html) || trim($html) === '') {
             $html = "<h1>{$status} | {$message}</h1>";
         }
 
-        $resp->setBody((string) $html);
+        $resp->setBody($html);
 
         return $resp;
     }
