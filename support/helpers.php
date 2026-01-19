@@ -137,6 +137,23 @@ if (!function_exists('view')) {
     }
 }
 
+if (!function_exists('storage_path')) {
+    function storage_path(string $path = ''): string
+    {
+        return ROOT_PATH . '/storage' . ($path ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : '');
+    }
+}
+
+if (!function_exists('cache_path')) {
+    /**
+     * Returnera den absoluta sökvägen till cache-katalogen.
+     */
+    function cache_path(string $path = ''): string
+    {
+        return ROOT_PATH . '/cache' . ($path ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : '');
+    }
+}
+
 if (!function_exists('array_merge_deep')) {
     /**
      * Rekursiv array-merge.
