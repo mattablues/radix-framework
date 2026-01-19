@@ -46,12 +46,12 @@ class Migrator
             $className = pathinfo($migrationFile, PATHINFO_FILENAME);
 
             if (!in_array($className, $executedMigrations, true)) {
-                /** @var object $migration */
-                $migration = require_once $migrationFile;
+                /** @var object|bool $migration */
+                $migration = require $migrationFile; // Ändrat från require_once till require
                 $schema = new Schema($this->connection);
 
                 // Kör migrationen
-                if (method_exists($migration, 'up')) {
+                if (is_object($migration) && method_exists($migration, 'up')) {
                     $migration->up($schema);
                 } elseif (class_exists($className)) {
                     /** @var object $migrationInstance */
@@ -199,12 +199,20 @@ class Migrator
         $migrationFile = $this->migrationsPath . "/$migrationName.php";
 
         if (file_exists($migrationFile)) {
-            /** @var object $migration */
-            $migration = require_once $migrationFile;
+            // Om vi rullar tillbaka sessions-tabellen, stäng sessionen först
+            // för att undvika krasch i session_write_close() vid skriptslut.
+            if (str_contains($migrationName, 'sessions')) {
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    session_abort();
+                }
+            }
+
+            /** @var object|bool $migration */
+            $migration = require $migrationFile; // Ändrat från require_once till require
 
             $schema = new Schema($this->connection);
 
-            if (method_exists($migration, 'down')) {
+            if (is_object($migration) && method_exists($migration, 'down')) {
                 $migration->down($schema);
             } elseif (class_exists($migrationName)) {
                 /** @var object $migrationInstance */
