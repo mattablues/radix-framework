@@ -13,25 +13,22 @@ class JsonResponse extends Response
     {
         ob_start();
 
-        // 1. Skicka alla headers som tidigare satts
+        // 1. Sätt Content-Type automatiskt för JSON om den inte redan finns
+        if (empty($this->getHeaders()['Content-Type'])) {
+            $this->setHeader('Content-Type', 'application/json; charset=utf-8');
+        }
+
+        // 2. Skicka HTTP-statuskod
+        http_response_code($this->getStatusCode());
+
+        // 3. Skicka alla headers till webbläsaren/Postman
         foreach ($this->getHeaders() as $key => $value) {
-            header(sprintf('%s: %s', $key, $value), true, $this->getStatusCode());
+            header(sprintf('%s: %s', $key, $value));
         }
 
-        // 2. Beräkna längd på bodyn (sätt Content-Length om saknas)
-        $body = $this->getBody();
-        $bodyLength = strlen($body);
-        if (empty($this->header('Content-Length'))) {
-            $this->setHeader('Content-Length', $bodyLength); // Lagra Content-Length
-        }
+        // 4. Skicka ENDAST bodyn (som redan är en JSON-sträng från ApiController)
+        echo $this->getBody();
 
-        // 3. Skicka det formaterade JSON-svaret
-        echo json_encode([
-            'status' => $this->getStatusCode(), // Statuskod som anges av kontrollen
-            'headers' => $this->getHeaders(),   // Alla headers
-            'body' => json_decode($body, true), // Dekodad kropp (om JSON-innehåll)
-        ], JSON_UNESCAPED_UNICODE);             // Utför utan att escapa unicode-tecken
-
-        ob_end_flush(); // Töm och avsluta output cache
+        ob_end_flush();
     }
 }
