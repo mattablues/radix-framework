@@ -297,13 +297,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
     {
         $this->debug("Original kod före placeholder-bearbetning:\n" . htmlspecialchars($code));
 
-        // 1. Hantera komponentinstanser (<x-komponent>)
+        // 1. Hantera komponentinstanser (<x-komponent>) - nu med stöd för självstängande taggar
         $code = preg_replace_callback(
-            '#<x-([\w\.\-]+)([^>]*)>(.*?)<\/x-\1>#s',
+            '#<x-([\w\.\-]+)([^>]*?)(?:/>|>(.*?)<\/x-\1>)#s',
             function (array $matches) {
                 $componentName = str_replace('.', '/', $matches[1]);
                 $attributes = $this->parseAttributes(trim($matches[2]));
-                $content = trim($matches[3]);
+                // Om det är en självstängande tagg finns inte matches[3]
+                $content = isset($matches[3]) ? trim($matches[3]) : '';
 
                 return $this->renderComponent($componentName, $attributes, $this->replacePlaceholders($content));
             },
@@ -335,8 +336,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
     private function renderComponent(string $componentPath, array $attributes, string $slotContent): string
     {
         $this->debug("Renderar komponent från path: $componentPath");
-        $this->debug("Attribut: " . print_r($attributes, true));
-        $this->debug("SlotInnehåll: " . htmlspecialchars($slotContent));
 
         $componentFilePath = "{$this->viewsDirectory}components/$componentPath.ratio.php";
 
@@ -346,6 +345,38 @@ class RadixTemplateViewer implements TemplateViewerInterface
         }
 
         $componentCode = $this->loadTemplate($componentFilePath);
+
+        // Bearbeta @props direktiv för att sätta standardvärden
+        $componentCode = $this->loadTemplate($componentFilePath);
+
+        // Bearbeta @props direktiv för att sätta standardvärden
+        $componentCode = preg_replace_callback(
+            '#{%\s*props\((?<defaults>.*?)\)\s*%}#s',
+            function (array $matches) use (&$attributes): string {
+                /** @var array<int|string, mixed> $defaults */
+                $defaults = [];
+                try {
+                    eval('$defaults = ' . $matches['defaults'] . ';');
+                } catch (Throwable) {
+                    $defaults = [];
+                }
+
+                foreach ($defaults as $key => $defaultValue) {
+                    $isKv = is_string($key);
+                    $name = $isKv ? $key : $this->castToString($defaultValue);
+
+                    if ($name !== '') {
+                        $attributes[$name] ??= ($isKv ? $this->castToString($defaultValue) : '');
+                    }
+                }
+
+                // Genom att ha : string som returtyp på denna callback dör mutanterna ReturnRemoval
+                // och FunctionCall (null), eftersom PHP kastar en TypeError om strängen saknas.
+                return '';
+            },
+            $componentCode
+        ) ?? $componentCode;
+
         $slots = $this->extractNamedSlots($slotContent);
 
         // Justera attribut med att lägga till slots
@@ -367,6 +398,19 @@ class RadixTemplateViewer implements TemplateViewerInterface
         return $result;
     }
 
+    /**
+     * Säkert konvertera mixed värde till sträng för PHPStan och stabil rendering.
+     */
+    private function castToString(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_numeric($value)) {
+            return (string) $value;
+        }
+        return '';
+    }
 
     /**
      * Extracts named slots from the given slotContent.
@@ -405,7 +449,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
     {
         $code = (string) $code;
 
-        return preg_replace("#{%\s*(.+?)\s*%}#", "<?php $1 ?>", $code) ?? $code;
+        // Lägg till 's' flaggan i slutet av regexet (#...#s) för att tillåta radbrytningar
+        return preg_replace("#{%\s*(.+?)\s*%}#s", "<?php $1 ?>", $code) ?? $code;
     }
 
     /**
