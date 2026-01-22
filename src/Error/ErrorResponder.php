@@ -57,8 +57,10 @@ final class ErrorResponder
 
             $html = ob_get_clean();
         } catch (Throwable) {
-            while (ob_get_level() > $startLevel) {
+            $safety = 0;
+            while (ob_get_level() > $startLevel && $safety < 50) {
                 ob_end_clean();
+                $safety++;
             }
             $html = '';
         }
