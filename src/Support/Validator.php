@@ -32,6 +32,7 @@ class Validator
         'course' => 'bana',
         'profit' => 'vinst',
         'amount_per_share' => 'kostnad per andel',
+        'current_password' => 'nuvarande lösenord',
     ];
 
     /**
