@@ -9,6 +9,7 @@ use DateTimeImmutable;
 
 final class FileCache
 {
+    public static string $dirSeparatorForChmod = DIRECTORY_SEPARATOR;
     private string $path;
 
     public function __construct(?string $path = null)
@@ -59,7 +60,7 @@ final class FileCache
 
         $ok = @file_put_contents($file, $payload) !== false;
 
-        if ($ok && DIRECTORY_SEPARATOR === '/') {
+        if ($ok && self::$dirSeparatorForChmod === '/') {
             @chmod($file, 0o664);
         }
         return $ok;
