@@ -8,6 +8,7 @@ use Exception;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Support\StringHelper;
 
 class BelongsTo
@@ -26,7 +27,8 @@ class BelongsTo
         string $relatedTable,
         string $foreignKey,
         string $ownerKey,
-        Model $parentModel
+        Model $parentModel,
+        private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $this->connection = $connection;
         $this->relatedTable = $relatedTable;
@@ -109,11 +111,14 @@ class BelongsTo
 
     private function resolveModelClass(string $classOrTable): string
     {
+        if ($this->modelClassResolver !== null) {
+            return $this->modelClassResolver->resolve($classOrTable);
+        }
+
         if (class_exists($classOrTable)) {
             return $classOrTable; // Returnera direkt
         }
 
-        // Använd den delade singulariseringen
         $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
 
         if (class_exists($singularClass)) {

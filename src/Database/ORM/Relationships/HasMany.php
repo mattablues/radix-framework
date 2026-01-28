@@ -8,6 +8,7 @@ use Exception;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Support\StringHelper;
 use ReflectionClass;
 
@@ -20,8 +21,13 @@ class HasMany
     private string $localKeyName;
     private ?Model $parent = null;
 
-    public function __construct(Connection $connection, string $modelClass, string $foreignKey, string $localKeyName)
-    {
+    public function __construct(
+        Connection $connection,
+        string $modelClass,
+        string $foreignKey,
+        string $localKeyName,
+        private readonly ?ModelClassResolverInterface $modelClassResolver = null
+    ) {
         $resolvedClass = $this->resolveModelClass($modelClass);
         if (!class_exists($resolvedClass) || !is_subclass_of($resolvedClass, Model::class)) {
             throw new Exception("Model class '$resolvedClass' must exist and extend " . Model::class . '.');
@@ -118,10 +124,17 @@ class HasMany
      */
     private function resolveModelClass(string $classOrTable): string
     {
+        // 1) FQCN → direkt
         if (class_exists($classOrTable)) {
             return $classOrTable;
         }
 
+        // 2) Resolver (map/konvention)
+        if ($this->modelClassResolver !== null) {
+            return $this->modelClassResolver->resolve($classOrTable);
+        }
+
+        // 3) Fallback (din befintliga StringHelper-baserade konvention)
         $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
         if (class_exists($singularClass)) {
             return $singularClass;

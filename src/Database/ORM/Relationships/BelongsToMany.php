@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Support\StringHelper;
 use RuntimeException;
 
@@ -32,7 +33,8 @@ class BelongsToMany
         string $pivotTable,
         string $foreignPivotKey,
         string $relatedPivotKey,
-        string $parentKeyName
+        string $parentKeyName,
+        private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $this->connection = $connection;
         $resolved = $this->resolveModelClass($relatedModel);
@@ -348,10 +350,17 @@ class BelongsToMany
 
     private function resolveModelClass(string $classOrTable): string
     {
+        // 1) FQCN → direkt
         if (class_exists($classOrTable)) {
             return $classOrTable;
         }
 
+        // 2) Resolver (map/konvention)
+        if ($this->modelClassResolver !== null) {
+            return $this->modelClassResolver->resolve($classOrTable);
+        }
+
+        // 3) Fallback (din befintliga StringHelper-baserade konvention)
         $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
         if (class_exists($singularClass)) {
             return $singularClass;

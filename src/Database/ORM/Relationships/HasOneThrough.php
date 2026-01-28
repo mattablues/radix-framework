@@ -8,6 +8,7 @@ use Exception;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
+use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Support\StringHelper;
 
 class HasOneThrough
@@ -28,7 +29,8 @@ class HasOneThrough
         string $firstKey,
         string $secondKey,
         string $localKey = 'id',
-        string $secondLocal = 'id'
+        string $secondLocal = 'id',
+        private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $this->connection  = $connection;
         $this->related     = $related;
@@ -101,10 +103,17 @@ class HasOneThrough
 
     private function resolveModelClass(string $classOrTable): string
     {
+        // 1) FQCN → direkt
         if (class_exists($classOrTable)) {
             return $classOrTable;
         }
 
+        // 2) Resolver (map/konvention)
+        if ($this->modelClassResolver !== null) {
+            return $this->modelClassResolver->resolve($classOrTable);
+        }
+
+        // 3) Fallback (din befintliga StringHelper-baserade konvention)
         $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
         if (class_exists($singularClass)) {
             return $singularClass;

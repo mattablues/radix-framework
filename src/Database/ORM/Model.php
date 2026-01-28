@@ -213,6 +213,22 @@ abstract class Model implements JsonSerializable
     protected array $guarded = [];
     /** @var array<int, string> */
     protected array $autoloadRelations = [];
+    private static ?ModelClassResolverInterface $modelClassResolver = null;
+
+    public static function setModelClassResolver(ModelClassResolverInterface $resolver): void
+    {
+        self::$modelClassResolver = $resolver;
+    }
+
+    protected function modelClassResolver(): ModelClassResolverInterface
+    {
+        if (self::$modelClassResolver !== null) {
+            return self::$modelClassResolver;
+        }
+
+        // Fallback om någon använder ORM utan att ha bootstrappat services.php
+        return new ConventionModelClassResolver('App\\Models\\');
+    }
 
     /**
      * @param array<string, mixed> $attributes
@@ -809,22 +825,42 @@ abstract class Model implements JsonSerializable
     }
 
     /**
+     * @param string $classOrTable FQCN eller tabellnamn
+     * @return class-string<self>
+     */
+    protected function resolveRelatedModelClass(string $classOrTable): string
+    {
+        $resolved = $this->modelClassResolver()->resolve($classOrTable);
+
+        if (!class_exists($resolved)) {
+            throw new Exception("Relation model class '{$classOrTable}' could not be resolved.");
+        }
+
+        if (!is_subclass_of($resolved, self::class)) {
+            throw new LogicException(
+                "Resolved relation model class '{$resolved}' måste ärva " . self::class . "."
+            );
+        }
+
+        /** @var class-string<self> $resolved */
+        return $resolved;
+    }
+
+    /**
      * Definiera en "hasMany"-relation.
      */
     public function hasMany(string $relatedModel, string $foreignKey, ?string $localKey = null): HasMany
     {
         $localKey ??= $this->primaryKey;
 
-        if (!class_exists($relatedModel)) {
-            throw new Exception("Relation model class '$relatedModel' not found.");
-        }
+        $relatedModel = $this->resolveRelatedModelClass($relatedModel);
 
-        // Skapa relationen med key-namnet, och koppla parent efteråt
         $relation = new HasMany(
             $this->getConnection(),
             $relatedModel,
             $foreignKey,
-            $localKey
+            $localKey,
+            $this->modelClassResolver()
         );
 
         $relation->setParent($this);
@@ -868,6 +904,9 @@ abstract class Model implements JsonSerializable
         $localKey ??= $this->primaryKey;
         $secondLocal ??= 'id';
 
+        $related = $this->resolveRelatedModelClass($related);
+        $through = $this->resolveRelatedModelClass($through);
+
         $relation = new HasManyThrough(
             $this->getConnection(),
             $related,
@@ -875,7 +914,8 @@ abstract class Model implements JsonSerializable
             $firstKey,
             $secondKey,
             $localKey,
-            $secondLocal
+            $secondLocal,
+            $this->modelClassResolver()
         );
 
         $relation->setParent($this);
@@ -916,6 +956,9 @@ abstract class Model implements JsonSerializable
         $localKey ??= $this->primaryKey;
         $secondLocal ??= 'id';
 
+        $related = $this->resolveRelatedModelClass($related);
+        $through = $this->resolveRelatedModelClass($through);
+
         $relation = new \Radix\Database\ORM\Relationships\HasOneThrough(
             $this->getConnection(),
             $related,
@@ -923,7 +966,8 @@ abstract class Model implements JsonSerializable
             $firstKey,
             $secondKey,
             $localKey,
-            $secondLocal
+            $secondLocal,
+            $this->modelClassResolver()
         );
 
         $relation->setParent($this);
@@ -938,21 +982,21 @@ abstract class Model implements JsonSerializable
     {
         $localKey ??= $this->primaryKey;
 
-        if (!class_exists($relatedModel)) {
-            throw new Exception("Relation model class '$relatedModel' not found.");
-        }
+        $relatedModel = $this->resolveRelatedModelClass($relatedModel);
 
         $relation = new HasOne(
             $this->getConnection(),
             $relatedModel,
             $foreignKey,
-            $localKey // skicka key-namn
+            $localKey,
+            $this->modelClassResolver()
         );
 
         $relation->setParent($this);
 
         return $relation;
     }
+
     public function belongsToMany(
         string $relatedModel,
         string $pivotTable,
@@ -962,17 +1006,16 @@ abstract class Model implements JsonSerializable
     ): BelongsToMany {
         $parentKey ??= $this->primaryKey;
 
-        if (!class_exists($relatedModel)) {
-            throw new Exception("Relation model class '$relatedModel' not found.");
-        }
+        $relatedModel = $this->resolveRelatedModelClass($relatedModel);
 
         $relation = new BelongsToMany(
             $this->getConnection(),
-            $relatedModel,     // skicka modellklass
+            $relatedModel,
             $pivotTable,
             $foreignPivotKey,
             $relatedPivotKey,
-            $parentKey         // skicka key-namn
+            $parentKey,
+            $this->modelClassResolver()
         );
 
         $relation->setParent($this);
@@ -987,27 +1030,18 @@ abstract class Model implements JsonSerializable
     {
         $ownerKey ??= $this->primaryKey;
 
-        if (!class_exists($relatedModel)) {
-            throw new Exception("Relation model class '$relatedModel' not found.");
-        }
-
-        $relatedInstance = new $relatedModel();
-
-        if (!$relatedInstance instanceof self) {
-            throw new LogicException(
-                "belongsTo-relaterad klass '$relatedModel' måste ärva " . self::class . "."
-            );
-        }
+        $relatedModel = $this->resolveRelatedModelClass($relatedModel);
 
         /** @var self $relatedInstance */
+        $relatedInstance = new $relatedModel();
 
-        // Skicka den aktuella instansen (`$this`) som parent-modellen
         return new BelongsTo(
             $this->getConnection(),
             $relatedInstance->getTable(),
             $foreignKey,
             $ownerKey,
-            $this // Passera parent-modellen
+            $this,
+            $this->modelClassResolver()
         );
     }
 
