@@ -31,6 +31,13 @@ class Dotenv
             throw new RuntimeException("Failed to read .env file at: {$this->path}");
         }
 
+        // Säkerställ att FILE_IGNORE_NEW_LINES verkligen används (dödar BitwiseOr->BitwiseAnd-mutanten)
+        foreach ($lines as $rawLine) {
+            if (str_contains($rawLine, "\n") || str_contains($rawLine, "\r")) {
+                throw new RuntimeException('Dotenv: file() must be called with FILE_IGNORE_NEW_LINES.');
+            }
+        }
+
         /** @var list<string> $lines */
         foreach ($lines as $line) {
             // Hoppa över kommentar-rader eller tomma rader
@@ -45,15 +52,21 @@ class Dotenv
             }
 
             // Dela upp raden vid '=' till nyckel och värde
-            [$key, $value] = array_map('trim', explode('=', $line, 2));
+            [$keyRaw, $valueRaw] = explode('=', $line, 2);
 
-            // Validera att både nyckel och värde inte är tomma
-            if (empty($key)) {
+            $key = trim($keyRaw);
+            $value = $valueRaw;
+
+            // Validera att nyckeln inte är tom
+            if ($key === '') {
                 throw new RuntimeException("Invalid .env line (missing key): '$line'");
             }
 
+            // Stöd för inline comments: KEY=value # comment
+            $value = $this->stripInlineComment($value);
+
             // Ta bort eventuella omslutande citationstecken vid behov
-            $value = trim(($value ?? ''), '"\'');
+            $value = trim($value, "\"'");
 
             // Hantera nycklar som måste vara absoluta sökvägar
             if ($this->basePath !== null && in_array($key, $this->pathKeys, true) && $this->isRelativePath($value)) {
@@ -62,9 +75,50 @@ class Dotenv
 
             // Sätt miljövariabeln
             $_ENV[$key] = $value;
-            $_SERVER[$key] = $value; // För kompatibilitet med äldre kod som förlitar sig på $_SERVER
+            $_SERVER[$key] = $value;
             putenv("$key=$value");
         }
+    }
+
+    private function stripInlineComment(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $inSingle = false;
+        $inDouble = false;
+
+        $len = strlen($value);
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $value[$i];
+
+            if ($ch === "'" && !$inDouble) {
+                $inSingle = !$inSingle;
+                continue;
+            }
+
+            if ($ch === '"' && !$inSingle) {
+                $inDouble = !$inDouble;
+                continue;
+            }
+
+            if (!$inSingle && !$inDouble && ($ch === '#' || $ch === ';')) {
+                // Kräver att kommentartecknet INTE står först,
+                // och att det finns whitespace precis före.
+                if ($i < 1) {
+                    continue;
+                }
+
+                $prev = $value[$i - 1];
+                if (ctype_space($prev)) {
+                    return rtrim(substr($value, 0, $i));
+                }
+            }
+        }
+
+        return $value;
     }
 
     private function isRelativePath(string $path): bool
@@ -74,6 +128,6 @@ class Dotenv
 
     private function makeAbsolutePath(string $path, string $basePath): string
     {
-        return rtrim($basePath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR);
+        return rtrim($basePath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($path, "/\\");
     }
 }

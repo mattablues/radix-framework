@@ -85,7 +85,6 @@ readonly class Dispatcher
             unset($params[0]);
 
             if (is_array($handler) && count($handler) === 2) {
-                // [$object, 'method'] eller [ClassName::class, 'method']
                 [$objOrClass, $methodName] = $handler;
 
                 if (!is_object($objOrClass) && !is_string($objOrClass)) {
@@ -97,42 +96,44 @@ readonly class Dispatcher
 
                 $reflection = new ReflectionMethod($objOrClass, $methodName);
             } elseif ($handler instanceof Closure || is_string($handler)) {
-                // Funktionsnamn eller anonym funktion
                 $reflection = new ReflectionFunction($handler);
             } else {
-                // Någon annan callable-variant vi inte stödjer explicit
                 throw new UnexpectedValueException('Unsupported callable type for route handler.');
             }
 
             $arguments = $reflection->getParameters();
 
+            // Nytt: bygg args ENDAST från handlerns signatur.
+            // Detta förhindrar att extra route-parametrar (t.ex. "any") skickas som named args.
+            $args = [];
             foreach ($arguments as $argument) {
-                if ($argument->getName() === 'request') {
-                    $params['request'] = $request;
+                $name = $argument->getName();
+
+                if ($name === 'request') {
+                    $args['request'] = $request;
+                    continue;
                 }
 
-                if ($argument->getName() === 'response') {
+                if ($name === 'response') {
                     $resp = $this->container->get(Response::class);
                     if (!$resp instanceof Response) {
                         throw new UnexpectedValueException(
                             'Container must return Radix\Http\Response for Response::class.'
                         );
                     }
-                    $params['response'] = $resp;
-                }
-            }
-
-            $except = ['method', 'middlewares'];
-            $args = [];
-
-            foreach ($params as $key => $value) {
-                if (in_array($key, $except, true)) {
+                    $args['response'] = $resp;
                     continue;
                 }
-                $args[$key] = $value;
-            }
 
-            if (count($args) !== count($arguments)) {
+                if (array_key_exists($name, $params)) {
+                    $args[$name] = $params[$name];
+                    continue;
+                }
+
+                if ($argument->isOptional() || $argument->isVariadic()) {
+                    continue;
+                }
+
                 throw new PageNotFoundException("Function argument(s) missing in query string");
             }
 
