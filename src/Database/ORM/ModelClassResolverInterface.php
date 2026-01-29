@@ -8,7 +8,8 @@ interface ModelClassResolverInterface
 {
     /**
      * @param string $classOrTable Antingen FQCN eller tabellnamn
-     * @return class-string
+     * @return class-string<Model>
+     * @phpstan-return class-string<Model>
      */
     public function resolve(string $classOrTable): string;
 }

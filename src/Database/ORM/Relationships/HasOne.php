@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
-use Exception;
-use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
+use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
 use Radix\Support\StringHelper;
 
 class HasOne
 {
+    use EnsuresModelClassLoaded;
+
     private Connection $connection;
+    /** @var class-string<Model> */
     private string $modelClass;
     private string $foreignKey;
     private string $localKeyName;
@@ -32,9 +34,11 @@ class HasOne
         private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $resolvedClass = $this->resolveModelClass($modelClass);
-        if (!class_exists($resolvedClass)) {
-            throw new Exception("Model class '$resolvedClass' not found.");
-        }
+
+        $this->ensureModelClassLoaded($resolvedClass);
+
+        // OBS: Ingen is_subclass_of-check här längre.
+        // Validering sker centralt i Model::resolveRelatedModelClass() innan relationsobjektet skapas.
 
         $this->connection = $connection;
         /** @var class-string<Model> $resolvedClass */
@@ -123,15 +127,13 @@ class HasOne
     /**
      * @param array<string, mixed> $data
      */
+    /**
+     * @param array<string, mixed> $data
+     */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
-        $modelClass = $this->resolveModelClass($classOrTable);
-
-        if (!is_subclass_of($modelClass, Model::class)) {
-            throw new LogicException(
-                "HasOne relation resolved model class '$modelClass' must extend " . Model::class . "."
-            );
-        }
+        // Använd redan-resolvad klass, inte resolve/autoload igen.
+        $modelClass = $this->modelClass;
 
         /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
@@ -144,10 +146,14 @@ class HasOne
     /**
      * Hjälpmetod för att lösa det fullständiga modellklassnamnet.
      */
+    /**
+     * Hjälpmetod för att lösa modellklass från klassnamn eller tabellnamn.
+     * OBS: Ingen autoload här – bara mapping.
+     */
     private function resolveModelClass(string $classOrTable): string
     {
-        // 1) FQCN → direkt
-        if (class_exists($classOrTable)) {
+        // 1) FQCN → direkt (ingen class_exists här)
+        if (strpos($classOrTable, '\\') !== false) {
             return $classOrTable;
         }
 
@@ -156,13 +162,7 @@ class HasOne
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        // 3) Fallback (din befintliga StringHelper-baserade konvention)
-        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-
-        if (class_exists($singularClass)) {
-            return $singularClass;
-        }
-
-        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        // 3) Fallback-konvention
+        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
     }
 }

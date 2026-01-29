@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Radix\Database\ORM\Relationships;
 
 use Exception;
-use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
-use Radix\Support\StringHelper;
+use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
 use ReflectionClass;
 
 class HasMany
 {
+    use EnsuresModelClassLoaded;
+
     private Connection $connection;
     /** @var class-string<Model> */
     private string $modelClass;
@@ -29,8 +30,13 @@ class HasMany
         private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $resolvedClass = $this->resolveModelClass($modelClass);
-        if (!class_exists($resolvedClass) || !is_subclass_of($resolvedClass, Model::class)) {
-            throw new Exception("Model class '$resolvedClass' must exist and extend " . Model::class . '.');
+
+        $this->ensureModelClassLoaded($resolvedClass);
+
+        if (!is_subclass_of($resolvedClass, Model::class, true)) {
+            throw new Exception(
+                "Model class '" . $resolvedClass . "' must exist and extend " . Model::class . '.'
+            );
         }
 
         $this->connection   = $connection;
@@ -94,13 +100,7 @@ class HasMany
      */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
-        $modelClass = $this->resolveModelClass($classOrTable);
-
-        if (!is_subclass_of($modelClass, Model::class)) {
-            throw new LogicException(
-                "HasMany relation resolved model class '$modelClass' must extend " . Model::class . '.'
-            );
-        }
+        $modelClass = $this->modelClass;
 
         /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
@@ -109,7 +109,6 @@ class HasMany
         $model->markAsExisting();
 
         if ($this->parent !== null) {
-            // Koppla tillbaka parent som relation
             $model->setRelation(
                 strtolower((new ReflectionClass($this->parent))->getShortName()),
                 $this->parent
@@ -124,8 +123,13 @@ class HasMany
      */
     private function resolveModelClass(string $classOrTable): string
     {
-        // 1) FQCN → direkt
-        if (class_exists($classOrTable)) {
+        // 0) Om klassen redan är laddad: använd den direkt (ingen autoload här)
+        if (class_exists($classOrTable, false)) {
+            return $classOrTable;
+        }
+
+        // 1) FQCN → direkt (ingen autoload här)
+        if (strpos($classOrTable, '\\') !== false) {
             return $classOrTable;
         }
 
@@ -134,12 +138,7 @@ class HasMany
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        // 3) Fallback (din befintliga StringHelper-baserade konvention)
-        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-        if (class_exists($singularClass)) {
-            return $singularClass;
-        }
-
-        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        // 3) Fallback-konvention
+        return 'App\\Models\\' . ucfirst(\Radix\Support\StringHelper::singularize($classOrTable));
     }
 }

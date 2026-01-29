@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
-use Exception;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
+use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
 use Radix\Support\StringHelper;
 
 /**
@@ -42,6 +42,8 @@ use Radix\Support\StringHelper;
  */
 class HasManyThrough
 {
+    use EnsuresModelClassLoaded;
+
     private Connection $connection;
     private string $related;      // Klassnamn ELLER tabellnamn
     private string $through;      // Klassnamn ELLER tabellnamn
@@ -85,9 +87,17 @@ class HasManyThrough
             throw new LogicException('HasManyThrough parent saknas.');
         }
 
+        /** @var Model $parent */
+        $parent = $this->parent;
+
         $relatedClass = $this->resolveModelClass($this->related);
         $throughClass = $this->resolveModelClass($this->through);
 
+        $this->ensureModelClassLoaded($relatedClass);
+        $this->ensureModelClassLoaded($throughClass);
+
+        /** @var class-string<Model> $relatedClass */
+        /** @var class-string<Model> $throughClass */
         $relatedModel = new $relatedClass();
         $throughModel = new $throughClass();
 
@@ -96,7 +106,7 @@ class HasManyThrough
         $relatedTable = $relatedModel->getTable();
         $throughTable = $throughModel->getTable();
 
-        $parentValue = $this->parent->getAttribute($this->localKey);
+        $parentValue = $parent->getAttribute($this->localKey);
         if ($parentValue === null) {
             return [];
         }
@@ -119,31 +129,23 @@ class HasManyThrough
 
     private function resolveModelClass(string $classOrTable): string
     {
-        // 1) FQCN → direkt
-        if (class_exists($classOrTable)) {
+        if (strpos($classOrTable, '\\') !== false) {
             return $classOrTable;
         }
 
-        // 2) Resolver (map/konvention)
         if ($this->modelClassResolver !== null) {
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        // 3) Fallback (din befintliga StringHelper-baserade konvention)
-        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-        if (class_exists($singularClass)) {
-            return $singularClass;
-        }
-
-        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
     }
 
     /**
      * @param array<string, mixed> $data
+     * @param class-string<Model>  $modelClass
      */
-    private function createModelInstance(array $data, string $classOrTable): Model
+    private function createModelInstance(array $data, string $modelClass): Model
     {
-        $modelClass = $this->resolveModelClass($classOrTable);
         /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
         $model->hydrateFromDatabase($data);

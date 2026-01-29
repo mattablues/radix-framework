@@ -51,7 +51,7 @@ class Connection
      * Hämta alla rader som assoc‑arrayer.
      *
      * @param array<int|string,mixed> $params
-     * @return array<int,array<string,mixed>>
+     * @return array<int, array<string, mixed>>
      */
     public function fetchAll(string $query, array $params = []): array
     {
@@ -59,7 +59,7 @@ class Connection
         $statement = $pdo->prepare($query);
         $statement->execute($params);
 
-        /** @var array<int,array<string,mixed>> $rows */
+        /** @var array<int, array<string, mixed>> $rows */
         $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
 
         return $rows;
@@ -121,7 +121,7 @@ class Connection
      * Hämta första raden som assoc‑array (eller null).
      *
      * @param array<int|string,mixed> $params
-     * @return array<string,mixed>|null
+     * @return array<string, mixed>|null
      */
     public function fetchOne(string $query, array $params = []): ?array
     {

@@ -830,15 +830,64 @@ abstract class Model implements JsonSerializable
      */
     protected function resolveRelatedModelClass(string $classOrTable): string
     {
-        $resolved = $this->modelClassResolver()->resolve($classOrTable);
+        $resolver = $this->modelClassResolver();
+        $resolved = $resolver->resolve($classOrTable);
 
-        if (!class_exists($resolved)) {
-            throw new Exception("Relation model class '{$classOrTable}' could not be resolved.");
+        // Re-entrant-säker autoload
+        /** @var array<string, true> $loading */
+        static $loading = [];
+
+        $autoloaders = spl_autoload_functions();
+        $autoloadersCount = count($autoloaders);
+
+        $diag = [
+            'input' => $classOrTable,
+            'resolved' => $resolved,
+            'resolver' => $resolver::class,
+            'already_loaded' => class_exists($resolved, false),
+            'autoloaders_count' => $autoloadersCount,
+        ];
+
+        if (!class_exists($resolved, false)) {
+            if (isset($loading[$resolved])) {
+                $diag['phase'] = 're-entrant-autoload-guard';
+                throw new LogicException(
+                    'Re-entrant autoload detected for relation model. diag=' . json_encode($diag, JSON_UNESCAPED_SLASHES)
+                );
+            }
+
+            $loading[$resolved] = true;
+            try {
+                if (!class_exists($resolved)) {
+                    $diag['phase'] = 'autoload-failed';
+                    throw new Exception(
+                        "Relation model class could not be loaded/resolved. diag=" . json_encode($diag, JSON_UNESCAPED_SLASHES)
+                    );
+                }
+            } finally {
+                unset($loading[$resolved]);
+            }
         }
 
-        if (!is_subclass_of($resolved, self::class)) {
+        $rc = new ReflectionClass($resolved);
+        $base = new ReflectionClass(self::class);
+
+        $ok = ($rc->getName() === $base->getName()) || $rc->isSubclassOf($base->getName());
+
+        if (!$ok) {
+            $parent = $rc->getParentClass();
+
+            $diag['phase'] = 'not-a-model';
+            $diag['resolved_class'] = $rc->getName();
+            $diag['resolved_parent'] = $parent instanceof ReflectionClass ? $parent->getName() : null;
+            $diag['expected_base'] = $base->getName();
+
+            $fileName = $rc->getFileName();
+            $diag['resolved_file_basename'] = is_string($fileName) ? basename($fileName) : null;
+
             throw new LogicException(
-                "Resolved relation model class '{$resolved}' måste ärva " . self::class . "."
+                "Resolved relation model class is not a Model (wrong base class). diag="
+                . json_encode($diag, JSON_UNESCAPED_SLASHES)
             );
         }
 
@@ -1024,20 +1073,17 @@ abstract class Model implements JsonSerializable
     }
 
     /**
-     * Definiera en "belongsTo"-relation.
-     */
-    public function belongsTo(string $relatedModel, string $foreignKey, ?string $ownerKey = null): BelongsTo
+      * Definiera en "belongsTo"-relation.
+      */
+    public function belongsTo(string $relatedModel, string $foreignKey, ?string $ownerKey = null): \Radix\Database\ORM\Relationships\BelongsTo
     {
         $ownerKey ??= $this->primaryKey;
 
         $relatedModel = $this->resolveRelatedModelClass($relatedModel);
 
-        /** @var self $relatedInstance */
-        $relatedInstance = new $relatedModel();
-
-        return new BelongsTo(
+        return new \Radix\Database\ORM\Relationships\BelongsTo(
             $this->getConnection(),
-            $relatedInstance->getTable(),
+            $relatedModel,
             $foreignKey,
             $ownerKey,
             $this,

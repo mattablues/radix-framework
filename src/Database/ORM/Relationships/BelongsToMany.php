@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
-use Exception;
 use InvalidArgumentException;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
+use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
 use Radix\Support\StringHelper;
 use RuntimeException;
 
 class BelongsToMany
 {
+    use EnsuresModelClassLoaded;
+
     private Connection $connection;
     /** @var class-string<Model> */
-    private string $relatedModelClass; // ändrat: spara klassnamn
+    private string $relatedModelClass;
     private string $pivotTable;
     private string $foreignPivotKey;
     private string $relatedPivotKey;
@@ -37,10 +39,13 @@ class BelongsToMany
         private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $this->connection = $connection;
+
         $resolved = $this->resolveModelClass($relatedModel);
-        if (!is_subclass_of($resolved, Model::class)) {
-            throw new LogicException("BelongsToMany related model '$resolved' must extend " . Model::class . '.');
-        }
+        $this->ensureModelClassLoaded($resolved);
+
+        // OBS: Ingen is_subclass_of-check här längre.
+        // Validering sker centralt i Model::resolveRelatedModelClass() innan relationsobjektet skapas.
+
         /** @var class-string<Model> $resolved */
         $this->relatedModelClass = $resolved;
         $this->pivotTable = $pivotTable;
@@ -191,13 +196,19 @@ class BelongsToMany
         // Injicera pivot-data på modellerna om withPivot använts
         if (!empty($this->pivotColumns)) {
             foreach ($models as $i => $model) {
+                $resultRow = $results[$i] ?? null;
+                if (!is_array($resultRow)) {
+                    continue;
+                }
+                /** @var array<string, mixed> $resultRow */
                 $pivotData = [];
                 foreach ($this->pivotColumns as $col) {
                     $key = "pivot_$col";
-                    if (array_key_exists($key, $results[$i])) {
-                        $pivotData[$col] = $results[$i][$key];
+                    if (array_key_exists($key, $resultRow)) {
+                        $pivotData[$col] = $resultRow[$key];
                     }
                 }
+
                 if (!empty($pivotData)) {
                     $model->setRelation('pivot', $pivotData);
                 }
@@ -348,39 +359,13 @@ class BelongsToMany
         return $this->parentKeyName;
     }
 
-    private function resolveModelClass(string $classOrTable): string
-    {
-        // 1) FQCN → direkt
-        if (class_exists($classOrTable)) {
-            return $classOrTable;
-        }
-
-        // 2) Resolver (map/konvention)
-        if ($this->modelClassResolver !== null) {
-            return $this->modelClassResolver->resolve($classOrTable);
-        }
-
-        // 3) Fallback (din befintliga StringHelper-baserade konvention)
-        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-        if (class_exists($singularClass)) {
-            return $singularClass;
-        }
-
-        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
-    }
-
     /**
      * @param array<string, mixed> $data
      */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
-        $modelClass = $this->resolveModelClass($classOrTable);
-
-        if (!is_subclass_of($modelClass, Model::class)) {
-            throw new LogicException(
-                "BelongsToMany relation resolved model class '$modelClass' must extend " . Model::class . "."
-            );
-        }
+        // Använd redan-resolvad klass
+        $modelClass = $this->relatedModelClass;
 
         /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
@@ -389,6 +374,22 @@ class BelongsToMany
         $model->markAsExisting();
 
         return $model;
+    }
+
+    /**
+     * OBS: Ingen autoload här – bara mapping.
+     */
+    private function resolveModelClass(string $classOrTable): string
+    {
+        if (strpos($classOrTable, '\\') !== false) {
+            return $classOrTable;
+        }
+
+        if ($this->modelClassResolver !== null) {
+            return $this->modelClassResolver->resolve($classOrTable);
+        }
+
+        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
     }
 
     // --- Hjälpmetoder ---
@@ -464,15 +465,16 @@ class BelongsToMany
     private function getExistingRelatedIds(int $parentId): array
     {
         $sql = "SELECT `$this->relatedPivotKey` AS rid FROM `$this->pivotTable` WHERE `$this->foreignPivotKey` = ?";
-        /** @var array<int, array<string, mixed>> $rows */
+
+        /** @var array<int, array{rid: mixed}> $rows */
         $rows = $this->connection->fetchAll($sql, [$parentId]);
 
         return array_map(
             /**
-             * @param array<string, mixed> $r
+             * @param array{rid: mixed} $r
              */
             function (array $r): int {
-                $rid = $r['rid'] ?? null;
+                $rid = $r['rid'];
 
                 if (is_int($rid)) {
                     return $rid;

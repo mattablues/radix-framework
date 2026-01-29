@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Radix\Database\ORM\Relationships;
 
 use Exception;
-use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
@@ -14,27 +13,59 @@ use Radix\Support\StringHelper;
 class BelongsTo
 {
     private Connection $connection;
+
+    /**
+     * Kan vara antingen:
+     *  - class-string<Model> (t.ex. App\Models\User::class)
+     *  - tabellnamn (t.ex. 'users')
+     */
+    private string $relatedModelOrTable;
+
+    /**
+     * Behövs p.g.a. QueryBuilder WithCount använder Reflection och förväntar sig propertyn `relatedTable`.
+     * @phpstan-ignore property.onlyWritten
+     */
     private string $relatedTable;
+
     private string $foreignKey;
     private string $ownerKey;
     private Model $parentModel;
+
     private bool $useDefault = false;
+
     /** @var array<string, mixed>|callable|null */
     private $defaultAttributes = null;
 
     public function __construct(
         Connection $connection,
-        string $relatedTable,
+        string $relatedModelOrTable,
         string $foreignKey,
         string $ownerKey,
         Model $parentModel,
         private readonly ?ModelClassResolverInterface $modelClassResolver = null
     ) {
         $this->connection = $connection;
-        $this->relatedTable = $relatedTable;
+        $this->relatedModelOrTable = $relatedModelOrTable;
         $this->foreignKey = $foreignKey;
         $this->ownerKey = $ownerKey;
         $this->parentModel = $parentModel;
+
+        // Sätt relatedTable direkt så WithCount kan läsa den via Reflection
+        if (strpos($relatedModelOrTable, '\\') !== false) {
+            if (!class_exists($relatedModelOrTable)) {
+                throw new Exception("Model class '{$relatedModelOrTable}' not found.");
+            }
+            if (!is_subclass_of($relatedModelOrTable, Model::class, true)) {
+                throw new Exception("Model class '{$relatedModelOrTable}' must exist and extend " . Model::class . '.');
+            }
+
+            /** @var class-string<Model> $relatedModelOrTable */
+            $tmp = new $relatedModelOrTable();
+            /** @var Model $tmp */
+            $this->relatedTable = $tmp->getTable();
+        } else {
+            $this->relatedTable = $relatedModelOrTable;
+        }
     }
 
     /**
@@ -49,32 +80,28 @@ class BelongsTo
 
     public function get(): ?Model
     {
-        // Hämta värdet av foreignKey från den aktuella modellens attribut
-        $foreignKeyValue = $this->getParentModelAttribute($this->foreignKey);
+        $foreignKeyValue = $this->parentModel->getAttribute($this->foreignKey);
 
         if ($foreignKeyValue === null) {
             return $this->returnDefaultOrNull();
         }
 
-        $query = "SELECT * FROM `$this->relatedTable` WHERE `$this->ownerKey` = ? LIMIT 1";
-        $result = $this->connection->fetchOne($query, [$foreignKeyValue]); // Använder rätt värde här
+        [$relatedClass, $relatedTable] = $this->resolveRelatedClassAndTable();
+
+        $query = "SELECT * FROM `$relatedTable` WHERE `$this->ownerKey` = ? LIMIT 1";
+        $result = $this->connection->fetchOne($query, [$foreignKeyValue]);
 
         if ($result === null) {
-            return $this->returnDefaultOrNull(); // Inget resultat från databasen
+            return $this->returnDefaultOrNull();
         }
 
-        return $this->createModelInstance($result, $this->relatedTable); // Skapa modellinstans
+        return $this->createModelInstance($result, $relatedClass);
     }
 
     public function first(): ?Model
     {
-        $result = $this->get(); // Hämta en enda relaterad post
-
-        if (!$result) {
-            return $this->returnDefaultOrNull();
-        }
-
-        return $result; // Returera modellen direkt
+        $result = $this->get();
+        return $result ?: $this->returnDefaultOrNull();
     }
 
     private function returnDefaultOrNull(): ?Model
@@ -83,9 +110,11 @@ class BelongsTo
             return null;
         }
 
-        $modelClass = $this->resolveModelClass($this->relatedTable);
+        [$relatedClass] = $this->resolveRelatedClassAndTable();
+
+        /** @var class-string<Model> $relatedClass */
+        $model = new $relatedClass();
         /** @var Model $model */
-        $model = new $modelClass();
 
         if (is_array($this->defaultAttributes)) {
             /** @var array<string, mixed> $defaults */
@@ -99,54 +128,68 @@ class BelongsTo
         return $model;
     }
 
-    private function getParentModelAttribute(string $attribute): mixed
+    /**
+     * @return array{0: class-string<Model>, 1: string} [relatedModelClass, relatedTable]
+     */
+    private function resolveRelatedClassAndTable(): array
     {
-        // Försäkra att modellen har attributet
-        if (property_exists($this, 'parentModel')) {
-            return $this->parentModel->getAttribute($attribute);
+        // 1) Om vi redan fick en FQCN: använd den
+        if (strpos($this->relatedModelOrTable, '\\') !== false) {
+            $cls = $this->relatedModelOrTable;
+
+            if (!class_exists($cls)) {
+                throw new Exception("Model class '{$cls}' not found.");
+            }
+            if (!is_subclass_of($cls, Model::class, true)) {
+                throw new Exception("Model class '{$cls}' must exist and extend " . Model::class . '.');
+            }
+
+            /** @var class-string<Model> $cls */
+            $tmp = new $cls();
+            /** @var Model $tmp */
+            return [$cls, $tmp->getTable()];
         }
 
-        throw new Exception("Unable to access the foreign key attribute '$attribute' on the parent model.");
+        // 2) Annars: vi fick tabellnamn
+        $table = $this->relatedModelOrTable;
+        $cls = $this->resolveModelClassFromTable($table);
+
+        return [$cls, $table];
     }
 
-    private function resolveModelClass(string $classOrTable): string
+    /**
+     * @return class-string<Model>
+     */
+    private function resolveModelClassFromTable(string $table): string
     {
         if ($this->modelClassResolver !== null) {
-            return $this->modelClassResolver->resolve($classOrTable);
+            $cls = $this->modelClassResolver->resolve($table);
+        } else {
+            $cls = 'App\\Models\\' . ucfirst(StringHelper::singularize($table));
         }
 
-        if (class_exists($classOrTable)) {
-            return $classOrTable; // Returnera direkt
+        if (!class_exists($cls)) {
+            throw new Exception("Model class '{$cls}' not found.");
+        }
+        if (!is_subclass_of($cls, Model::class, true)) {
+            throw new Exception("Model class '{$cls}' must exist and extend " . Model::class . '.');
         }
 
-        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-
-        if (class_exists($singularClass)) {
-            return $singularClass;
-        }
-
-        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        /** @var class-string<Model> $cls */
+        return $cls;
     }
 
     /**
      * @param array<string, mixed> $data
+     * @param class-string<Model>  $relatedClass
      */
-    private function createModelInstance(array $data, string $classOrTable): Model
+    private function createModelInstance(array $data, string $relatedClass): Model
     {
-        $modelClass = $this->resolveModelClass($classOrTable);
-
-        if (!is_subclass_of($modelClass, Model::class)) {
-            throw new LogicException(
-                "BelongsTo relation resolved model class '$modelClass' måste ärva " . Model::class . "."
-            );
-        }
-
-        /** @var class-string<Model> $modelClass */
-        $model = new $modelClass();
+        /** @var class-string<Model> $relatedClass */
+        $model = new $relatedClass();
         /** @var Model $model */
         $model->hydrateFromDatabase($data);
         $model->markAsExisting();
-
         return $model;
     }
 }

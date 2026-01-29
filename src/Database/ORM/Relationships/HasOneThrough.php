@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Radix\Database\ORM\Relationships;
 
-use Exception;
 use LogicException;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
+use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
 use Radix\Support\StringHelper;
 
 class HasOneThrough
 {
+    use EnsuresModelClassLoaded;
+
     private Connection $connection;
     private string $related;     // Klassnamn ELLER tabellnamn
     private string $through;     // Klassnamn ELLER tabellnamn
@@ -61,16 +63,17 @@ class HasOneThrough
             throw new LogicException('HasOneThrough parent saknas.');
         }
 
+        /** @var Model $parent */
+        $parent = $this->parent;
+
         $relatedClass = $this->resolveModelClass($this->related);
         $throughClass = $this->resolveModelClass($this->through);
 
-        // Säkerställ att båda klasserna ärver Model
-        if (!is_subclass_of($relatedClass, Model::class)) {
-            throw new LogicException("HasOneThrough related class '$relatedClass' must extend " . Model::class . '.');
-        }
-        if (!is_subclass_of($throughClass, Model::class)) {
-            throw new LogicException("HasOneThrough through class '$throughClass' must extend " . Model::class . '.');
-        }
+        $this->ensureModelClassLoaded($relatedClass);
+        $this->ensureModelClassLoaded($throughClass);
+
+        // OBS: Ingen is_subclass_of-check här längre.
+        // Validering sker centralt i Model::resolveRelatedModelClass() innan relationsobjektet skapas.
 
         /** @var class-string<Model> $relatedClass */
         /** @var class-string<Model> $throughClass */
@@ -82,7 +85,7 @@ class HasOneThrough
         $relatedTable = $relatedModel->getTable();
         $throughTable = $throughModel->getTable();
 
-        $parentValue = $this->parent->getAttribute($this->localKey);
+        $parentValue = $parent->getAttribute($this->localKey);
         if ($parentValue === null) {
             return null;
         }
@@ -94,40 +97,33 @@ class HasOneThrough
                  LIMIT 1";
 
         $row = $this->connection->fetchOne($sql, [$parentValue]);
-        if (!$row) {
+        if ($row === null) {
             return null;
         }
 
+        /** @var array<string, mixed> $row */
         return $this->createModelInstance($row, $relatedClass);
     }
 
     private function resolveModelClass(string $classOrTable): string
     {
-        // 1) FQCN → direkt
-        if (class_exists($classOrTable)) {
+        if (strpos($classOrTable, '\\') !== false) {
             return $classOrTable;
         }
 
-        // 2) Resolver (map/konvention)
         if ($this->modelClassResolver !== null) {
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        // 3) Fallback (din befintliga StringHelper-baserade konvention)
-        $singularClass = 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
-        if (class_exists($singularClass)) {
-            return $singularClass;
-        }
-
-        throw new Exception("Model class '$classOrTable' not found. Expected '$singularClass'.");
+        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
     }
 
     /**
      * @param array<string, mixed> $data
+     * @param class-string<Model>  $modelClass
      */
-    private function createModelInstance(array $data, string $classOrTable): Model
+    private function createModelInstance(array $data, string $modelClass): Model
     {
-        $modelClass = $this->resolveModelClass($classOrTable);
         /** @var class-string<Model> $modelClass */
         $model = new $modelClass();
         $model->hydrateFromDatabase($data);

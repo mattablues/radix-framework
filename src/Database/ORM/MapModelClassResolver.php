@@ -7,12 +7,12 @@ namespace Radix\Database\ORM;
 final readonly class MapModelClassResolver implements ModelClassResolverInterface
 {
     /**
-     * @var array<string, class-string>
+     * @var array<string, class-string<Model>>
      */
     private array $mapLower;
 
     /**
-     * @param array<array-key, class-string> $map
+     * @param array<string, class-string<Model>> $map
      */
     public function __construct(
         array $map,
@@ -27,11 +27,18 @@ final readonly class MapModelClassResolver implements ModelClassResolverInterfac
         $this->mapLower = $lower;
     }
 
+    /**
+     * @param string $classOrTable
+     * @return class-string<Model>
+     * @phpstan-return class-string<Model>
+     */
     public function resolve(string $classOrTable): string
     {
-        // Om någon redan skickar in en FQCN som existerar: respektera den
-        if (class_exists($classOrTable)) {
-            return $classOrTable;
+        // FQCN -> returnera direkt (ingen autoload här)
+        if (str_contains($classOrTable, '\\')) {
+            /** @var class-string<Model> $fqcn */
+            $fqcn = $classOrTable;
+            return $fqcn;
         }
 
         $key = strtolower($classOrTable);
