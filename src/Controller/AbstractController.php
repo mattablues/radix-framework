@@ -71,9 +71,7 @@ abstract class AbstractController
     protected function registerFilters(array $filters): void
     {
         foreach ($filters as $name => $callback) {
-            // Använd fallback-typen "string" om ingen specifik typ anges
             $type = $callback['type'] ?? 'string';
-            // Registrera själva filtret
             $this->viewer->registerFilter($name, $callback['callback'], $type);
         }
     }

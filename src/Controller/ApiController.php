@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Radix\Controller;
 
-use App\Models\Token;
 use Radix\Http\JsonResponse;
 use Radix\Support\Validator;
 use RuntimeException;
@@ -162,42 +161,25 @@ abstract class ApiController extends AbstractController
 
     /**
      * Kontrollera om en token är giltig.
+     *
+     * OBS: Framework får inte bero på applikationslagret.
+     * Appen kan override:a detta i sin egen controller för DB-token.
      */
-    private function isTokenValid(string $token): bool
+    protected function isTokenValid(string $token): bool
     {
-        // Rensa utgångna tokens
         $this->cleanupExpiredTokens();
 
-        // Kontrollera mot miljövariabel eller databasen
         $validToken = getenv('API_TOKEN');
-        if ($token === $validToken) {
-            return true;
-        }
-
-        // Kontrollera token i databasen
-        /** @var \App\Models\Token|null $existingToken */
-        $existingToken = Token::query()->where('value', '=', $token)->first();
-
-        if (!$existingToken) {
-            return false;
-        }
-
-        // Säkerställ att vi skickar en ren sträng till strtotime
-        $expiresAt = (string) $existingToken->expires_at;
-        if ($expiresAt === '' || strtotime($expiresAt) < time()) {
-            return false;
-        }
-
-        return true;
+        return $validToken !== false && $token === $validToken;
     }
 
     /**
-     * Rensa utgångna tokens från databasen.
+     * Rensa utgångna tokens.
+     *
+     * Framework-versionen är no-op.
+     * Appen override:ar om den vill städa tokens i DB.
      */
-    private function cleanupExpiredTokens(): void
-    {
-        Token::query()->where('expires_at', '<', date('Y-m-d H:i:s'))->delete()->execute();
-    }
+    protected function cleanupExpiredTokens(): void {}
 
     /**
      * Returnera felmeddelande för dålig förfrågan (400).
@@ -208,8 +190,6 @@ abstract class ApiController extends AbstractController
     }
 
     /**
-     * Skicka validerings-/API-fel som standardiserat JSON-svar.
-     *
      * @param array<string, string|array<int, string>> $errors
      */
     protected function respondWithErrors(array $errors, int $status = 422): void
