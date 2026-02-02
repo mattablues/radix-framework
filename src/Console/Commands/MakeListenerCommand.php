@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 class MakeListenerCommand extends BaseCommand
 {
     private string $listenerPath;
     private string $templatePath;
 
-    public function __construct(string $listenerPath, string $templatePath)
-    {
+    public function __construct(
+        string $listenerPath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->listenerPath = $listenerPath;
         $this->templatePath = $templatePath;
     }
@@ -88,7 +93,7 @@ class MakeListenerCommand extends BaseCommand
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[ListenerName]', '[Namespace]'],
-            [$listenerName, 'App\EventListeners'],
+            [$listenerName, $this->config->ns('EventListeners')],
             $template
         );
 

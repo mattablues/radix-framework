@@ -9,7 +9,7 @@ use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
-use Radix\Support\StringHelper;
+use RuntimeException;
 
 /**
  * HasManyThrough: En "has many" relation via en mellanmodell/tabell.
@@ -137,7 +137,9 @@ class HasManyThrough
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
+        throw new RuntimeException(
+            'ModelClassResolverInterface is not configured for relationship. Provide a resolver or pass a FQCN.'
+        );
     }
 
     /**

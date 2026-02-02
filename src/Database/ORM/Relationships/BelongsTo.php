@@ -8,7 +8,7 @@ use Exception;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
-use Radix\Support\StringHelper;
+use RuntimeException;
 
 class BelongsTo
 {
@@ -16,7 +16,7 @@ class BelongsTo
 
     /**
      * Kan vara antingen:
-     *  - class-string<Model> (t.ex. App\Models\User::class)
+     *  - class-string<Model> (t.ex. Domain\Models\User::class)
      *  - tabellnamn (t.ex. 'users')
      */
     private string $relatedModelOrTable;
@@ -165,7 +165,9 @@ class BelongsTo
         if ($this->modelClassResolver !== null) {
             $cls = $this->modelClassResolver->resolve($table);
         } else {
-            $cls = 'App\\Models\\' . ucfirst(StringHelper::singularize($table));
+            throw new RuntimeException(
+                'ModelClassResolverInterface is not configured for relationship. Provide a resolver or pass a FQCN.'
+            );
         }
 
         if (!class_exists($cls)) {

@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 class MakeEventCommand extends BaseCommand
 {
     private string $eventPath;
     private string $templatePath;
 
-    public function __construct(string $eventPath, string $templatePath)
-    {
+    public function __construct(
+        string $eventPath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->eventPath = $eventPath;
         $this->templatePath = $templatePath;
     }
@@ -85,10 +90,9 @@ class MakeEventCommand extends BaseCommand
         $template = file_get_contents($templateFile);
 
         /** @var string $template */
-        // Byt ut placeholders i mallen
         $content = str_replace(
             ['[EventName]', '[Namespace]'],
-            [$eventName, 'App\Events'],
+            [$eventName, $this->config->ns('Events')],
             $template
         );
 

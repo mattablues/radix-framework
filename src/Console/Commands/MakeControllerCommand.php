@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 class MakeControllerCommand extends BaseCommand
 {
     private string $controllerPath;
     private string $templatePath;
 
-    public function __construct(string $controllerPath, string $templatePath)
-    {
+    public function __construct(
+        string $controllerPath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->controllerPath = $controllerPath;
         $this->templatePath = $templatePath;
     }
@@ -118,7 +123,10 @@ class MakeControllerCommand extends BaseCommand
     {
         $parts = explode('/', $name);
         array_pop($parts); // Exkludera själva filnamnet
-        return 'App\Controllers' . (count($parts) ? '\\' . implode('\\', $parts) : '');
+
+        $base = $this->config->ns('Controllers');
+
+        return $base . (count($parts) ? '\\' . implode('\\', $parts) : '');
     }
 
     private function getClassName(string $name): string

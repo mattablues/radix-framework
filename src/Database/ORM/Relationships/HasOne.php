@@ -8,7 +8,7 @@ use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
-use Radix\Support\StringHelper;
+use RuntimeException;
 
 class HasOne
 {
@@ -162,7 +162,9 @@ class HasOne
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        // 3) Fallback-konvention
-        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
+        // 3) Ingen implicit App-konvention i framework
+        throw new RuntimeException(
+            'ModelClassResolverInterface is not configured for relationship. Provide a resolver or pass a FQCN.'
+        );
     }
 }

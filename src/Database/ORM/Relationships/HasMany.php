@@ -10,6 +10,7 @@ use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
 use ReflectionClass;
+use RuntimeException;
 
 class HasMany
 {
@@ -138,7 +139,9 @@ class HasMany
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        // 3) Fallback-konvention
-        return 'App\\Models\\' . ucfirst(\Radix\Support\StringHelper::singularize($classOrTable));
+        // 3) Ingen implicit App-konvention i framework
+        throw new RuntimeException(
+            'ModelClassResolverInterface is not configured for relationship. Provide a resolver or pass a FQCN.'
+        );
     }
 }

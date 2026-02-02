@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 final class MakeFormRequestCommand extends BaseCommand
 {
     public function __construct(
         private string $requestsPath,
-        private string $templatePath
+        private string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
     ) {}
-
     /**
      * @param array<int, string> $args
      */
@@ -114,7 +116,9 @@ final class MakeFormRequestCommand extends BaseCommand
         $parts = explode('/', str_replace('\\', '/', $name));
         array_pop($parts);
 
-        return 'App\Requests' . (count($parts) ? '\\' . implode('\\', $parts) : '');
+        $base = $this->config->ns('Requests');
+
+        return $base . (count($parts) ? '\\' . implode('\\', $parts) : '');
     }
 
     private function getClassName(string $name): string

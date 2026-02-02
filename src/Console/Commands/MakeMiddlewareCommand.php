@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 class MakeMiddlewareCommand extends BaseCommand
 {
     private string $middlewarePath;
     private string $templatePath;
 
-    public function __construct(string $middlewarePath, string $templatePath)
-    {
+    public function __construct(
+        string $middlewarePath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->middlewarePath = $middlewarePath;
         $this->templatePath = $templatePath;
     }
@@ -88,7 +93,7 @@ class MakeMiddlewareCommand extends BaseCommand
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[MiddlewareName]', '[Namespace]'],
-            [$middlewareName, 'App\Middlewares'],
+            [$middlewareName, $this->config->ns('Middlewares')],
             $template
         );
 

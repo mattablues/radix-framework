@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Middleware\Middlewares;
 
+use Closure;
 use Radix\Http\JsonResponse;
 use Radix\Http\Request;
 use Radix\Http\RequestHandlerInterface;
@@ -18,6 +19,7 @@ class RateLimiter implements MiddlewareInterface
     /** @var Redis|null */
     private $redis;
     private bool $isRedis;
+    private readonly Closure $rand;
 
     public function __construct(
         Redis|string|null $redis = null,
@@ -25,9 +27,11 @@ class RateLimiter implements MiddlewareInterface
         private readonly int $windowSeconds = 60,
         private readonly ?string $bucket = null,
         private readonly ?FileCache $fileCache = null,
+        ?callable $rand = null,
     ) {
         $this->redis = $redis instanceof Redis ? $redis : null;
         $this->isRedis = $this->redis instanceof Redis;
+        $this->rand = Closure::fromCallable($rand ?? 'mt_rand');
     }
 
     public function process(Request $request, RequestHandlerInterface $next): Response
@@ -79,17 +83,14 @@ class RateLimiter implements MiddlewareInterface
                 $redis->expire($key, $ttl);
             }
 
-            //error_log(sprintf("[Redis] Key: %s, Value: %d, TTL: %d", $key, $val, $ttl));
             return (int) $val;
         }
 
-        // Om RATELIMIT_CACHE_PATH är satt: använd alltid den
         $envPath = getenv('RATELIMIT_CACHE_PATH');
         if (is_string($envPath) && $envPath !== '') {
             $cacheDir = rtrim($envPath, '/\\');
             $cache = new FileCache($cacheDir);
         } else {
-            // Annars: behåll gamla beteendet (injicerad FileCache eller tempdir)
             $cacheDir = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'radix_ratelimit';
             $cache = $this->fileCache ?? new FileCache($cacheDir);
         }
@@ -106,19 +107,17 @@ class RateLimiter implements MiddlewareInterface
             $existingExpireAt = isset($payload['e']) ? (int) $payload['e'] : 0;
 
             if ($existingExpireAt > $now) {
-                $expireAt = $existingExpireAt; // Retain current expiration if still valid
+                $expireAt = $existingExpireAt;
             }
         }
 
         $count++;
-        $effectiveTtl = max(1, $expireAt - $now); // Ensuring absolute minimum of 1s TTL
+        $effectiveTtl = max(1, $expireAt - $now);
 
-        // Prevent recalculating TTL when it's too short
         if ($effectiveTtl < $ttl) {
             $effectiveTtl = max(2, $ttl);
         }
 
-        // Save data into cache
         if (!$cache->set($key, ['c' => $count, 'e' => $expireAt], $effectiveTtl)) {
             throw new RuntimeException(sprintf(
                 'Failed to update cache for Key: %s, Count: %d, ExpireAt: %d, EffectiveTtl: %d',
@@ -130,7 +129,7 @@ class RateLimiter implements MiddlewareInterface
         }
 
         // Automatisk rensning med 1% chans (hjälper till att hålla disken ren)
-        if (mt_rand(1, 100) === 1) {
+        if (($this->rand)(1, 100) === 1) {
             $cache->prune($now);
         }
 

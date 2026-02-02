@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 class MakeProviderCommand extends BaseCommand
 {
     private string $providerPath;
     private string $templatePath;
 
-    public function __construct(string $providerPath, string $templatePath)
-    {
+    public function __construct(
+        string $providerPath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->providerPath = $providerPath;
         $this->templatePath = $templatePath;
     }
@@ -92,7 +97,7 @@ class MakeProviderCommand extends BaseCommand
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[ProviderName]', '[Namespace]'],
-            [$providerName, 'App\Providers'],
+            [$providerName, $this->config->ns('Providers')],
             $template
         );
 

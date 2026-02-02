@@ -9,7 +9,7 @@ use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
 use Radix\Database\ORM\ModelClassResolverInterface;
 use Radix\Database\ORM\Relationships\Concerns\EnsuresModelClassLoaded;
-use Radix\Support\StringHelper;
+use RuntimeException;
 
 class HasOneThrough
 {
@@ -115,7 +115,9 @@ class HasOneThrough
             return $this->modelClassResolver->resolve($classOrTable);
         }
 
-        return 'App\\Models\\' . ucfirst(StringHelper::singularize($classOrTable));
+        throw new RuntimeException(
+            'ModelClassResolverInterface is not configured for relationship. Provide a resolver or pass a FQCN.'
+        );
     }
 
     /**

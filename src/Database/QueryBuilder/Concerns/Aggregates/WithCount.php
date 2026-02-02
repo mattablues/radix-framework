@@ -59,17 +59,25 @@ trait WithCount
         $relatedTableGuess = $relation;
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
+            // Försök hämta relaterad tabell från relationens modelClass (ingen App-konvention i framework)
+            $relatedTable = $relatedTableGuess;
+
             try {
-                $relatedModelClass = 'App\\Models\\' . ucfirst(\Radix\Support\StringHelper::singularize($relation));
-                if (class_exists($relatedModelClass) && is_subclass_of($relatedModelClass, Model::class)) {
-                    /** @var class-string<Model> $relatedModelClass */
-                    $relatedInstance = new $relatedModelClass();
-                    /** @var Model $relatedInstance */
-                    $relatedTable = $relatedInstance->getTable();
-                } else {
-                    $relatedTable = $relatedTableGuess;
+                $refRel = new ReflectionClass($rel);
+                if ($refRel->hasProperty('modelClass')) {
+                    $mcProp = $refRel->getProperty('modelClass');
+                    $mcProp->setAccessible(true);
+                    $relatedModelClass = $mcProp->getValue($rel);
+
+                    if (is_string($relatedModelClass) && class_exists($relatedModelClass) && is_subclass_of($relatedModelClass, Model::class)) {
+                        /** @var class-string<Model> $relatedModelClass */
+                        $relatedInstance = new $relatedModelClass();
+                        /** @var Model $relatedInstance */
+                        $relatedTable = $relatedInstance->getTable();
+                    }
                 }
             } catch (Throwable) {
+                // fallback: använd relationsnamnet som tabell
                 $relatedTable = $relatedTableGuess;
             }
 

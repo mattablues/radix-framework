@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
+
 class MakeServiceCommand extends BaseCommand
 {
     private string $servicePath;
     private string $templatePath;
 
-    public function __construct(string $servicePath, string $templatePath)
-    {
+    public function __construct(
+        string $servicePath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->servicePath = $servicePath;
         $this->templatePath = $templatePath;
     }
@@ -92,7 +97,7 @@ class MakeServiceCommand extends BaseCommand
         // Byt ut placeholders i mallen
         $content = str_replace(
             ['[ServiceName]', '[Namespace]'],
-            [$serviceName, 'App\Services'],
+            [$serviceName, $this->config->ns('Services')],
             $template
         );
 

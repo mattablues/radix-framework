@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Radix\Database\ORM;
 
 use Radix\Support\StringHelper;
+use RuntimeException;
 
 final class ConventionModelClassResolver implements ModelClassResolverInterface
 {
     public function __construct(
-        private string $modelNamespace = 'App\\Models\\'
+        private string $modelNamespace = ''
     ) {}
 
     /**
@@ -26,7 +27,16 @@ final class ConventionModelClassResolver implements ModelClassResolverInterface
             return $fqcn;
         }
 
-        $ns = $this->modelNamespace !== '' ? $this->modelNamespace : 'App\\Models\\';
+        $ns = trim($this->modelNamespace);
+
+        if ($ns === '') {
+            throw new RuntimeException('ORM model namespace is not configured. Provide it when constructing ConventionModelClassResolver.');
+        }
+
+        // Normalisera så vi alltid har trailing backslash
+        if (!str_ends_with($ns, '\\')) {
+            $ns .= '\\';
+        }
 
         /** @var class-string<Model> $fqcn */
         $fqcn = $ns . ucfirst(StringHelper::singularize($classOrTable));

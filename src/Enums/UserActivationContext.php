@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Radix\Enums;
 
 /**
- * Class UserActivationContext
- * @package App\Events
+ * Kontext för användaraktivering (t.ex. vem som initierade den).
  */
 enum UserActivationContext: string
 {

@@ -24,6 +24,7 @@ use ReflectionIntersectionType;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionUnionType;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -226,8 +227,9 @@ abstract class Model implements JsonSerializable
             return self::$modelClassResolver;
         }
 
-        // Fallback om någon använder ORM utan att ha bootstrappat services.php
-        return new ConventionModelClassResolver('App\\Models\\');
+        throw new RuntimeException(
+            'ModelClassResolverInterface is not configured. Call ' . self::class . '::setModelClassResolver(...) during app bootstrap.'
+        );
     }
 
     /**
@@ -834,7 +836,7 @@ abstract class Model implements JsonSerializable
         $resolved = $resolver->resolve($classOrTable);
 
         // Re-entrant-säker autoload
-        /** @var array<string, true> $loading */
+        /** @var array<string, bool> $loading */
         static $loading = [];
 
         $autoloaders = spl_autoload_functions();
@@ -849,7 +851,7 @@ abstract class Model implements JsonSerializable
         ];
 
         if (!class_exists($resolved, false)) {
-            if (isset($loading[$resolved])) {
+            if (($loading[$resolved] ?? false) === true) {
                 $diag['phase'] = 're-entrant-autoload-guard';
                 throw new LogicException(
                     'Re-entrant autoload detected for relation model. diag=' . json_encode($diag, JSON_UNESCAPED_SLASHES)

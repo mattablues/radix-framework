@@ -6,6 +6,7 @@ namespace Radix\Container;
 
 use ArrayAccess;
 use Psr\Container\ContainerInterface;
+use Radix\Container\Contract\ContainerRegistryInterface;
 use Radix\Container\Exception\ContainerDependencyInjectionException;
 use Radix\Container\Exception\ContainerNotFoundException;
 use ReflectionClass;
@@ -13,7 +14,7 @@ use ReflectionClass;
 /**
  * @implements ArrayAccess<string, object>
  */
-class Container implements ContainerInterface, ArrayAccess
+class Container implements ContainerInterface, ArrayAccess, ContainerRegistryInterface
 {
     /**
      * @var array<string, string>
@@ -45,7 +46,12 @@ class Container implements ContainerInterface, ArrayAccess
     {
         $this->parameters = new Parameter();
         $this->resolver = new Resolver($this);
+
         $this->add($this);
+
+        // Gör det möjligt att hämta containern via interface-typer (autowire-säkert)
+        $this->add(ContainerInterface::class, $this);
+        $this->add(ContainerRegistryInterface::class, $this);
     }
 
     public function offsetExists(mixed $offset): bool

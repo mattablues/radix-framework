@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\Console\Commands;
 
+use Radix\Console\GeneratorConfig;
 use Radix\Support\StringHelper;
 
 // använd relationernas pluralizer
@@ -12,8 +13,11 @@ class MakeModelCommand extends BaseCommand
     private string $modelPath;
     private string $templatePath;
 
-    public function __construct(string $modelPath, string $templatePath)
-    {
+    public function __construct(
+        string $modelPath,
+        string $templatePath,
+        private readonly GeneratorConfig $config = new GeneratorConfig()
+    ) {
         $this->modelPath = $modelPath;
         $this->templatePath = $templatePath;
     }
@@ -105,7 +109,7 @@ class MakeModelCommand extends BaseCommand
         /** @var string $template */
         $content = str_replace(
             ['[ModelName]', '[Namespace]', '[table_name]'],
-            [$modelName, 'App\Models', $tableName],
+            [$modelName, $this->config->ns('Models'), $tableName],
             $template
         );
 
