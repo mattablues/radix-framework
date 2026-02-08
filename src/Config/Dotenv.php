@@ -33,6 +33,10 @@ class Dotenv
 
         // Säkerställ att FILE_IGNORE_NEW_LINES verkligen används (dödar BitwiseOr->BitwiseAnd-mutanten)
         foreach ($lines as $rawLine) {
+            if (!is_string($rawLine)) {
+                throw new RuntimeException('Dotenv: unexpected non-string line from file().');
+            }
+
             if (str_contains($rawLine, "\n") || str_contains($rawLine, "\r")) {
                 throw new RuntimeException('Dotenv: file() must be called with FILE_IGNORE_NEW_LINES.');
             }
@@ -65,15 +69,12 @@ class Dotenv
             // Stöd för inline comments: KEY=value # comment
             $value = $this->stripInlineComment($value);
 
-            // Ta bort eventuella omslutande citationstecken vid behov
             $value = trim($value, "\"'");
 
-            // Hantera nycklar som måste vara absoluta sökvägar
             if ($this->basePath !== null && in_array($key, $this->pathKeys, true) && $this->isRelativePath($value)) {
                 $value = $this->makeAbsolutePath($value, $this->basePath);
             }
 
-            // Sätt miljövariabeln
             $_ENV[$key] = $value;
             $_SERVER[$key] = $value;
             putenv("$key=$value");
@@ -83,9 +84,6 @@ class Dotenv
     private function stripInlineComment(string $value): string
     {
         $value = trim($value);
-        if ($value === '') {
-            return '';
-        }
 
         $inSingle = false;
         $inDouble = false;
@@ -105,9 +103,8 @@ class Dotenv
             }
 
             if (!$inSingle && !$inDouble && ($ch === '#' || $ch === ';')) {
-                // Kräver att kommentartecknet INTE står först,
-                // och att det finns whitespace precis före.
-                if ($i < 1) {
+                // Kommentartecknet får inte stå först
+                if ($i === 0) {
                     continue;
                 }
 

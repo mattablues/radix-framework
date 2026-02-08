@@ -1,0 +1,269 @@
+{
+  "$schema": "https://raw.githubusercontent.com/infection/infection/0.29.8/resources/schema.json",
+  "source": {
+    "directories": ["src"],
+    "excludes": ["../vendor", "../tests", "tests"]
+  },
+  "logs": {
+    "text": "php://stdout"
+  },
+  "timeout": 25,
+  "mutators": {
+    "@default": true,
+    "PublicVisibility": false,
+    "Concat": {
+      "ignore": [
+        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders"
+      ]
+    },
+    "Continue_": {
+      "ignore": [
+        "Radix\\Routing\\Dispatcher::handle"
+      ]
+    },
+    "UnwrapRtrim": {
+      "ignore": [
+        "Radix\\Routing\\Router::add",
+        "Radix\\Routing\\Router::addRoute",
+        "Radix\\Support\\FileCache::__construct"
+      ]
+    },
+    "UnwrapLtrim": {
+      "ignore": [
+        "Radix\\Routing\\Router::add",
+        "Radix\\Routing\\Router::addRoute"
+      ]
+    },
+    "MBString": {
+      "ignore": [
+        "Radix\\Routing\\Router::addRoute"
+      ]
+    },
+    "DecrementInteger": {
+      "ignore": [
+        "Radix\\Config\\Dotenv::stripInlineComment",
+        "Radix\\Database\\ORM\\Relationships\\BelongsToMany::attach",
+        "Radix\\Database\\ORM\\Relationships\\BelongsToMany::detach",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::lazy",
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesMutations::compileMutationSql",
+        "Radix\\Database\\QueryBuilder\\Concerns\\BuildsWhere::whereIn",
+        "Radix\\Database\\QueryBuilder\\Concerns\\BuildsWhere::whereNotIn",
+        "Radix\\File\\Image::pngCompressionLevel",
+        "Radix\\Support\\FileCache::get",
+        "Radix\\Support\\FileCache::__construct"
+      ]
+    },
+    "ProtectedVisibility": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::compileAllBindings",
+        "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCtePrefix",
+        "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCteBindings",
+        "Radix\\Database\\QueryBuilder\\Concerns\\GroupingSets::compileGroupByClause",
+        "Radix\\Database\\QueryBuilder\\Concerns\\Windows::compileWindowSelects"
+      ]
+    },
+    "IncrementInteger": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Relationships\\BelongsToMany::attach",
+        "Radix\\Database\\ORM\\Relationships\\BelongsToMany::detach",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::from",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::lazy",
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesMutations::compileMutationSql",
+        "Radix\\Database\\QueryBuilder\\Concerns\\BuildsWhere::whereIn",
+        "Radix\\Database\\QueryBuilder\\Concerns\\BuildsWhere::whereNotIn",
+        "Radix\\Routing\\Dispatcher::handle",
+        "Radix\\File\\Image::resizeImage",
+        "Radix\\File\\Image::pngCompressionLevel",
+        "Radix\\Support\\FileCache::__construct"
+      ]
+    },
+    "CastInt": {
+      "ignore": [
+        "Radix\\Support\\FileCache::ttlToExpires",
+        "Radix\\Support\\Validator::validateMax"
+      ]
+    },
+    "CastFloat": {
+      "ignore": [
+        "Radix\\Support\\Validator::validateMin",
+        "Radix\\Support\\Validator::validateMax"
+      ]
+    },
+    "Throw_": {
+      "ignore": [
+        "Radix\\File\\Image::openImage"
+      ]
+    },
+    "UnwrapArrayValues": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Relationships\\BelongsToMany::sync",
+        "Radix\\Database\\QueryBuilder\\Concerns\\Windows::compileWindowSelects"
+      ]
+    },
+    "Ternary": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Support\\FileCache::__construct"
+      ]
+    },
+    "LogicalOrAllSubExprNegation": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "LogicalOrNegation": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "LogicalAnd": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "LogicalAndAllSubExprNegation": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Container\\Definition::getResolved",
+        "Radix\\Database\\QueryBuilder\\Concerns\\GroupingSets",
+        "Radix\\Database\\QueryBuilder\\Concerns\\GroupingSets::compileGroupByClause",
+        "Radix\\Routing\\Dispatcher::handle"
+      ]
+    },
+    "LogicalAndSingleSubExprNegation": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "MethodCallRemoval": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect",
+        "Radix\\Container\\Argument\\Literal\\ArrayArgument::__construct",
+        "Radix\\Container\\Argument\\Literal\\ObjectArgument::__construct"
+      ]
+    },
+    "PregMatchRemoveCaret": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\Concerns\\Functions::wrapColumnsForFunction",
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::wrapColumn",
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::select"
+      ]
+    },
+    "PregMatchRemoveDollar": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::wrapColumn",
+        "Radix\\Database\\QueryBuilder\\Concerns\\Functions::wrapColumnsForFunction",
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::select"
+      ]
+    },
+    "PregMatchRemoveFlags": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::wrapColumn",
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::compileColumns"
+      ]
+    },
+    "UnwrapTrim": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::compileWhere",
+        "Radix\\Routing\\Router::group"
+      ]
+    },
+    "TrueValue": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect"
+      ]
+    },
+    "LogicalOr": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect",
+        "Radix\\Routing\\Router::addRoute",
+        "Radix\\Support\\Validator::validateUnique"
+      ]
+    },
+    "Identical": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "InstanceOf_": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "Coalesce": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "LogicalAndNegation": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "IfNegation": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::load"
+      ]
+    },
+    "ReturnRemoval": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::isFillable",
+        "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCteBindings",
+        "Radix\\Database\\QueryBuilder\\Concerns\\Functions::wrapColumnsForFunction",
+        "Radix\\Support\\FileCache::get"
+      ]
+    },
+    "UnwrapUcWords": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::getAttribute",
+        "Radix\\Database\\ORM\\Model::setAttribute"
+      ]
+    },
+    "UnwrapUcFirst": {
+      "ignore": [
+        "Radix\\Database\\ORM\\Model::__set"
+      ]
+    },
+    "UnwrapArrayMerge": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::compileAllBindings",
+        "Radix\\Database\\QueryBuilder\\Concerns\\Windows::compileWindowSelects",
+        "Radix\\Viewer\\RadixTemplateViewer::processExtends"
+      ]
+    },
+    "GreaterThan": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\Concerns\\Pagination::paginate",
+        "Radix\\Database\\QueryBuilder\\Concerns\\Pagination::search"
+      ]
+    },
+    "CastString": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::debugSqlInterpolated",
+        "Radix\\Database\\QueryBuilder\\Concerns\\JsonFunctions::whereJsonContains",
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere"
+      ]
+    },
+    "CastBool": {
+      "ignore": [
+        "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCtePrefix"
+      ]
+    },
+    "Break_": {
+      "ignore": [
+        "Radix\\Support\\Validator::validateRequiredWith"
+      ]
+    }
+  },
+  "testFramework": "phpunit",
+  "phpUnit": {
+    "configDir": "."
+  },
+  "testFrameworkOptions": "--testsuite=framework"
+}

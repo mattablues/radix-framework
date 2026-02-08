@@ -236,9 +236,18 @@ final class Writer
         if ($fp === false) {
             throw new RuntimeException("Kunde inte öppna fil för skrivning: {$path}");
         }
+
+        // Ta ett exklusivt lock så att vi kan testa att "finally" verkligen stänger/släpper.
+        if (!flock($fp, LOCK_EX)) {
+            fclose($fp);
+            throw new RuntimeException("Kunde inte låsa fil för skrivning: {$path}");
+        }
+
         $writeItem = function (array|object $item) use ($fp, $targetEncoding, $pretty): void {
             $opts = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | ($pretty ? JSON_PRETTY_PRINT : 0);
+
             $json = json_encode($item, $opts | JSON_THROW_ON_ERROR);
+
             if ($targetEncoding !== null && strcasecmp($targetEncoding, 'UTF-8') !== 0) {
                 $json2 = @iconv('UTF-8', $targetEncoding . '//TRANSLIT', $json);
                 if ($json2 === false) {
@@ -246,12 +255,15 @@ final class Writer
                 }
                 $json = $json2;
             }
+
             fwrite($fp, $json);
             fwrite($fp, PHP_EOL);
         };
+
         try {
             $withWriter($writeItem);
         } finally {
+            flock($fp, LOCK_UN);
             fclose($fp);
         }
     }
@@ -264,9 +276,10 @@ final class Writer
                 throw new RuntimeException("Kunde inte skapa katalog: {$dir}");
             }
         }
-        if ($dir !== '' && !is_writable($dir)) {
-            throw new RuntimeException("Katalog inte skrivbar: {$dir}");
-        }
+
+        // OBS: Ingen is_writable()-check här.
+        // På Windows/CI blir den ofta instabil och den riktiga write-operationen
+        // är ändå det som avgör om katalogen fungerar.
     }
 
     /**
@@ -294,12 +307,18 @@ final class Writer
                 continue;
             }
             foreach ($r as $k => $_) {
-                if (!in_array($k, $headers, true)) {
-                    $headers[] = (string) $k;
+                $key = self::normalizeHeaderKey($k);
+                if (!in_array($key, $headers, true)) {
+                    $headers[] = $key;
                 }
             }
         }
         return $headers;
+    }
+
+    private static function normalizeHeaderKey(mixed $key): string
+    {
+        return self::castMixedToString($key);
     }
 
     /**
@@ -358,7 +377,7 @@ final class Writer
             /** @var array<string,mixed> $row */
             $row = $normalizedRow;
 
-            // required
+            $skipRow = false;
             foreach ($required as $reqKey) {
                 /** @var string $key */
                 $key = $reqKey;
@@ -368,10 +387,15 @@ final class Writer
                     || ($row[$key] === '' && !array_key_exists($key, $nullable))
                 ) {
                     if ($onError === 'skip') {
-                        continue 2;
+                        $skipRow = true;
+                        break;
                     }
                     throw new RuntimeException("Saknar obligatoriskt fält: {$key}");
                 }
+            }
+
+            if ($skipRow) {
+                continue;
             }
 
             // defaults
@@ -504,15 +528,9 @@ final class Writer
             $xmlString = $converted;
         }
 
-        $fp = fopen($path, 'wb');
-        if ($fp === false) {
-            throw new RuntimeException("Kunde inte öppna fil för skrivning: {$path}");
-        }
-        try {
-            fwrite($fp, $xmlString);
-            fflush($fp);
-        } finally {
-            fclose($fp);
+        $bytes = file_put_contents($path, $xmlString);
+        if ($bytes === false) {
+            throw new RuntimeException("Kunde inte skriva fil: {$path}");
         }
     }
 
@@ -523,7 +541,7 @@ final class Writer
     {
         foreach ($data as $key => $value) {
             // Normalisera nyckeln till sträng
-            $keyStr = (string) $key;
+            $keyStr = self::normalizeXmlKey($key);
             $keyStr = is_numeric($keyStr) ? 'item' : $keyStr;
 
             if (is_array($value)) {
@@ -543,5 +561,37 @@ final class Writer
                 $xml->addChild($keyStr, htmlspecialchars($value));
             }
         }
+    }
+
+    private static function normalizeXmlKey(mixed $key): string
+    {
+        // Array-nycklar i PHP är alltid int|string, men vi defensiv-hanterar mixed här.
+        return self::castMixedToString($key);
+    }
+
+    /**
+     * Säkert "stringify" av mixed för att göra PHPStan nöjd och beteendet stabilt.
+     */
+    private static function castMixedToString(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+
+        if (is_object($value) && method_exists($value, '__toString')) {
+            return (string) $value;
+        }
+
+        // Fallback: försök serialisera (för arrays/objekt utan __toString/etc)
+        $encoded = json_encode($value);
+        return $encoded !== false ? $encoded : '';
     }
 }

@@ -1,0 +1,1 @@
+{% extends "layouts/main.ratio.php" %}{% block body %}<h1>Hello!</h1>{% endblock %}

@@ -72,6 +72,31 @@ class HasManyThrough
         $this->secondLocal  = $secondLocal;
     }
 
+    public function getRelated(): string
+    {
+        return $this->related;
+    }
+
+    public function getThrough(): string
+    {
+        return $this->through;
+    }
+
+    public function getFirstKey(): string
+    {
+        return $this->firstKey;
+    }
+
+    public function getSecondKey(): string
+    {
+        return $this->secondKey;
+    }
+
+    public function getSecondLocal(): string
+    {
+        return $this->secondLocal;
+    }
+
     public function setParent(Model $parent): self
     {
         $this->parent = $parent;

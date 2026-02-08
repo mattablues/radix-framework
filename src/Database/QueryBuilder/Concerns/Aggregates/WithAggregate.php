@@ -11,7 +11,6 @@ use Radix\Database\ORM\Relationships\BelongsTo;
 use Radix\Database\ORM\Relationships\HasManyThrough;
 use Radix\Database\ORM\Relationships\HasOne;
 use Radix\Database\ORM\Relationships\HasOneThrough;
-use ReflectionClass;
 
 trait WithAggregate
 {
@@ -70,20 +69,13 @@ trait WithAggregate
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasMany) {
             /** @var \Radix\Database\ORM\Relationships\HasMany $rel */
-            $ref = new ReflectionClass($rel);
-            $relatedModelClassProp = $ref->getProperty('modelClass');
-            $relatedModelClassProp->setAccessible(true);
-            /** @var class-string<Model> $relatedClass */
-            $relatedClass = $relatedModelClassProp->getValue($rel);
+            $relatedClass = $rel->getRelatedModelClass();
 
             $relatedInstance = new $relatedClass();
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $fkProp = $ref->getProperty('foreignKey');
-            $fkProp->setAccessible(true);
-            /** @var string $foreignKey */
-            $foreignKey = $fkProp->getValue($rel);
+            $foreignKey = $rel->getForeignKey();
 
             $this->columns[]
                 = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$foreignKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";
@@ -92,32 +84,13 @@ trait WithAggregate
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOneThrough) {
             /** @var HasOneThrough $rel */
-            $ref = new ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
-            /** @var string $relatedClassOrTable */
-            $relatedClassOrTable = $relatedProp->getValue($rel);
+            $relatedClassOrTable = $rel->getRelated();
+            $throughClassOrTable = $rel->getThrough();
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
-            /** @var string $throughClassOrTable */
-            $throughClassOrTable = $throughProp->getValue($rel);
-
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
-            /** @var string $firstKey */
-            $firstKey = $firstKeyProp->getValue($rel);
-
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
-            /** @var string $secondKey */
-            $secondKey = $secondKeyProp->getValue($rel);
-
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
-            /** @var string $secondLocal */
-            $secondLocal = $secondLocalProp->getValue($rel);
+            $firstKey = $rel->getFirstKey();
+            $secondKey = $rel->getSecondKey();
+            $secondLocal = $rel->getSecondLocal();
 
             $resolveTable = function (string $classOrTable): string {
                 if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
@@ -139,32 +112,13 @@ trait WithAggregate
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasManyThrough) {
             /** @var HasManyThrough $rel */
-            $ref = new ReflectionClass($rel);
 
-            $relatedProp = $ref->getProperty('related');
-            $relatedProp->setAccessible(true);
-            /** @var string $relatedClassOrTable */
-            $relatedClassOrTable = $relatedProp->getValue($rel);
+            $relatedClassOrTable = $rel->getRelated();
+            $throughClassOrTable = $rel->getThrough();
 
-            $throughProp = $ref->getProperty('through');
-            $throughProp->setAccessible(true);
-            /** @var string $throughClassOrTable */
-            $throughClassOrTable = $throughProp->getValue($rel);
-
-            $firstKeyProp = $ref->getProperty('firstKey');
-            $firstKeyProp->setAccessible(true);
-            /** @var string $firstKey */
-            $firstKey = $firstKeyProp->getValue($rel);
-
-            $secondKeyProp = $ref->getProperty('secondKey');
-            $secondKeyProp->setAccessible(true);
-            /** @var string $secondKey */
-            $secondKey = $secondKeyProp->getValue($rel);
-
-            $secondLocalProp = $ref->getProperty('secondLocal');
-            $secondLocalProp->setAccessible(true);
-            /** @var string $secondLocal */
-            $secondLocal = $secondLocalProp->getValue($rel);
+            $firstKey = $rel->getFirstKey();
+            $secondKey = $rel->getSecondKey();
+            $secondLocal = $rel->getSecondLocal();
 
             $resolveTable = function (string $classOrTable): string {
                 if (class_exists($classOrTable) && is_subclass_of($classOrTable, Model::class)) {
@@ -186,17 +140,9 @@ trait WithAggregate
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\HasOne) {
             /** @var HasOne $rel */
-            $ref = new ReflectionClass($rel);
+            $foreignKey = $rel->getForeignKey();
 
-            $fkProp = $ref->getProperty('foreignKey');
-            $fkProp->setAccessible(true);
-            /** @var string $foreignKey */
-            $foreignKey = $fkProp->getValue($rel);
-
-            $mcProp = $ref->getProperty('modelClass');
-            $mcProp->setAccessible(true);
-            /** @var class-string<Model> $modelClass */
-            $modelClass = $mcProp->getValue($rel);
+            $modelClass = $rel->getRelatedModelClass();
 
             $relatedInstance = new $modelClass();
             /** @var Model $relatedInstance */
@@ -209,22 +155,9 @@ trait WithAggregate
 
         if ($rel instanceof \Radix\Database\ORM\Relationships\BelongsTo) {
             /** @var BelongsTo $rel */
-            $ref = new ReflectionClass($rel);
-
-            $ownerKeyProp = $ref->getProperty('ownerKey');
-            $ownerKeyProp->setAccessible(true);
-            /** @var string $ownerKey */
-            $ownerKey = $ownerKeyProp->getValue($rel);
-
-            $fkProp = $ref->getProperty('foreignKey');
-            $fkProp->setAccessible(true);
-            /** @var string $parentForeignKey */
-            $parentForeignKey = $fkProp->getValue($rel);
-
-            $tableProp = $ref->getProperty('relatedTable');
-            $tableProp->setAccessible(true);
-            /** @var string $relatedTable */
-            $relatedTable = $tableProp->getValue($rel);
+            $ownerKey = $rel->getOwnerKey();
+            $parentForeignKey = $rel->getForeignKey();
+            $relatedTable = $rel->getRelatedTable();
 
             $this->columns[]
                 = "(SELECT $fn(`$relatedTable`.`$column`) FROM `$relatedTable` WHERE `$relatedTable`.`$ownerKey` = `$parentTable`.`$parentForeignKey`) AS `$aggAlias`";
@@ -250,10 +183,7 @@ trait WithAggregate
             /** @var Model $relatedInstance */
             $relatedTable = $relatedInstance->getTable();
 
-            $relatedPivotKeyProp = (new ReflectionClass($rel))->getProperty('relatedPivotKey');
-            $relatedPivotKeyProp->setAccessible(true);
-            /** @var string $relatedPivotKey */
-            $relatedPivotKey = $relatedPivotKeyProp->getValue($rel);
+            $relatedPivotKey = $rel->getRelatedPivotKey();
 
             $this->columns[]
                 = "(SELECT $fn(`related`.`$column`) FROM `$relatedTable` AS related INNER JOIN `$pivotTable` AS pivot ON related.`id` = pivot.`$relatedPivotKey` WHERE pivot.`$foreignPivotKey` = `$parentTable`.`$parentPk`) AS `$aggAlias`";

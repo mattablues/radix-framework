@@ -17,29 +17,28 @@ trait CompilesSelect
     {
         $this->type = 'SELECT';
 
-        if ($this->columns === ['*']) {
-            $this->columns = [];
-        }
-
         $this->columns = array_map(function ($column) {
-            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
-                $columnPart = $this->wrapColumn(trim($matches[1]));
-                $aliasPart = $this->wrapAlias(trim($matches[2]));
-                return "$columnPart AS $aliasPart";
-            }
-
+            // 1) FUNKTION(col) AS alias – mer specifik, måste testas först
             if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
-                $function = $matches[1];
+                $function   = $matches[1];
                 $parameters = $matches[2];
-                $alias = $matches[3];
+                $alias      = $matches[3];
 
-                $wrappedParameters = implode(
-                    ', ',
-                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters)))
-                );
+                // Parametrarna ska lämnas råa enligt testerna (SUM(price), SUM(amount) osv),
+                // bara trimma runt komma-separerade delar.
+                $parts = array_map('trim', explode(',', $parameters));
+                $paramString = implode(', ', $parts);
+
                 $wrappedAlias = $this->wrapAlias($alias);
 
-                return strtoupper($function) . "($wrappedParameters) AS $wrappedAlias";
+                return strtoupper($function) . "($paramString) AS $wrappedAlias";
+            }
+
+            // 2) Vanlig "kolumn AS alias"
+            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
+                $columnPart = $this->wrapColumn(trim($matches[1]));
+                $aliasPart  = $this->wrapAlias(trim($matches[2]));
+                return "$columnPart AS $aliasPart";
             }
 
             return $this->wrapColumn($column);
@@ -47,6 +46,40 @@ trait CompilesSelect
 
         return $this;
     }
+    //    public function select(array|string $columns = ['*']): self
+    //    {
+    //        $this->type = 'SELECT';
+    //
+    //        if ($this->columns === ['*']) {
+    //            $this->columns = [];
+    //        }
+    //
+    //        $this->columns = array_map(function ($column) {
+    //            if (preg_match('/^(.+)\s+AS\s+(.+)$/i', $column, $matches)) {
+    //                $columnPart = $this->wrapColumn(trim($matches[1]));
+    //                $aliasPart = $this->wrapAlias(trim($matches[2]));
+    //                return "$columnPart AS $aliasPart";
+    //            }
+    //
+    //            if (preg_match('/^([A-Z_]+)\((.*)\)\s+AS\s+(.+)$/i', $column, $matches)) {
+    //                $function = $matches[1];
+    //                $parameters = $matches[2];
+    //                $alias = $matches[3];
+    //
+    //                $wrappedParameters = implode(
+    //                    ', ',
+    //                    array_map([$this, 'wrapColumn'], array_map('trim', explode(',', $parameters)))
+    //                );
+    //                $wrappedAlias = $this->wrapAlias($alias);
+    //
+    //                return strtoupper($function) . "($wrappedParameters) AS $wrappedAlias";
+    //            }
+    //
+    //            return $this->wrapColumn($column);
+    //        }, (array) $columns);
+    //
+    //        return $this;
+    //    }
 
     public function distinct(bool $value = true): self
     {

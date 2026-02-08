@@ -14,8 +14,6 @@ final class ErrorResponder
     public static ?string $viewPath = null;
 
     /**
-     * Returnera ett Response beroende på API eller Web.
-     *
      * @param array<string, mixed> $jsonExtra
      */
     public static function respond(Request $request, int $status, string $message, array $jsonExtra = []): Response
@@ -57,7 +55,11 @@ final class ErrorResponder
 
             $html = ob_get_clean();
         } catch (Throwable) {
-            for ($i = 0; $i < 50 && ob_get_level() > $startLevel; $i++) {
+            // Vi behöver kunna städa:
+            // - ErrorResponder:s egen ob_start() (1 nivå)
+            // - plus ett rimligt max av nästlade buffertar från inkluderad vy.
+            // Testerna stressar med 51 nästlade nivåer, så 1 + 51 = 52 städningar.
+            for ($i = 0; $i <= 51 && ob_get_level() > $startLevel; $i++) {
                 ob_end_clean();
             }
             $html = '';

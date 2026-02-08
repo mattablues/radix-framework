@@ -59,6 +59,31 @@ class BelongsToMany
         return $this;
     }
 
+    public function getPivotTable(): string
+    {
+        return $this->pivotTable;
+    }
+
+    public function getForeignPivotKey(): string
+    {
+        return $this->foreignPivotKey;
+    }
+
+    public function getRelatedPivotKey(): string
+    {
+        return $this->relatedPivotKey;
+    }
+
+    public function getRelatedModelClass(): string
+    {
+        return $this->relatedModelClass;
+    }
+
+    public function getParentKeyName(): string
+    {
+        return $this->parentKeyName;
+    }
+
     // Ny: bygg en QueryBuilder för relaterade med JOIN pivot och standard WHERE på parent
     public function query(): \Radix\Database\QueryBuilder\QueryBuilder
     {
@@ -336,26 +361,6 @@ class BelongsToMany
             return null;
         }
         return reset($results);
-    }
-
-    public function getPivotTable(): string
-    {
-        return $this->pivotTable;
-    }
-
-    public function getForeignPivotKey(): string
-    {
-        return $this->foreignPivotKey;
-    }
-
-    public function getRelatedModelClass(): string
-    {
-        return $this->relatedModelClass;
-    }
-
-    public function getParentKeyName(): string
-    {
-        return $this->parentKeyName;
     }
 
     /**

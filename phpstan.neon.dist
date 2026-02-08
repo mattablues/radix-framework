@@ -1,0 +1,13 @@
+parameters:
+    level: 9
+    paths:
+        - src
+        - tests
+
+    # Använd rootens phpstan-bootstrap (så länge vendor/ ligger i root)
+    bootstrapFiles:
+        - ../tools/phpstan-bootstrap.php
+
+    reportUnmatchedIgnoredErrors: true
+    inferPrivatePropertyTypeFromConstructor: true
+    treatPhpDocTypesAsCertain: false

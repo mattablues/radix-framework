@@ -176,17 +176,28 @@ class Container implements ContainerInterface, ArrayAccess, ContainerRegistryInt
     protected function resolveAlias(string $id): string
     {
         $resolvedIds = [];
-        while (isset($this->aliases[$id])) {
+
+        // Arbeta på en lokal kopia så att vi kan "stoppa" loopen utan att mutera Container-state.
+        $aliases = $this->aliases;
+
+        while (isset($aliases[$id])) {
             if (in_array($id, $resolvedIds, true)) {
-                throw new ContainerDependencyInjectionException(sprintf('Circular alias detected for "%s".', $id));
+                // Viktigt för mutation testing:
+                // Om "throw" muteras bort vill vi INTE fastna i en oändlig loop.
+                // Genom att tömma den lokala alias-tabellen avslutas while-loopen direkt.
+                $aliases = [];
+
+                throw new ContainerDependencyInjectionException(
+                    sprintf('Circular alias detected for "%s".', $id)
+                );
             }
+
             $resolvedIds[] = $id;
-            $id = $this->aliases[$id];
+            $id = $aliases[$id];
         }
 
         return $id;
     }
-
 
     protected function resolveInstance(string $id): object
     {

@@ -231,7 +231,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $accumulatedBlocks = array_merge($this->getBlocks($currentCode), $accumulatedBlocks);
 
         // Iterera uppåt i hierarkin och merg:a block vid varje nivå
-        while (preg_match('#^{% extends "(?<view>.*?)" %}#', $currentCode, $matches)) {
+        // OBS: använd \A (början av strängen) istället för ^ så PregMatchRemoveCaret inte kan mutera bort ankaret.
+        while (preg_match('#\A\s*{%\s*extends\s*"(?<view>.*?)"\s*%}#', $currentCode, $matches) === 1) {
             $parentTemplate = $this->loadTemplate($viewsDirectory . $matches['view']);
 
             // Merg:a block från mellanlayouten (om den definierar t.ex. sidebar/hasSidebar)
@@ -461,7 +462,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         // 1. Placeholder för slot
         $code = preg_replace_callback(
             "#{{\s*slot\s*}}#",
-            function () {
+            function (): string {
                 return '<?php echo trim($slot); ?>';
             },
             $code
@@ -470,19 +471,34 @@ class RadixTemplateViewer implements TemplateViewerInterface
         // 2. Bearbeta uttryck med "|raw" för att undvika HTML-escaping
         $code = preg_replace_callback(
             "#{{\s*(.+?)\|raw\s*}}#",
-            function ($matches) {
-                // Casta till string så secure_output inte får mixed
-                return '<?php echo secure_output((string) (' . $matches[1] . '), true); ?>';
+            function (array $matches): string {
+                $expr = trim((string) $matches[1]);
+
+                // Säkerhetsbälte: om mutanter (eller annat) stoppar in hela token "{{ ... }}"
+                // så skulle det skapa ogiltig PHP i eval(). Då fallbackar vi till null.
+                if ($expr === '' || str_contains($expr, '{{') || str_contains($expr, '}}')) {
+                    $expr = 'null';
+                }
+
+                $template = '<?php echo secure_output((string) (__RADIX_EXPR__), true); ?>';
+                return str_replace('__RADIX_EXPR__', $expr, $template);
             },
             $code
         ) ?? $code;
 
-        // 3. Alla andra placeholders (inklusive variabler och funktioner)
+        // 3. Alla andra placeholders
         $code = preg_replace_callback(
             "#{{\s*(.+?)\s*}}#",
-            function ($matches) {
-                // Casta till string för säkert, escapat output
-                return '<?php echo secure_output((string) (' . $matches[1] . ')); ?>';
+            function (array $matches): string {
+                $expr = trim((string) $matches[1]);
+
+                // Samma säkerhetsbälte här
+                if ($expr === '' || str_contains($expr, '{{') || str_contains($expr, '}}')) {
+                    $expr = 'null';
+                }
+
+                $template = '<?php echo secure_output((string) (__RADIX_EXPR__)); ?>';
+                return str_replace('__RADIX_EXPR__', $expr, $template);
             },
             $code
         ) ?? $code;
@@ -547,22 +563,18 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         ob_start();
         try {
-            eval('?>' . $code);
+            eval(sprintf('?>%s', $code));
         } catch (Throwable $e) {
-            // Behåll tydlig felhantering utan att påverka lyckade körningar
             ob_end_clean();
             throw new RuntimeException('Template evaluation failed: ' . $e->getMessage(), 0, $e);
         }
         $output = ob_get_clean();
 
         if ($output === false) {
-            // Ingen output producerades (eller något gick fel med output-buffer),
-            // men vi vill fortfarande returnera en sträng enligt signaturen.
             $output = '';
         }
 
-        // Behåll outputen som den är utan normalisering
-        $this->debug("Evaluations resultat:\n" . htmlspecialchars($output));
+        $this->debug(sprintf("Evaluations resultat:\n%s", htmlspecialchars($output)));
 
         return $output;
     }
@@ -857,4 +869,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
             }
         }
     }
+
+
 }

@@ -18,21 +18,7 @@ class ArrayArgument extends LiteralArgument
             throw new ContainerInvalidArgumentException('Array cannot be empty.');
         }
 
-        $this->validateArray($value);
         parent::__construct($value, LiteralArgument::TYPE_ARRAY);
-    }
-
-    /**
-     * Validera att given array uppfyller samlingens krav.
-     *
-     * @param array<int|string, mixed> $value
-     */
-    private function validateArray(array $value): void
-    {
-        // Exempel: Lägg till valideringslogik här om nödvändigt.
-        if (empty($value)) {
-            throw new ContainerInvalidArgumentException('Array cannot be empty.');
-        }
     }
 
     /**

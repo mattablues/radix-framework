@@ -99,10 +99,12 @@ class Logger
             if (!is_file($candidate) || filesize($candidate) === false || filesize($candidate) < $this->maxBytes) {
                 return $candidate;
             }
+
             $i++;
+
             // Säkerhetsbroms (mycket osannolikt att nås)
             if ($i > 1000) {
-                return $candidate; // skriv ändå
+                return $fileBase . '.' . $i; // skriv ändå (=> .1001 när .1..1000 är fulla)
             }
         }
     }
@@ -141,7 +143,7 @@ class Logger
         $replace = [];
         foreach ($context as $k => $v) {
             if (is_scalar($v) || $v === null) {
-                $replace['{' . $k . '}'] = (string) $v;
+                $replace['{' . $k . '}'] = strval($v);
             }
         }
         return strtr($message, $replace);
@@ -152,9 +154,8 @@ class Logger
      */
     private function contextToString(array $context): string
     {
-        if ($context === []) {
-            return '';
-        }
+        // (Den här early-returnen var redundant och gav en ekvivalent ReturnRemoval-mutation.)
+        // ... existing code ...
         // Ta bort värden som redan interpolerats
         $rest = array_filter($context, function ($k) use ($context) {
             return str_contains($this->interpolate('{' . $k . '}', $context), '{' . $k . '}');

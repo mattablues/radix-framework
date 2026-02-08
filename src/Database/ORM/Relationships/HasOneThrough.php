@@ -49,6 +49,31 @@ class HasOneThrough
         return $this;
     }
 
+    public function getRelated(): string
+    {
+        return $this->related;
+    }
+
+    public function getThrough(): string
+    {
+        return $this->through;
+    }
+
+    public function getFirstKey(): string
+    {
+        return $this->firstKey;
+    }
+
+    public function getSecondKey(): string
+    {
+        return $this->secondKey;
+    }
+
+    public function getSecondLocal(): string
+    {
+        return $this->secondLocal;
+    }
+
     /**
      * Lägg till denna metod för att stödja eager loading via QueryBuilder
      */

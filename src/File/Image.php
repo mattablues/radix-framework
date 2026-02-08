@@ -117,9 +117,7 @@ class Image
                 break;
 
             case 'png':
-                // Säkerställ att $invertScaleQuality är en heltal
-                $scaleQuality = round(($quality / 100) * 9);
-                $invertScaleQuality = max(0, min(9, (int) (9 - $scaleQuality)));
+                $invertScaleQuality = $this->pngCompressionLevel($quality);
 
                 if (!imagepng($this->imageResized, $path, $invertScaleQuality)) {
                     throw new RuntimeException("Misslyckades med att spara som PNG till \"$path\".");
@@ -135,6 +133,18 @@ class Image
             default:
                 throw new InvalidArgumentException("Okänt filformat \"$ext\".");
         }
+    }
+
+    protected function pngCompressionLevel(int $quality): int
+    {
+        // Kvalitet 0..100 -> PNG-compression 9..0 (inverterad skala)
+        if ($quality < 0 || $quality > 100) {
+            throw new InvalidArgumentException('Kvalitet måste vara mellan 0 och 100.');
+        }
+
+        $scaleQuality = round(($quality / 100) * 9);
+
+        return max(0, min(9, (int) (9 - $scaleQuality)));
     }
 
     public function rotateImage(float $angle, int $bgColor = 0): void

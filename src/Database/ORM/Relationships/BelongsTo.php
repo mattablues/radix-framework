@@ -23,7 +23,6 @@ class BelongsTo
 
     /**
      * Behövs p.g.a. QueryBuilder WithCount använder Reflection och förväntar sig propertyn `relatedTable`.
-     * @phpstan-ignore property.onlyWritten
      */
     private string $relatedTable;
 
@@ -66,6 +65,24 @@ class BelongsTo
         } else {
             $this->relatedTable = $relatedModelOrTable;
         }
+    }
+
+    /**
+     * För QueryBuilder (withAggregate/withCount m.fl.)
+     */
+    public function getRelatedTable(): string
+    {
+        return $this->relatedTable;
+    }
+
+    public function getForeignKey(): string
+    {
+        return $this->foreignKey;
+    }
+
+    public function getOwnerKey(): string
+    {
+        return $this->ownerKey;
     }
 
     /**

@@ -57,17 +57,15 @@ class Router
                 if ($method && array_key_exists('method', $params)) {
                     $routeMethod = $params['method'];
 
-                    // Säkerställ att route-metoden verkligen är en sträng
                     if (!is_string($routeMethod)) {
                         continue;
                     }
 
-                    $routeMethodLower = mb_strtolower($routeMethod);
+                    $routeMethodLower = strtolower($routeMethod);
 
-                    if (mb_strtolower($method) !== $routeMethodLower) {
-                        // Hantera HEAD som fallback för GET
+                    if (strtolower($method) !== $routeMethodLower) {
                         if (!($method === 'HEAD' && $routeMethodLower === 'get')) {
-                            continue; // Ignorera om HEAD inte kan mappas
+                            continue;
                         }
                     }
                 }
@@ -84,32 +82,25 @@ class Router
      */
     public function group(array $options, Closure $routes): void
     {
-        $currentPath = $this->path ?? ''; // Spara nuvarande path
+        $currentPath = $this->path ?? '';
 
-        // Extrahera och använd gruppens path
         $pathOption = $options['path'] ?? '';
         if (!is_string($pathOption)) {
             throw new InvalidArgumentException('Group "path" option must be a string.');
         }
-        $groupPath = trim($pathOption, '/'); // Exempel: 'admin'
-        $this->path = $currentPath . ($groupPath ? '/' . $groupPath : ''); // Exempel: '/admin'
+        $groupPath = trim($pathOption, '/');
+        $this->path = $currentPath . ($groupPath ? '/' . $groupPath : '');
 
-        $groupMiddleware = $options['middleware'] ?? []; // Gruppens middleware
+        $groupMiddleware = $options['middleware'] ?? [];
         if (!is_array($groupMiddleware)) {
             $groupMiddleware = (array) $groupMiddleware;
         }
 
-        $existingRoutes = array_keys($this->routes); // Befintliga rutter
+        $existingRoutes = array_keys($this->routes);
 
-        // Kör Closure som skapar nya rutter
         $routes($this);
 
-        // Hitta nya rutter och uppdatera deras path och middleware
         $newRouteKeys = array_diff(array_keys($this->routes), $existingRoutes);
-
-        // $this->path är ?string, efter ?? '' är det alltid string ⇒ ingen extra is_string‑kontroll behövs
-        $basePath = $this->path ?? '';
-        $basePathTrimmed = trim($basePath, '/');
 
         foreach ($newRouteKeys as $key) {
             $routeMiddlewares = $this->routes[$key]['middlewares'] ?? [];
@@ -117,35 +108,15 @@ class Router
                 $routeMiddlewares = (array) $routeMiddlewares;
             }
 
-            // Tillämpa gruppens middleware
             $this->routes[$key]['middlewares'] = array_merge(
                 $groupMiddleware,
                 $routeMiddlewares
             );
 
-            // Typ‑säker path för denna route
-            $rawPath = $this->routes[$key]['path'] ?? '';
-            if (!is_string($rawPath)) {
-                $encoded = json_encode($rawPath);
-                $rawPath = $encoded === false ? '' : $encoded;
-            }
-            $routePath = $rawPath;
-
-            // Tillämpa gruppens path (om det inte redan finns)
-            if ($basePath !== '' && !str_starts_with($routePath, $basePath)) {
-                $routePath = $basePathTrimmed . '/' . ltrim($routePath, '/');
-            }
-
-            // Rensa eventuella dubbla snedstreck
-            $normalized = preg_replace('#/+#', '/', $routePath);
-            if (!is_string($normalized)) {
-                throw new RuntimeException('Misslyckades med att normalisera route-path.');
-            }
-
-            $this->routes[$key]['path'] = $normalized;
+            // OBS: Vi justerar INTE path här.
+            // Path-prefix ska redan ha applicerats när rutten skapades (via $this->path i add()).
         }
 
-        // Återställ den globala pathen
         $this->path = $currentPath;
     }
 
@@ -301,7 +272,6 @@ class Router
             throw new InvalidArgumentException("Method '$method' is not allowed");
         }
 
-        // Beräkna det fullständiga pathet med gruppens prefix (samma som i add())
         $fullPath = $this->path ? rtrim($this->path, '/') . '/' . ltrim($path, '/') : $path;
         $fullPath = preg_replace('#/+#', '/', $fullPath);
 

@@ -38,8 +38,8 @@ class Config
             $value = $value[$subKey];
         }
 
-        // Kontrollera om värdet är callable
-        if (is_callable($value) && is_object($value) && ($value instanceof Closure)) {
+        // Lazy-loading: exekvera endast Closures (inte invokable objects)
+        if ($value instanceof Closure) {
             $this->config[$key] = $value = $value();
         }
 

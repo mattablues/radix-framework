@@ -54,6 +54,19 @@ class HasMany
     }
 
     /**
+     * @return class-string<Model>
+     */
+    public function getRelatedModelClass(): string
+    {
+        return $this->modelClass;
+    }
+
+    public function getForeignKey(): string
+    {
+        return $this->foreignKey;
+    }
+
+    /**
      * @return array<int, Model>
      */
     public function get(): array

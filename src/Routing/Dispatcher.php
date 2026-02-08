@@ -103,8 +103,6 @@ readonly class Dispatcher
 
             $arguments = $reflection->getParameters();
 
-            // Nytt: bygg args ENDAST från handlerns signatur.
-            // Detta förhindrar att extra route-parametrar (t.ex. "any") skickas som named args.
             $args = [];
             foreach ($arguments as $argument) {
                 $name = $argument->getName();

@@ -10,6 +10,8 @@ use Closure;
 use Countable;
 use InvalidArgumentException;
 use IteratorAggregate;
+use ReflectionObject;
+use Throwable;
 use Traversable;
 
 /**
@@ -153,11 +155,9 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
 
     public function last(mixed $default = null): mixed
     {
-        if ($this->isEmpty()) {
-            return $default;
-        }
         $copy = $this->elements;
         $end = end($copy);
+
         return $end === false && !in_array(false, $copy, true) ? $default : $end;
     }
 
@@ -228,6 +228,10 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
      */
     public function filter(?callable $callback = null, int $mode = 0): self
     {
+        if ($mode !== 0) {
+            throw new InvalidArgumentException('filter() stöder endast mode=0.');
+        }
+
         if ($callback === null) {
             return new self(array_filter($this->elements));
         }
@@ -356,30 +360,68 @@ class Collection implements IteratorAggregate, Countable, ArrayAccess
         foreach ($this->elements as $k => $v) {
             $key = $callback ? $callback($v, $k) : $v;
 
-            // Serialize för att jämföra komplexa värden säkert
-            if (is_object($key) || is_array($key)) {
+            if (is_object($key)) {
+                try {
+                    $hash = md5(serialize($key));
+                } catch (Throwable) {
+                    $hash = md5(serialize(self::objectSignature($key)));
+                }
+            } elseif (is_array($key)) {
                 $hash = md5(serialize($key));
             } elseif ($strict) {
                 $encoded = json_encode([$key, gettype($key)]);
-                // Säkerställ att hash alltid är en sträng, även om json_encode misslyckas
                 $hash = $encoded === false ? 'null' : $encoded;
             } else {
-                // I icke-strikt läge: tillåt endast scalar/null, annars fallback till serialize
-                if (is_scalar($key) || $key === null) {
-                    /** @var scalar|null $key */
+                // Non-strict:
+                // - resource: använd stabilt id (ska inte serialiseras)
+                // - null/scalar: sträng-cast
+                // - övrigt: serialize-hash
+                if (is_resource($key)) {
+                    $hash = 'resource:' . get_resource_id($key);
+                } elseif ($key === null) {
+                    $hash = '';
+                } elseif (is_scalar($key)) {
+                    /** @var scalar $key */
                     $hash = (string) $key;
                 } else {
                     $hash = md5(serialize($key));
                 }
             }
 
-            if (!array_key_exists($hash, $seen)) {
-                $seen[$hash] = true;
+            if (!isset($seen[$hash])) {
+                $seen[$hash] = '1';
                 $result[$k] = $v;
             }
         }
 
         return new self($result);
+    }
+
+    /**
+     * Skapar en serialiserbar "signatur" av ett objekt (inkl. privata properties) via reflection.
+     *
+     * Viktigt:
+     * - Intern fallback för Collection::unique() när serialize($obj) inte är tillåtet.
+     * - Ska inte kopieras som standardlösning i ORM/appkod (där föredras explicita kontrakt/getters).
+     *
+     * @return array{class: string, props: array<string, mixed>}
+     */
+    private static function objectSignature(object $obj): array
+    {
+        $ref = new ReflectionObject($obj);
+
+        $props = [];
+        foreach ($ref->getProperties() as $p) {
+            $name = $p->getDeclaringClass()->getName() . '::' . $p->getName();
+            $props[$name] = $p->isInitialized($obj) ? $p->getValue($obj) : '__UNINITIALIZED__';
+        }
+
+        ksort($props);
+
+        return [
+            'class' => $ref->getName(),
+            'props' => $props,
+        ];
     }
 
     public function values(): self

@@ -46,8 +46,12 @@ class RadixSessionHandler implements SessionHandlerInterface
             }
             $this->filePath = $path;
 
-            if (!is_dir($this->filePath) && !@mkdir($this->filePath, 0o755, true) && !is_dir($this->filePath)) {
-                throw new RuntimeException("Kunde inte skapa katalog för fil baserade sessioner: {$this->filePath}");
+            if (!is_dir($this->filePath)) {
+                $ok = @mkdir($this->filePath, 0o755, true);
+
+                if (!$ok && !is_dir($this->filePath)) {
+                    throw new RuntimeException("Kunde inte skapa katalog för fil baserade sessioner: {$this->filePath}");
+                }
             }
         } else {
             throw new InvalidArgumentException("Ogiltig driver specifikation: {$this->driver}");
@@ -87,7 +91,7 @@ class RadixSessionHandler implements SessionHandlerInterface
             $file = rtrim($this->filePath, '/\\') . DIRECTORY_SEPARATOR . "sess_{$id}";
             if (is_readable($file)) {
                 $data = file_get_contents($file);
-                return $data === false ? '' : (string) $data;
+                return $data === false ? '' : $data;
             }
             return '';
         }
@@ -100,19 +104,15 @@ class RadixSessionHandler implements SessionHandlerInterface
 
     public function write($id, $data): bool
     {
-        $expiry = time() + $this->lifetime;
-
         if ($this->driver === 'file') {
             if (!is_dir($this->filePath)) {
                 @mkdir($this->filePath, 0o755, true);
             }
             $file = rtrim($this->filePath, '/\\') . DIRECTORY_SEPARATOR . "sess_{$id}";
-            $ok = file_put_contents($file, (string) $data) !== false;
-            if ($ok) {
-                @chmod($file, 0o640); // valfri härdning, påverkar inte funktion
-            }
-            return $ok;
+            return file_put_contents($file, (string) $data) !== false;
         }
+
+        $expiry = time() + $this->lifetime;
 
         $stmt = $this->getPdo()->prepare("
             INSERT INTO {$this->tableName} (id, data, expiry)

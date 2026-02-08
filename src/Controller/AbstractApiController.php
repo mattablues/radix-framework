@@ -8,7 +8,7 @@ use Radix\Http\JsonResponse;
 use Radix\Support\Validator;
 use RuntimeException;
 
-abstract class ApiController extends AbstractController
+abstract class AbstractApiController extends AbstractController
 {
     /**
      * Skapa ett JsonResponse‑objekt från en array.

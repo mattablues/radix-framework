@@ -54,6 +54,19 @@ class HasOne
     }
 
     /**
+     * @return class-string<Model>
+     */
+    public function getRelatedModelClass(): string
+    {
+        return $this->modelClass;
+    }
+
+    public function getForeignKey(): string
+    {
+        return $this->foreignKey;
+    }
+
+    /**
      * @param array<string, mixed>|callable|null $attributes
      */
     public function withDefault(array|callable|null $attributes = null): self

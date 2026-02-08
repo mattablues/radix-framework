@@ -61,11 +61,17 @@ class LiteralArgument implements LiteralArgumentInterface
      */
     public function setValue(mixed $value): void
     {
-        if (
-            ($this->type === self::TYPE_CALLABLE && !is_callable($value))
-            || ($this->type === self::TYPE_OBJECT && !is_object($value))
-            || (gettype($value) !== $this->type && $this->type !== null)
-        ) {
+        if ($this->type === null) {
+            $this->value = $value;
+            return;
+        }
+
+        $ok
+            = ($this->type === self::TYPE_CALLABLE && is_callable($value))
+            || ($this->type === self::TYPE_OBJECT && is_object($value))
+            || (gettype($value) === $this->type);
+
+        if (!$ok) {
             throw new ContainerInvalidArgumentException('Incorrect type for value.');
         }
 

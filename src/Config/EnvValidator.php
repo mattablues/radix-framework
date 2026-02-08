@@ -306,7 +306,10 @@ final class EnvValidator
             return false;
         }
 
-        $prefix = (int) $prefixRaw;
+        $prefix = filter_var($prefixRaw, FILTER_VALIDATE_INT);
+        if ($prefix === false) {
+            return false;
+        }
 
         $isV4 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
         if ($isV4) {
