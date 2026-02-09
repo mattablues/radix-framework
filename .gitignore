@@ -12,7 +12,7 @@ vendor/
 node_modules/
 
 # Förhindra att skriptfiler hamnar i källkoden
-framework/src/**/*.sh
+src/**/*.sh
 *.sh
 
 tests/test_image.jpg
@@ -38,6 +38,15 @@ cache/
 storage/
 .php-cs-fixer.cache
 infection-report.html
+
+# Framework-repo: runtime/test-artifacts (ska inte committas)
+app/
+public/
+views/
+cacheapp/
+
+# Om verktyg/tester skapar .1, .2, ... i repo-roten
+.[0-9]*
 
 # Build-artifacts
 build/

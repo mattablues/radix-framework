@@ -4,6 +4,7 @@
     "directories": ["src"],
     "excludes": ["vendor", "tests"]
   },
+  "tmpDir": "build/infection-tmp",
   "logs": {
     "text": "php://stdout"
   },
