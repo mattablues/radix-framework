@@ -1,0 +1,49 @@
+name: Infection (scheduled)
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # måndagar 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  infection:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP (with Xdebug)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Get Composer cache dir
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run Infection
+        env:
+          XDEBUG_MODE: coverage
+        run: vendor/bin/infection --configuration=infection.json.dist --no-interaction
+
+      - name: Upload Infection report (HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infection-report
+          path: infection-report.html
+          if-no-files-found: warn
