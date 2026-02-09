@@ -15,7 +15,8 @@
     "PublicVisibility": false,
     "Concat": {
       "ignore": [
-        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders"
+        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders",
+        "Radix\\Viewer\\RadixTemplateViewer::debug"
       ]
     },
     "Continue_": {
