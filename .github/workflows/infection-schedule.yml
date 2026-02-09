@@ -23,6 +23,11 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Clear Infection cache
+        run: |
+          rm -rf .infection || true
+          rm -rf var/cache || true
+
       - name: Run Infection (with loggers)
         env:
           XDEBUG_MODE: coverage
