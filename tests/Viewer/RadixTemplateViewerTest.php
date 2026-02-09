@@ -213,6 +213,7 @@ class RadixTemplateViewerTest extends TestCase
         // Stabil start-mtime
         $t1 = time();
         touch($templatePath, $t1);
+        $mtime1 = filemtime($templatePath);
 
         /** @var string $key1 */
         $key1 = $generateCacheKey->invoke($this->viewer, $resolved, $data);
@@ -220,6 +221,15 @@ class RadixTemplateViewerTest extends TestCase
         // Ändra ENDAST mtime (inte innehållet)
         $t2 = $t1 + 10;
         touch($templatePath, $t2);
+        $mtime2 = filemtime($templatePath);
+
+        // Om filsystemet inte klarar att uppdatera mtime som förväntat (t.ex. på vissa Windows/FS-kombinationer),
+        // så skippar vi testet i stället för att ge falskt negativt.
+        if ($mtime1 === $mtime2) {
+            $this->markTestSkipped(
+                'Filsystemets mtime ändras inte tillräckligt tydligt för att testa cache-nyckel beroende av mtime.'
+            );
+        }
 
         /** @var string $key2 */
         $key2 = $generateCacheKey->invoke($this->viewer, $resolved, $data);
@@ -335,7 +345,7 @@ class RadixTemplateViewerTest extends TestCase
             $templatePath,
             '{% extends "layout.ratio.php" %}
              {% block pageId %}
-                777 
+                777
              {% endblock %}
              {% block pageClass %}  my-class  {% endblock %}
              {% block searchId %}	search-99	{% endblock %}'

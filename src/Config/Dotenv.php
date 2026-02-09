@@ -44,29 +44,27 @@ class Dotenv
 
         /** @var list<string> $lines */
         foreach ($lines as $line) {
-            // Hoppa över kommentar-rader eller tomma rader
             $line = trim($line);
             if (str_starts_with($line, '#') || empty($line)) {
                 continue;
             }
 
-            // Kontrollera om raden innehåller likhetstecknet
             if (!str_contains($line, '=')) {
                 throw new RuntimeException("Invalid .env line (missing '='): '$line'");
             }
 
-            // Dela upp raden vid '=' till nyckel och värde
-            [$keyRaw, $valueRaw] = explode('=', $line, 2);
+            // Dela upp raden vid '=' till nyckel och värde (robust mot mutanter/edge cases)
+            $parts = explode('=', $line, 2);
+            $keyRaw = $parts[0] ?? '';
+            $valueRaw = $parts[1] ?? '';
 
             $key = trim($keyRaw);
             $value = $valueRaw;
 
-            // Validera att nyckeln inte är tom
             if ($key === '') {
                 throw new RuntimeException("Invalid .env line (missing key): '$line'");
             }
 
-            // Stöd för inline comments: KEY=value # comment
             $value = $this->stripInlineComment($value);
 
             $value = trim($value, "\"'");
