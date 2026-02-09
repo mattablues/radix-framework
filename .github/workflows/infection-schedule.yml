@@ -43,7 +43,8 @@ jobs:
             --configuration=infection.json.dist \
             --threads=1 \
             --logger-html=infection-report.html \
-            --logger-json=infection-report.json \
+            --logger-text=infection-report.txt \
+            --logger-summary-json=infection-summary.json \
             --log-verbosity=all \
             --no-interaction
 
