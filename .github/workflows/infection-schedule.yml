@@ -35,10 +35,10 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Run Infection
+      - name: Run Infection (deterministic)
         env:
           XDEBUG_MODE: coverage
-        run: vendor/bin/infection --configuration=infection.json.dist --no-interaction
+        run: php vendor/bin/infection --configuration=infection.json.dist --threads=1 --logger-html=infection-report.html --no-interaction
 
       - name: Upload Infection report (HTML)
         if: always()
