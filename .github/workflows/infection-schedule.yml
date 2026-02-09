@@ -20,22 +20,10 @@ jobs:
           coverage: xdebug
           tools: composer:v2
 
-      - name: Get Composer cache dir
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache Composer
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-composer-
-
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Run Infection (diagnostic)
+      - name: Run Infection (with loggers)
         env:
           XDEBUG_MODE: coverage
         run: |
@@ -46,14 +34,25 @@ jobs:
             --logger-text=infection-report.txt \
             --logger-summary-json=infection-summary.json \
             --log-verbosity=all \
-            --no-interaction
+            --no-interaction \
+            --no-progress
 
-      - name: Upload Infection report (HTML + JSON)
+      - name: Show generated report files
+        if: always()
+        run: |
+          echo "PWD: $(pwd)"
+          ls -la
+          ls -la infection-report.html || true
+          ls -la infection-report.txt || true
+          ls -la infection-summary.json || true
+
+      - name: Upload Infection reports (HTML + TXT + summary JSON)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: infection-report
           path: |
             infection-report.html
-            infection-report.json
+            infection-report.txt
+            infection-summary.json
           if-no-files-found: warn
