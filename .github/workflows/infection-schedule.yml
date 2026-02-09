@@ -35,10 +35,35 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Run Infection (deterministic)
+      - name: Pre-check PHPUnit for Infection (deterministic)
         env:
           XDEBUG_MODE: coverage
-        run: php vendor/bin/infection --configuration=infection.json.dist --threads=1 --logger-html=infection-report.html --no-interaction
+        run: |
+          vendor/bin/phpunit -c phpunit.xml --display-deprecations --display-errors --display-notices --colors=never --order-by=default --do-not-cache-result
+
+      - name: Generate coverage for Infection
+        env:
+          XDEBUG_MODE: coverage
+        run: |
+          rm -rf build/coverage || true
+          mkdir -p build/coverage
+          vendor/bin/phpunit \
+            -c phpunit.xml \
+            --order-by=default \
+            --do-not-cache-result \
+            --coverage-xml=build/coverage/coverage-xml \
+            --log-junit=build/coverage/junit.xml
+
+      - name: Run Infection (use pre-generated coverage)
+        run: |
+          php vendor/bin/infection \
+            --configuration=infection.json.dist \
+            --threads=1 \
+            --skip-initial-tests \
+            --coverage=build/coverage \
+            --logger-html=infection-report.html \
+            --no-interaction \
+            --no-progress
 
       - name: Upload Infection report (HTML)
         if: always()
