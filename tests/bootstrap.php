@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../../vendor/autoload.php';
+require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/Support/RadixSupportFsOverrides.php';
 
 spl_autoload_register(static function (string $class): void {

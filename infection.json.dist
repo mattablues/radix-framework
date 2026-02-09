@@ -1,8 +1,8 @@
 {
-  "$schema": "https://raw.githubusercontent.com/infection/infection/0.29.8/resources/schema.json",
+  "$schema": "https://raw.githubusercontent.com/infection/infection/0.32.3/resources/schema.json",
   "source": {
     "directories": ["src"],
-    "excludes": ["../vendor", "../tests", "tests"]
+    "excludes": ["vendor", "tests"]
   },
   "logs": {
     "text": "php://stdout"
@@ -264,6 +264,5 @@
   "testFramework": "phpunit",
   "phpUnit": {
     "configDir": "."
-  },
-  "testFrameworkOptions": "--testsuite=framework"
+  }
 }

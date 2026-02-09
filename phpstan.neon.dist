@@ -6,7 +6,7 @@ parameters:
 
     # Använd rootens phpstan-bootstrap (så länge vendor/ ligger i root)
     bootstrapFiles:
-        - ../tools/phpstan-bootstrap.php
+        - ./tools/phpstan-bootstrap.php
 
     reportUnmatchedIgnoredErrors: true
     inferPrivatePropertyTypeFromConstructor: true

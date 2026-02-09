@@ -223,10 +223,12 @@ class QueryBuilderTest extends TestCase
         $this->assertIsString($file, 'ReflectionMethod::getFileName() ska returnera en sträng i detta test.');
         $file = $file; // nu säkert string för PHPStan
 
-        $this->assertStringContainsString(
-            'framework',
-            $file,
-            'paginate() laddas inte från framework/src. Fil: ' . $file
+        $normalized = str_replace(['/', '\\'], '/', $file);
+
+        $this->assertStringEndsWith(
+            '/src/Database/QueryBuilder/Concerns/Pagination.php',
+            $normalized,
+            'paginate() laddas inte från förväntad trait-fil. Fil: ' . $file
         );
     }
 

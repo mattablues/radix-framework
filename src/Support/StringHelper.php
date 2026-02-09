@@ -10,44 +10,48 @@ use RuntimeException;
 class StringHelper
 {
     /**
+     * @var array<string,mixed>|null
+     */
+    private static ?array $pluralizationOverride = null;
+
+    /**
+     * @var array<string,string>|null
+     */
+    private static ?array $irregularCache = null;
+
+    /**
+     * Appen kan override:a pluralization-reglerna här.
+     *
+     * @param array<string,mixed> $config
+     */
+    public static function setPluralizationConfig(array $config): void
+    {
+        self::$pluralizationOverride = $config;
+        self::$irregularCache = null; // reset cache
+    }
+
+
+    /**
      * Singularize a table name.
      */
     public static function singularize(string $tableName): string
     {
-        // Ladda konfigurationen för pluralisering
-        $pluralConfig = include dirname(__DIR__, 3) . '/config/pluralization.php';
-
-        if (!is_array($pluralConfig)) {
-            throw new RuntimeException('pluralization.php måste returnera en array.');
-        }
-
-        /** @var array<string,mixed> $pluralConfig */
-        $config = new Config($pluralConfig);
-        $rawIrregular = $config->get('irregular', []);
-        $irregularWords = is_array($rawIrregular) ? $rawIrregular : [];
+        $irregularWords = self::irregularMap();
 
         $lower = strtolower($tableName);
 
-        // Kontrollera om det finns oregelbundna pluralformer
-        if (isset($irregularWords[$lower])) {
-            $mapped = $irregularWords[$lower];
-
-            if (is_string($mapped)) {
-                return $mapped;
-            }
+        if (isset($irregularWords[$lower]) && is_string($irregularWords[$lower])) {
+            return $irregularWords[$lower];
         }
 
-        // Hantera standardfallet där tabellnamnet slutar på 'ies'
         if (str_ends_with($tableName, 'ies')) {
             return substr($tableName, 0, -3) . 'y';
         }
 
-        // Ta bort sista 's' om det inte är ett undantag
         if (str_ends_with($tableName, 's')) {
             return substr($tableName, 0, -1);
         }
 
-        // Returnera originalnamnet om inget behöver ändras
         return $tableName;
     }
 
@@ -56,26 +60,14 @@ class StringHelper
      */
     public static function pluralize(string $word): string
     {
-        $pluralConfig = include dirname(__DIR__, 3) . '/config/pluralization.php';
-
-        if (!is_array($pluralConfig)) {
-            throw new RuntimeException('pluralization.php måste returnera en array.');
-        }
-
-        /** @var array<string,mixed> $pluralConfig */
-        $config = new Config($pluralConfig);
-        $rawIrregular = $config->get('irregular', []);
-        $irregularWords = is_array($rawIrregular) ? $rawIrregular : [];
+        $irregularWords = self::irregularMap();
 
         $lower = strtolower($word);
 
-        // Om oregelbunden mappning finns (direkt sträng), använd den.
         if (isset($irregularWords[$lower]) && is_string($irregularWords[$lower])) {
-            // För ord som "status" där singular==plural, returnera värdet.
             return $irregularWords[$lower];
         }
 
-        // Enkla regler
         if (preg_match('/(s|x|z|ch|sh)$/i', $word)) {
             return $word . 'es';
         }
@@ -83,5 +75,53 @@ class StringHelper
             return substr($word, 0, -1) . 'ies';
         }
         return $word . 's';
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function irregularMap(): array
+    {
+        if (self::$irregularCache !== null) {
+            return self::$irregularCache;
+        }
+
+        $pluralConfig = self::$pluralizationOverride;
+
+        if ($pluralConfig === null) {
+            $defaultFile = dirname(__DIR__, 2) . '/support/config/pluralization.php';
+
+            if (!is_file($defaultFile)) {
+                throw new RuntimeException('Saknar default pluralization-fil: ' . $defaultFile);
+            }
+
+            $pluralConfig = include $defaultFile;
+        }
+
+        if (!is_array($pluralConfig)) {
+            throw new RuntimeException('pluralization config måste returnera en array.');
+        }
+
+        /** @var array<string,mixed> $stringKeyedConfig */
+        $stringKeyedConfig = [];
+        foreach ($pluralConfig as $k => $v) {
+            if (is_string($k)) {
+                $stringKeyedConfig[$k] = $v;
+            }
+        }
+
+        $config = new Config($stringKeyedConfig);
+        $rawIrregular = $config->get('irregular', []);
+
+        $map = is_array($rawIrregular) ? $rawIrregular : [];
+
+        $out = [];
+        foreach ($map as $k => $v) {
+            if (is_string($k) && is_string($v)) {
+                $out[strtolower($k)] = $v;
+            }
+        }
+
+        return self::$irregularCache = $out;
     }
 }

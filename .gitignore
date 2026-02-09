@@ -1,0 +1,44 @@
+# Miljöfiler
+.env
+.env.test
+
+# Byggade assets
+public/css/app.css
+public/js/app.js
+public/images/user/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Förhindra att skriptfiler hamnar i källkoden
+framework/src/**/*.sh
+*.sh
+
+tests/test_image.jpg
+tests/watermark_image.png
+tests/resized_image.jpg
+tests/resized_image.jpeg
+tests/resized_image.JPG
+tests/result_*
+tests/*.thumb.jpg
+tests/crop_test_*.png
+tests/quality_*.jpg
+tests/thumb_delegate.jpg
+
+# Test/coverage-cache
+.phpunit.cache/
+.phpunit.result.cache
+phpunit.xml.bak
+coverage/
+
+# IDE och diverse cache
+.idea/
+cache/
+storage/
+.php-cs-fixer.cache
+infection-report.html
+
+# Build-artifacts
+build/
+-
