@@ -51,3 +51,4 @@ Klart när:
 - CI i radix-framework är grön på PR/push
 - infection-schedule kan köras manuellt och laddar upp report
 - composer install i radix-app kan installera radix/framework utan specialhack
+
