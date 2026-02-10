@@ -21,7 +21,7 @@ php vendor/bin/infection `
   --threads=1 `
   --skip-initial-tests `
   --coverage=build/coverage `
-  --filter=src/File/ `
+  --filter=src/File/Writer.php `
   --show-mutations `
   --log-verbosity=all `
   --no-interaction `
@@ -29,8 +29,6 @@ php vendor/bin/infection `
 
 
   ------------------------------
-
-
 $env:XDEBUG_MODE = 'coverage'
 
 # (om du inte redan har färsk coverage)
@@ -46,12 +44,15 @@ php vendor/bin/phpunit `
 
 $env:XDEBUG_MODE = 'coverage'
 $env:APP_ENV = 'development'
+$tmp = Join-Path $env:TEMP "infection-tmp"
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 php vendor/bin/infection `
   --configuration=infection.json.dist `
   --threads=1 `
   --skip-initial-tests `
   --coverage=build/coverage `
+  --filter=src/File/Writer.php `
   --log-verbosity=all `
   --no-interaction `
   --no-progress
