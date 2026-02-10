@@ -123,9 +123,19 @@ class RadixTemplateViewer implements TemplateViewerInterface
         }
 
         // Om ingen cache finns, fortsätt kompilera koden
+        // Om ingen cache finns, fortsätt kompilera koden
         $code = $rawCode;
         $code = $this->processExtends($code, $this->viewsDirectory);
         $code = $this->loadIncludes($this->viewsDirectory, $code);
+
+        // Viktigt: se till att {% yield %} inte kan hamna i replacePHPDirectives() och bli "yield" i eval()
+        $blocksFromFinalCode = $this->getBlocks($code);
+        $code = $this->replaceYields($code, $blocksFromFinalCode);
+
+        // Ta bort kvarvarande block-taggar (om någon renderar en template med block utan extends)
+        $code = preg_replace("#{%\s*block\s+\w+\s*%}#s", "", $code) ?? $code;
+        $code = preg_replace("#{%\s*endblock\s*%}#s", "", $code) ?? $code;
+
         $code = $this->replacePlaceholders($code);
 
         if (!$disableCache) {
@@ -280,14 +290,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
         foreach ($matches as $match) {
             $key = $match[1];
             $value = preg_replace_callback(
-                "#{{\s*(.+?)\s*}}#", // Matcha speciella placeholders i attribut
-                function ($matches) {
+                "#{{\s*(.+?)\s*}}#",
+                static function (array $matches): string {
                     return '<?php echo ' . $matches[1] . '; ?>';
                 },
                 $match[2]
             );
 
-            // preg_replace_callback kan returnera null vid regex-fel – säkerställ alltid string
             $attributes[$key] = trim((string) $value);
         }
 
@@ -313,18 +322,15 @@ class RadixTemplateViewer implements TemplateViewerInterface
         ) ?? $code;
 
         // 2. Specifik hantering av globala variabler (t.ex., {{ $globalVar }})
-        $code = preg_replace_callback(
-            "#{{\s*\\$(global\w+)\s*}}#", // Matchar globala variabler med `$`-prefix
-            function ($matches) {
-                return '<?php echo $' . $matches[1] . '; ?>';
-            },
+        // Undvik callback + strängkonkatenering här: Infection-mutanter kan annars skapa trasig PHP (parse errors).
+        // $$ i replacement => literal '$', följt av $1 (capture group) => t.ex. "$globalVar".
+        $code = preg_replace(
+            "#{{\s*\\$(global\\w+)\s*}}#",
+            '<?php echo $$1; ?>',
             (string) $code
         ) ?? $code;
 
-        // 3. Bearbeta PHP-direktiv `{% ... %}`
         $code = $this->replacePHPDirectives($code);
-
-        // 4. Bearbeta variabler och uttryck (gäller generiska placeholders som `{{ variabel }}`)
         $code = $this->replaceVariableOutput($code);
 
         $this->debug("Kod efter placeholder-bearbetning:\n" . htmlspecialchars($code));
@@ -450,8 +456,21 @@ class RadixTemplateViewer implements TemplateViewerInterface
     {
         $code = (string) $code;
 
-        // Lägg till 's' flaggan i slutet av regexet (#...#s) för att tillåta radbrytningar
-        return preg_replace("#{%\s*(.+?)\s*%}#s", "<?php $1 ?>", $code) ?? $code;
+        return preg_replace_callback(
+            "#{%\s*(?<directive>.+?)\s*%}#s",
+            function (array $m): string {
+                $directive = trim((string) ($m['directive'] ?? ''));
+
+                // Template-direktiv som absolut INTE får bli PHP (annars kan eval() dö med fatal, t.ex. "yield")
+                if (preg_match('/\A(yield|endyield|block|endblock|extends|include)\b/', $directive) === 1) {
+                    return '';
+                }
+
+                // Allt annat behandlas som PHP (t.ex. if/foreach/endif etc.)
+                return "<?php {$directive} ?>";
+            },
+            $code
+        ) ?? $code;
     }
 
     /**
@@ -543,13 +562,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
         ) ?? $code;
 
         // Hantera enkla yield-taggar utan fallback: {% yield name %}
-        preg_match_all("#{%\s*yield\s+(?<name>\\w+)\s*%}#", $code, $matches, PREG_SET_ORDER);
-
-        foreach ($matches as $match) {
-            $yieldName = $match['name'];
-            $replacement = $blocks[$yieldName] ?? '';
-            $code = str_replace($match[0], $replacement, $code);
-        }
+        $code = preg_replace_callback(
+            "#{%\s*yield\s+(?<name>\w+)\s*%}#",
+            function (array $m) use ($blocks): string {
+                $name = $m['name'];
+                return array_key_exists($name, $blocks) ? (string) $blocks[$name] : '';
+            },
+            $code
+        ) ?? $code;
 
         return $code;
     }

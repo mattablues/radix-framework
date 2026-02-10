@@ -56,3 +56,22 @@ php vendor/bin/infection `
   --log-verbosity=all `
   --no-interaction `
   --no-progress
+
+----------------------------------- UBUNTU
+rm -rf build/coverage || true
+mkdir -p build/coverage
+
+php -d pcov.enabled=1 -d pcov.directory=src vendor/bin/phpunit -c phpunit.xml \
+  --order-by=default \
+  --do-not-cache-result \
+  --coverage-xml=build/coverage/coverage-xml \
+  --log-junit=build/coverage/junit.xml
+
+APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist \
+  --threads=1 \
+  --skip-initial-tests \
+  --coverage=build/coverage \
+  --log-verbosity=all \
+  --filter=src/File/Writer.php \
+  --no-interaction \
+  --no-progress
