@@ -329,9 +329,15 @@ final class ReaderWriterTest extends TestCase
 
         $this->assertDirectoryDoesNotExist($nestedDir);
 
-        Writer::csvStream($path, function (callable $write): void {
-            $write([1, 'Alice']);
-        }, ['id', 'name'], ',');
+        try {
+            Writer::csvStream($path, function (callable $write): void {
+                $write([1, 'Alice']);
+            }, ['id', 'name'], ',');
+        } catch (RuntimeException $e) {
+            $this->fail(
+                'csvStream() ska inte kasta här. Fick: ' . $e->getMessage()
+            );
+        }
 
         $this->assertDirectoryExists($nestedDir);
         $this->assertFileExists($path);
