@@ -2228,8 +2228,12 @@ ReaderWriterTest extends TestCase
         $rows = Reader::csv($path, delimiter: ',', encoding: 'UTF-8', castNumeric: false);
 
         // Första "raden" är headern och ska därför komma med som data när hasHeader=false.
-        $this->assertSame('id', $rows[0]['0']);
-        $this->assertSame('name', $rows[0]['1']);
+        $this->assertArrayHasKey(0, $rows);
+        $this->assertArrayHasKey('0', $rows[0]);
+        $this->assertArrayHasKey('1', $rows[0]);
+
+        $this->assertSame('id', $rows[0]['0'] ?? null);
+        $this->assertSame('name', $rows[0]['1'] ?? null);
 
         // Mutant default=true skulle skippa headern och ge assoc-nycklar => detta failar.
         $this->assertArrayHasKey('0', $rows[0]);

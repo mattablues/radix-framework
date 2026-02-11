@@ -75,9 +75,6 @@ final class ReaderXmlErrorMutationsTest extends TestCase
             $m2 = $e->getMessage();
         }
 
-        $this->assertIsString($m1);
-        $this->assertIsString($m2);
-
         // Dödar FunctionCallRemoval (libxml_clear_errors bort):
         // utan clear_errors kan "AAA"-felet ligga kvar och dyka upp i andra exception.
         $this->assertStringNotContainsString('AAA', $m2, 'Libxml-fel från första parse får inte läcka in i nästa exception.');
