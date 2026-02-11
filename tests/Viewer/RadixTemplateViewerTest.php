@@ -2351,10 +2351,6 @@ RadixTemplateViewerTest extends TestCase
             return rtrim($p, '/\\') . DIRECTORY_SEPARATOR;
         };
 
-        // I testmiljön är ROOT_PATH definierad till temp-root (”app-läge”),
-        // så default ska vara ROOT_PATH/views/
-        $this->assertTrue(defined('ROOT_PATH'), 'ROOT_PATH måste vara definierad i denna testmiljö.');
-
         /** @var string $root */
         $root = (string) ROOT_PATH;
         $expected = rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;

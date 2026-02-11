@@ -262,7 +262,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
                 ));
             }
 
-            $view = (string) ($matches['view'] ?? '');
+            $view = (string) $matches['view'];
             if ($view === '') {
                 throw new RuntimeException('Invalid extends directive: missing view.');
             }
