@@ -22,24 +22,19 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     public function __construct(?string $viewsDirectory = null)
     {
-        $this->viewsDirectory = $viewsDirectory ?? dirname(__DIR__, 3) . '/views/';
+        $defaultViews = defined('ROOT_PATH')
+            ? rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR
+            : dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+
+        $this->viewsDirectory = $viewsDirectory ?? $defaultViews;
+
         $envCachePath = getenv('VIEWS_CACHE_PATH') ?: '';
         $root = defined('ROOT_PATH') ? (string) ROOT_PATH : (string) dirname(__DIR__, 4);
         if ($root === '' || $root === DIRECTORY_SEPARATOR) {
             $root = sys_get_temp_dir();
         }
 
-        if ($envCachePath !== '') {
-            $isAbsolute = str_starts_with($envCachePath, DIRECTORY_SEPARATOR)
-                || preg_match('#^[A-Za-z]:[\\\\/]#', $envCachePath) === 1;
-
-            $this->cachePath = $isAbsolute
-                ? rtrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR
-                : rtrim($root, '/\\') . DIRECTORY_SEPARATOR . ltrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR;
-        } else {
-            $this->cachePath = rtrim($root, '/\\') . DIRECTORY_SEPARATOR
-                . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
-        }
+        $this->cachePath = $this->computeInitialCachePath($root, $envCachePath);
 
         // Normalisera och säkerställ att vi aldrig använder projektroten eller bara "cache" som cache-katalog
         $rootNormalized = rtrim($root, '/\\') . DIRECTORY_SEPARATOR;
@@ -91,7 +86,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $data = $this->mergeData($data);
 
         // Rensa gamla cachefiler
-        $this->clearOldCacheFiles(3600);
+        $this->clearRenderCache();
 
         $this->debug("Template resolved to: $templatePath");
 
@@ -126,6 +121,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $code = $rawCode;
         $code = $this->processExtends($code, $this->viewsDirectory);
         $code = $this->loadIncludes($this->viewsDirectory, $code);
+
+        // Viktigt: se till att {% yield %} inte kan hamna i replacePHPDirectives() och bli "yield" i eval()
+        $blocksFromFinalCode = $this->getBlocks($code);
+        $code = $this->replaceYields($code, $blocksFromFinalCode);
+
+        // Ta bort kvarvarande block-taggar (om någon renderar en template med block utan extends)
+        $code = $this->stripRemainingBlockTags($code);
+
         $code = $this->replacePlaceholders($code);
 
         if (!$disableCache) {
@@ -218,9 +221,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
         return $content;
     }
 
-    /**
-     * Process any `{% extends %}` directives for parent templates.
-     */
     private function processExtends(string $code, string $viewsDirectory): string
     {
         // Samla block från alla nivåer, där barnets block har prioritet
@@ -230,10 +230,53 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $currentCode = $code;
         $accumulatedBlocks = array_merge($this->getBlocks($currentCode), $accumulatedBlocks);
 
+        // Säkerhetsvakter mot oändliga loopar:
+        // - iterations-guard (skyddar även om 'break' muteras till 'continue')
+        // - max depth (gäller faktiska extends-steg)
+        // - cykel-detektering (A extends B extends A)
+        $maxIterations = $this->getMaxExtendsIterations();
+        $iterations = 0;
+
+        $maxDepth = $this->getMaxExtendsDepth();
+        $depth = 0;
+
+        /** @var array<string,bool> $seenParents */
+        $seenParents = [];
+
         // Iterera uppåt i hierarkin och merg:a block vid varje nivå
         // OBS: använd \A (början av strängen) istället för ^ så PregMatchRemoveCaret inte kan mutera bort ankaret.
         while (preg_match('#\A\s*{%\s*extends\s*"(?<view>.*?)"\s*%}#', $currentCode, $matches) === 1) {
-            $parentTemplate = $this->loadTemplate($viewsDirectory . $matches['view']);
+            $iterations++;
+            if ($iterations > $maxIterations) {
+                throw new RuntimeException(sprintf(
+                    'Max iterations (%d) exceeded while processing extends.',
+                    $maxIterations
+                ));
+            }
+
+            $depth++;
+            if ($depth > $maxDepth) {
+                throw new RuntimeException(sprintf(
+                    'Max extends depth (%d) exceeded while processing templates.',
+                    $maxDepth
+                ));
+            }
+
+            $view = (string) $matches['view'];
+            if ($view === '') {
+                throw new RuntimeException('Invalid extends directive: missing view.');
+            }
+
+            // Normalisera lite för att minska risk för "samma fil, olika sträng"
+            $parentPath = rtrim($viewsDirectory, '/\\') . DIRECTORY_SEPARATOR . ltrim($view, '/\\');
+
+            $realParentPath = realpath($parentPath) ?: $parentPath;
+            if (isset($seenParents[$realParentPath])) {
+                throw new RuntimeException(sprintf('Extends cycle detected for template: %s', $realParentPath));
+            }
+            $seenParents[$realParentPath] = true;
+
+            $parentTemplate = $this->loadTemplate($parentPath);
 
             // Merg:a block från mellanlayouten (om den definierar t.ex. sidebar/hasSidebar)
             $parentBlocks = $this->getBlocks($currentCode);
@@ -280,14 +323,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
         foreach ($matches as $match) {
             $key = $match[1];
             $value = preg_replace_callback(
-                "#{{\s*(.+?)\s*}}#", // Matcha speciella placeholders i attribut
-                function ($matches) {
+                "#{{\s*(.+?)\s*}}#",
+                static function (array $matches): string {
                     return '<?php echo ' . $matches[1] . '; ?>';
                 },
                 $match[2]
             );
 
-            // preg_replace_callback kan returnera null vid regex-fel – säkerställ alltid string
             $attributes[$key] = trim((string) $value);
         }
 
@@ -313,18 +355,15 @@ class RadixTemplateViewer implements TemplateViewerInterface
         ) ?? $code;
 
         // 2. Specifik hantering av globala variabler (t.ex., {{ $globalVar }})
-        $code = preg_replace_callback(
-            "#{{\s*\\$(global\w+)\s*}}#", // Matchar globala variabler med `$`-prefix
-            function ($matches) {
-                return '<?php echo $' . $matches[1] . '; ?>';
-            },
+        // Undvik callback + strängkonkatenering här: Infection-mutanter kan annars skapa trasig PHP (parse errors).
+        // $$ i replacement => literal '$', följt av $1 (capture group) => t.ex. "$globalVar".
+        $code = preg_replace(
+            "#{{\s*\\$(global\\w+)\s*}}#",
+            '<?php echo $$1; ?>',
             (string) $code
         ) ?? $code;
 
-        // 3. Bearbeta PHP-direktiv `{% ... %}`
         $code = $this->replacePHPDirectives($code);
-
-        // 4. Bearbeta variabler och uttryck (gäller generiska placeholders som `{{ variabel }}`)
         $code = $this->replaceVariableOutput($code);
 
         $this->debug("Kod efter placeholder-bearbetning:\n" . htmlspecialchars($code));
@@ -446,13 +485,26 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Convert `{% directive %}` to PHP code.
      */
-    private function replacePHPDirectives(?string $code): string
-    {
-        $code = (string) $code;
+        private function replacePHPDirectives(?string $code): string
+        {
+            $code = (string) $code;
 
-        // Lägg till 's' flaggan i slutet av regexet (#...#s) för att tillåta radbrytningar
-        return preg_replace("#{%\s*(.+?)\s*%}#s", "<?php $1 ?>", $code) ?? $code;
-    }
+            return preg_replace_callback(
+                "#{%\s*(?<directive>.+?)\s*%}#s",
+                function (array $m): string {
+                    $directive = trim((string) $m['directive']);
+
+                    // Template-direktiv som absolut INTE får bli PHP (annars kan eval() dö med fatal, t.ex. "yield")
+                    if (preg_match('/\A(yield|endyield|block|endblock|extends|include)\b/', $directive) === 1) {
+                        return '';
+                    }
+
+                    // Allt annat behandlas som PHP (t.ex. if/foreach/endif etc.)
+                    return "<?php {$directive} ?>";
+                },
+                $code
+            ) ?? $code;
+        }
 
     /**
      * Bearbeta och escapa variabelbaserade placeholders.
@@ -543,13 +595,14 @@ class RadixTemplateViewer implements TemplateViewerInterface
         ) ?? $code;
 
         // Hantera enkla yield-taggar utan fallback: {% yield name %}
-        preg_match_all("#{%\s*yield\s+(?<name>\\w+)\s*%}#", $code, $matches, PREG_SET_ORDER);
-
-        foreach ($matches as $match) {
-            $yieldName = $match['name'];
-            $replacement = $blocks[$yieldName] ?? '';
-            $code = str_replace($match[0], $replacement, $code);
-        }
+        $code = preg_replace_callback(
+            "#{%\s*yield\s+(?<name>\w+)\s*%}#",
+            function (array $m) use ($blocks): string {
+                $name = $m['name'];
+                return array_key_exists($name, $blocks) ? (string) $blocks[$name] : '';
+            },
+            $code
+        ) ?? $code;
 
         return $code;
     }
@@ -840,7 +893,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
      *
      * @param int $maxAgeInSeconds The maximum age (in seconds) a cache file is allowed to have.
      */
-    private function clearOldCacheFiles(int $maxAgeInSeconds = 86400, ?int $now = null): void // 1 day by default
+    protected function clearOldCacheFiles(int $maxAgeInSeconds = 86400, ?int $now = null): void // 1 day by default
     {
         // Kontrollera om cache-katalogen finns innan du rensar
         if (!is_dir($this->cachePath)) {
@@ -870,5 +923,57 @@ class RadixTemplateViewer implements TemplateViewerInterface
         }
     }
 
+    /**
+     * Small seam for testability: render() should always clear old cache files using a fixed TTL.
+     */
+    protected function clearRenderCache(): void
+    {
+        $this->clearOldCacheFiles(3600);
+    }
 
+    /**
+     * Compute the cache path before normalization/redirect guards.
+     * This is intentionally a small seam for mutation-testing.
+     */
+    protected function computeInitialCachePath(string $root, string $envCachePath): string
+    {
+        if ($envCachePath !== '') {
+            $isAbsolute = str_starts_with($envCachePath, DIRECTORY_SEPARATOR)
+                || preg_match('#^[A-Za-z]:[\\\\/]#', $envCachePath) === 1;
+
+            return $isAbsolute
+                ? rtrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR
+                : rtrim($root, '/\\') . DIRECTORY_SEPARATOR . ltrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR;
+        }
+
+        return rtrim($root, '/\\') . DIRECTORY_SEPARATOR
+            . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+    }
+
+    /**
+     * Strip leftover `{% block %}` / `{% endblock %}` tags after extends/yield resolution.
+     * Small seam to make mutation-testing deterministic without relying on later stages.
+     */
+    protected function stripRemainingBlockTags(string $code): string
+    {
+        $code = preg_replace("#{%\s*block\s+\w+\s*%}#s", "", $code) ?? $code;
+        $code = preg_replace("#{%\s*endblock\s*%}#s", "", $code) ?? $code;
+        return $code;
+    }
+
+    /**
+     * Small seam for testability/mutation testing.
+     */
+    protected function getMaxExtendsIterations(): int
+    {
+        return 200;
+    }
+
+    /**
+     * Small seam for testability/mutation testing.
+     */
+    protected function getMaxExtendsDepth(): int
+    {
+        return 50;
+    }
 }

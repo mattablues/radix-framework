@@ -92,7 +92,13 @@ final class Reader
         }
 
         libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($xmlString, 'SimpleXMLElement', LIBXML_NOCDATA);
+
+        $options = LIBXML_NOCDATA;
+        if (\defined('LIBXML_PARSEHUGE')) {
+            $options |= LIBXML_PARSEHUGE;
+        }
+
+        $xml = simplexml_load_string($xmlString, 'SimpleXMLElement', $options);
         if ($xml === false) {
             $errors = array_map(static fn($e) => trim($e->message), libxml_get_errors());
             libxml_clear_errors();
@@ -194,42 +200,7 @@ final class Reader
 
             // Trimma och ev. encoding-konvertera celler
             $row = array_map(
-                static function ($v) use ($encoding, $castNumeric) {
-                    if ($v === null) {
-                        return null;
-                    }
-
-                    // Gör om värdet till sträng på ett säkert sätt
-                    if (!is_scalar($v)) {
-                        // Oväntad typ: försök json_encode, annars tom sträng
-                        $encoded = json_encode($v);
-                        $s = $encoded !== false ? $encoded : '';
-                    } else {
-                        /** @var scalar $v */
-                        $s = (string) $v;
-                    }
-
-                    $s = trim($s);
-
-                    if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
-                        $s2 = @iconv($encoding, 'UTF-8//IGNORE', $s);
-                        if ($s2 === false) {
-                            throw new RuntimeException("Kunde inte konvertera cell från {$encoding} till UTF-8");
-                        }
-                        $s = $s2;
-                    }
-
-                    // Försök numerisk typning: heltal eller flyttal
-                    if ($castNumeric && $s !== '' && is_numeric($s)) {
-                        if (ctype_digit($s)) {
-                            return (int) $s;
-                        }
-                        // Hantera decimaltal med punkt
-                        return (float) $s;
-                    }
-
-                    return $s;
-                },
+                static fn($v) => self::normalizeCsvCell($v, $encoding, $castNumeric),
                 $row
             );
 
@@ -378,5 +349,46 @@ final class Reader
         /** @var array<string, mixed> $arr */
         $arr = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         return $arr;
+    }
+
+    /**
+     * @return int|float|string|null
+     */
+    private static function normalizeCsvCell(mixed $v, ?string $encoding, bool $castNumeric): int|float|string|null
+    {
+        if ($v === null) {
+            return null;
+        }
+
+        // Gör om värdet till sträng på ett säkert sätt
+        if (!is_scalar($v)) {
+            // Oväntad typ: försök json_encode, annars tom sträng
+            $encoded = json_encode($v);
+            $s = $encoded !== false ? $encoded : '';
+        } else {
+            /** @var scalar $v */
+            $s = (string) $v;
+        }
+
+        $s = trim($s);
+
+        if ($encoding !== null && strcasecmp($encoding, 'UTF-8') !== 0) {
+            $s2 = @iconv($encoding, 'UTF-8//IGNORE', $s);
+            if ($s2 === false) {
+                throw new RuntimeException("Kunde inte konvertera cell från {$encoding} till UTF-8");
+            }
+            $s = $s2;
+        }
+
+        // Försök numerisk typning: heltal eller flyttal
+        if ($castNumeric && $s !== '' && is_numeric($s)) {
+            if (ctype_digit($s)) {
+                return (int) $s;
+            }
+            // Hantera decimaltal med punkt
+            return (float) $s;
+        }
+
+        return $s;
     }
 }
