@@ -22,24 +22,19 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
     public function __construct(?string $viewsDirectory = null)
     {
-        $this->viewsDirectory = $viewsDirectory ?? dirname(__DIR__, 3) . '/views/';
+        $defaultViews = defined('ROOT_PATH')
+            ? rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR
+            : dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+
+        $this->viewsDirectory = $viewsDirectory ?? $defaultViews;
+
         $envCachePath = getenv('VIEWS_CACHE_PATH') ?: '';
         $root = defined('ROOT_PATH') ? (string) ROOT_PATH : (string) dirname(__DIR__, 4);
         if ($root === '' || $root === DIRECTORY_SEPARATOR) {
             $root = sys_get_temp_dir();
         }
 
-        if ($envCachePath !== '') {
-            $isAbsolute = str_starts_with($envCachePath, DIRECTORY_SEPARATOR)
-                || preg_match('#^[A-Za-z]:[\\\\/]#', $envCachePath) === 1;
-
-            $this->cachePath = $isAbsolute
-                ? rtrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR
-                : rtrim($root, '/\\') . DIRECTORY_SEPARATOR . ltrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR;
-        } else {
-            $this->cachePath = rtrim($root, '/\\') . DIRECTORY_SEPARATOR
-                . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
-        }
+        $this->cachePath = $this->computeInitialCachePath($root, $envCachePath);
 
         // Normalisera och säkerställ att vi aldrig använder projektroten eller bara "cache" som cache-katalog
         $rootNormalized = rtrim($root, '/\\') . DIRECTORY_SEPARATOR;
@@ -91,7 +86,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $data = $this->mergeData($data);
 
         // Rensa gamla cachefiler
-        $this->clearOldCacheFiles(3600);
+        $this->clearRenderCache();
 
         $this->debug("Template resolved to: $templatePath");
 
@@ -123,7 +118,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
         }
 
         // Om ingen cache finns, fortsätt kompilera koden
-        // Om ingen cache finns, fortsätt kompilera koden
         $code = $rawCode;
         $code = $this->processExtends($code, $this->viewsDirectory);
         $code = $this->loadIncludes($this->viewsDirectory, $code);
@@ -133,8 +127,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $code = $this->replaceYields($code, $blocksFromFinalCode);
 
         // Ta bort kvarvarande block-taggar (om någon renderar en template med block utan extends)
-        $code = preg_replace("#{%\s*block\s+\w+\s*%}#s", "", $code) ?? $code;
-        $code = preg_replace("#{%\s*endblock\s*%}#s", "", $code) ?? $code;
+        $code = $this->stripRemainingBlockTags($code);
 
         $code = $this->replacePlaceholders($code);
 
@@ -228,9 +221,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
         return $content;
     }
 
-    /**
-     * Process any `{% extends %}` directives for parent templates.
-     */
     private function processExtends(string $code, string $viewsDirectory): string
     {
         // Samla block från alla nivåer, där barnets block har prioritet
@@ -240,10 +230,53 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $currentCode = $code;
         $accumulatedBlocks = array_merge($this->getBlocks($currentCode), $accumulatedBlocks);
 
+        // Säkerhetsvakter mot oändliga loopar:
+        // - iterations-guard (skyddar även om 'break' muteras till 'continue')
+        // - max depth (gäller faktiska extends-steg)
+        // - cykel-detektering (A extends B extends A)
+        $maxIterations = $this->getMaxExtendsIterations();
+        $iterations = 0;
+
+        $maxDepth = $this->getMaxExtendsDepth();
+        $depth = 0;
+
+        /** @var array<string,bool> $seenParents */
+        $seenParents = [];
+
         // Iterera uppåt i hierarkin och merg:a block vid varje nivå
         // OBS: använd \A (början av strängen) istället för ^ så PregMatchRemoveCaret inte kan mutera bort ankaret.
         while (preg_match('#\A\s*{%\s*extends\s*"(?<view>.*?)"\s*%}#', $currentCode, $matches) === 1) {
-            $parentTemplate = $this->loadTemplate($viewsDirectory . $matches['view']);
+            $iterations++;
+            if ($iterations > $maxIterations) {
+                throw new RuntimeException(sprintf(
+                    'Max iterations (%d) exceeded while processing extends.',
+                    $maxIterations
+                ));
+            }
+
+            $depth++;
+            if ($depth > $maxDepth) {
+                throw new RuntimeException(sprintf(
+                    'Max extends depth (%d) exceeded while processing templates.',
+                    $maxDepth
+                ));
+            }
+
+            $view = (string) ($matches['view'] ?? '');
+            if ($view === '') {
+                throw new RuntimeException('Invalid extends directive: missing view.');
+            }
+
+            // Normalisera lite för att minska risk för "samma fil, olika sträng"
+            $parentPath = rtrim($viewsDirectory, '/\\') . DIRECTORY_SEPARATOR . ltrim($view, '/\\');
+
+            $realParentPath = realpath($parentPath) ?: $parentPath;
+            if (isset($seenParents[$realParentPath])) {
+                throw new RuntimeException(sprintf('Extends cycle detected for template: %s', $realParentPath));
+            }
+            $seenParents[$realParentPath] = true;
+
+            $parentTemplate = $this->loadTemplate($parentPath);
 
             // Merg:a block från mellanlayouten (om den definierar t.ex. sidebar/hasSidebar)
             $parentBlocks = $this->getBlocks($currentCode);
@@ -860,7 +893,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
      *
      * @param int $maxAgeInSeconds The maximum age (in seconds) a cache file is allowed to have.
      */
-    private function clearOldCacheFiles(int $maxAgeInSeconds = 86400, ?int $now = null): void // 1 day by default
+    protected function clearOldCacheFiles(int $maxAgeInSeconds = 86400, ?int $now = null): void // 1 day by default
     {
         // Kontrollera om cache-katalogen finns innan du rensar
         if (!is_dir($this->cachePath)) {
@@ -890,5 +923,57 @@ class RadixTemplateViewer implements TemplateViewerInterface
         }
     }
 
+    /**
+     * Small seam for testability: render() should always clear old cache files using a fixed TTL.
+     */
+    protected function clearRenderCache(): void
+    {
+        $this->clearOldCacheFiles(3600);
+    }
 
+    /**
+     * Compute the cache path before normalization/redirect guards.
+     * This is intentionally a small seam for mutation-testing.
+     */
+    protected function computeInitialCachePath(string $root, string $envCachePath): string
+    {
+        if ($envCachePath !== '') {
+            $isAbsolute = str_starts_with($envCachePath, DIRECTORY_SEPARATOR)
+                || preg_match('#^[A-Za-z]:[\\\\/]#', $envCachePath) === 1;
+
+            return $isAbsolute
+                ? rtrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR
+                : rtrim($root, '/\\') . DIRECTORY_SEPARATOR . ltrim($envCachePath, '/\\') . DIRECTORY_SEPARATOR;
+        }
+
+        return rtrim($root, '/\\') . DIRECTORY_SEPARATOR
+            . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+    }
+
+    /**
+     * Strip leftover `{% block %}` / `{% endblock %}` tags after extends/yield resolution.
+     * Small seam to make mutation-testing deterministic without relying on later stages.
+     */
+    protected function stripRemainingBlockTags(string $code): string
+    {
+        $code = preg_replace("#{%\s*block\s+\w+\s*%}#s", "", $code) ?? $code;
+        $code = preg_replace("#{%\s*endblock\s*%}#s", "", $code) ?? $code;
+        return $code;
+    }
+
+    /**
+     * Small seam for testability/mutation testing.
+     */
+    protected function getMaxExtendsIterations(): int
+    {
+        return 200;
+    }
+
+    /**
+     * Small seam for testability/mutation testing.
+     */
+    protected function getMaxExtendsDepth(): int
+    {
+        return 50;
+    }
 }

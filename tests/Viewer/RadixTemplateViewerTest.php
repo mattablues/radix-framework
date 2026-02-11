@@ -54,11 +54,13 @@ final class MarkableObject
     public bool $marked = false;
 }
 
-class RadixTemplateViewerTest extends TestCase
+class
+RadixTemplateViewerTest extends TestCase
 {
     private RadixTemplateViewer $viewer;
     private string $tempRootPath;
     private string $tempViewsPath;
+
 
     protected function setUp(): void
     {
@@ -90,6 +92,64 @@ class RadixTemplateViewerTest extends TestCase
         // Rensa temporära kataloger och filer
         $this->deleteDirectory($this->tempRootPath);
         parent::tearDown();
+    }
+
+    public function testCachedRenderDoesNotLeakOutputWhenUsingOutputBuffering(): void
+    {
+        // Tvinga cache-läge
+        $originalEnv = getenv('APP_ENV');
+        putenv('APP_ENV=production');
+
+        try {
+            $cacheDir = $this->tempRootPath . 'cache/views/';
+            $this->createDirectoryIfNotExists($cacheDir);
+
+            $reflection = new ReflectionClass($this->viewer);
+
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+            $cachePathProperty->setValue($this->viewer, $cacheDir);
+
+            $resolveTemplatePath = $reflection->getMethod('resolveTemplatePath');
+            $resolveTemplatePath->setAccessible(true);
+
+            $generateCacheKey = $reflection->getMethod('generateCacheKey');
+            $generateCacheKey->setAccessible(true);
+
+            $templateLogicalName = 'cached_no_output_leak';
+
+            /** @var string $resolved */
+            $resolved = $resolveTemplatePath->invoke($this->viewer, $templateLogicalName);
+
+            // Template-filen måste finnas så render() tar sig fram till cache-logiken
+            $templatePath = $this->tempViewsPath . $resolved;
+            $this->createDirectoryIfNotExists(dirname($templatePath));
+            file_put_contents($templatePath, 'ORIGINAL');
+
+            $data = [];
+
+            /** @var string $key */
+            $key = $generateCacheKey->invoke($this->viewer, $resolved, $data);
+
+            $cachedFile = $cacheDir . $key . '.php';
+
+            // Cachefilen ECHO:ar (typiskt scenario som ska fångas av ob_start())
+            file_put_contents($cachedFile, '<?php echo "LEAK?";');
+
+            // KRITISKT: render() ska inte skriva något direkt till STDOUT under testkörningen
+            $this->expectOutputString('');
+
+            $out = $this->viewer->render($templateLogicalName, $data);
+
+            $this->assertSame('LEAK?', $out);
+        } finally {
+            // Återställ APP_ENV
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
     }
 
     public function testViewsCachePathEnvVarRelativeIsAppliedInsteadOfDefault(): void
@@ -2176,5 +2236,1231 @@ class RadixTemplateViewerTest extends TestCase
         // KRITISKT: dödar ConcatOperandRemoval-mutanten genom att kräva att
         // htmlspecialchars($code) faktiskt loggas (inte bara prefixet).
         $this->assertStringContainsString('&lt;div&gt;&amp;&lt;/div&gt;', $all);
+    }
+
+    public function testRenderComponentDebugLogContainsPrefixAndEscapedRenderedOutput(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+        $viewer->enableDebugMode(true);
+
+        $reflection = new ReflectionClass($viewer);
+        $loggerProp = $reflection->getProperty('logger');
+        $loggerProp->setAccessible(true);
+
+        $testLogger = new TestViewLogger();
+        $loggerProp->setValue($viewer, $testLogger);
+
+        // Komponent + template som garanterat går igenom renderComponent() och loggar "Renderad komponent ut data:"
+        $componentPath = "{$this->tempViewsPath}components/dbg.ratio.php";
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents($componentPath, '<div>{{ $slot }}</div>');
+
+        $templatePath = "{$this->tempViewsPath}dbg_template.ratio.php";
+        file_put_contents($templatePath, '<x-dbg><span>&</span></x-dbg>');
+
+        $out = $viewer->render('dbg_template');
+
+        // Slot renderas via {{ $slot }} => secure_output => HTML-escapat (förväntat beteende)
+        $this->assertSame('<div>&lt;span&gt;&amp;&lt;/span&gt;</div>', $out);
+
+        $all = implode("\n", $testLogger->messages);
+
+        // Dödar Concat / ConcatOperandRemoval: både prefix och payload måste finnas.
+        $this->assertStringContainsString('Renderad komponent ut data:', $all);
+        $this->assertStringContainsString('&lt;div&gt;', $all);
+        $this->assertStringContainsString('&amp;', $all);
+    }
+
+    public function testComponentAttributesAreTrimmedAndAttributeValuesAreAvailableInComponentScope(): void
+    {
+        // Komponent som skriver ut class + n så vi kan verifiera trim samt att attribut blir variabler i komponenten
+        $componentPath = "{$this->tempViewsPath}components/attr_dbg.ratio.php";
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents($componentPath, '[{{ $class }}][{{ $n }}]');
+
+        // Lägg in whitespace runt class. Skicka n som ATTRIBUT (komponenter får inte automatiskt parent-data).
+        $templatePath = "{$this->tempViewsPath}attr_dbg_template.ratio.php";
+        file_put_contents($templatePath, '<x-attr_dbg class="  A   B  " n="123"></x-attr_dbg>');
+
+        $out = $this->viewer->render('attr_dbg_template');
+
+        // Dödar UnwrapTrim: class måste trimmas (inga inledande/avslutande blanks).
+        $this->assertSame('[A   B][123]', $out);
+    }
+
+    public function testReplaceVariableOutputFallsBackToOriginalCodeOnPcreBacktrackError(): void
+    {
+        // Den här testen är designad för att få preg_replace_callback att returnera null,
+        // så att "?? $code"-fallbacken verkligen behövs (dödar Coalesce-mutanten).
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+        $reflection = new ReflectionClass($viewer);
+        $m = $reflection->getMethod('replaceVariableOutput');
+        $m->setAccessible(true);
+
+        $oldBacktrack = ini_get('pcre.backtrack_limit');
+        $oldRecursion = ini_get('pcre.recursion_limit');
+
+        try {
+            ini_set('pcre.backtrack_limit', '1');
+            ini_set('pcre.recursion_limit', '1');
+
+            // Lång sträng som ofta triggar PCRE backtracking/recursion issues i "(.+?)"-mönster.
+            $input = '{{ ' . str_repeat('x', 5000) . ' }}';
+
+            $outMixed = $m->invoke($viewer, $input);
+            $this->assertIsString($outMixed);
+
+            /** @var string $out */
+            $out = $outMixed;
+
+            // Om fallbacken tas bort och preg_replace_callback ger null, skulle vi få '' eller TypeError i kedjan.
+            $this->assertSame($input, $out);
+        } finally {
+            if ($oldBacktrack === false) {
+                ini_set('pcre.backtrack_limit', '1000000');
+            } else {
+                ini_set('pcre.backtrack_limit', (string) $oldBacktrack);
+            }
+            if ($oldRecursion === false) {
+                ini_set('pcre.recursion_limit', '100000');
+            } else {
+                ini_set('pcre.recursion_limit', (string) $oldRecursion);
+            }
+        }
+    }
+
+    public function testDefaultViewsDirectoryIsDerivedFromSourceLocationAndEndsWithViewsSlash(): void
+    {
+        // Skapa viewer utan att skicka in viewsDirectory => vi testar default-branch
+        $viewer = new RadixTemplateViewer(null);
+
+        // Läs ut private $viewsDirectory
+        $ref = new ReflectionClass($viewer);
+        $prop = $ref->getProperty('viewsDirectory');
+        $prop->setAccessible(true);
+
+        $actualMixed = $prop->getValue($viewer);
+        $this->assertIsString($actualMixed);
+        /** @var string $actual */
+        $actual = $actualMixed;
+
+        // Normalisera och jämför exakt
+        $normalize = static function (string $p): string {
+            $p = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $p);
+            return rtrim($p, '/\\') . DIRECTORY_SEPARATOR;
+        };
+
+        // I testmiljön är ROOT_PATH definierad till temp-root (”app-läge”),
+        // så default ska vara ROOT_PATH/views/
+        $this->assertTrue(defined('ROOT_PATH'), 'ROOT_PATH måste vara definierad i denna testmiljö.');
+
+        /** @var string $root */
+        $root = (string) ROOT_PATH;
+        $expected = rtrim($root, '/\\') . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
+
+        $this->assertSame(
+            $normalize($expected),
+            $normalize($actual),
+            'Default viewsDirectory måste vara ROOT_PATH . "/views/".'
+        );
+
+        // Extra “spik i kistan” mot Concat-mutanten som gör "/views/" . dirname(...)
+        $this->assertFalse(
+            str_starts_with($normalize($actual), DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR),
+            'viewsDirectory får inte börja med "/views/" (tyder på felaktig concat).'
+        );
+    }
+
+    public function testViewsCachePathEnvVarRelativeLeadingBackslashIsTrimmed(): void
+    {
+        $original = getenv('VIEWS_CACHE_PATH');
+
+        try {
+            // OBS: börjar med "\" (inte "/" på Linux) => ska INTE klassas som absolut,
+            // men ltrim('/\\') ska ta bort "\" så att vi inte får en katalog som heter "\custom".
+            putenv('VIEWS_CACHE_PATH=\\custom/views-cache');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+            $reflection = new ReflectionClass($viewer);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+
+            $cachePathMixed = $cachePathProperty->getValue($viewer);
+            $this->assertIsString($cachePathMixed);
+            /** @var string $cachePath */
+            $cachePath = $cachePathMixed;
+
+            $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $cachePath);
+            $normalized = rtrim($normalized, '/\\') . DIRECTORY_SEPARATOR;
+
+            $expectedTail = 'custom' . DIRECTORY_SEPARATOR . 'views-cache' . DIRECTORY_SEPARATOR;
+
+            $this->assertStringEndsWith(
+                $expectedTail,
+                $normalized,
+                'När VIEWS_CACHE_PATH är relativ men börjar med backslash ska ledande "\" trimmas bort.'
+            );
+
+            // Extra assert som dödar UnwrapLtrim tydligt: ingen "\custom" får finnas kvar i sökvägen.
+            $this->assertStringNotContainsString(
+                DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR . 'custom',
+                $normalized,
+                'cachePath får inte innehålla ett extra tomt segment p.g.a. felaktig ltrim/konkat.'
+            );
+        } finally {
+            if ($original === false) {
+                putenv('VIEWS_CACHE_PATH');
+            } else {
+                putenv('VIEWS_CACHE_PATH=' . $original);
+            }
+        }
+    }
+
+    public function testDefaultCachePathEndsWithDirectorySeparatorWhenViewsCachePathEnvMissing(): void
+    {
+        $original = getenv('VIEWS_CACHE_PATH');
+
+        try {
+            // Säkerställ att env saknas så default-branch används
+            putenv('VIEWS_CACHE_PATH');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+            $reflection = new ReflectionClass($viewer);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+
+            $cachePathMixed = $cachePathProperty->getValue($viewer);
+            $this->assertIsString($cachePathMixed);
+            /** @var string $cachePath */
+            $cachePath = $cachePathMixed;
+
+            // Viktigt: normalisera separators men lägg INTE till trailing slash själv
+            $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $cachePath);
+
+            $this->assertNotSame('', $normalized);
+            $this->assertSame(
+                DIRECTORY_SEPARATOR,
+                substr($normalized, -1),
+                'Default cachePath måste sluta med DIRECTORY_SEPARATOR (dödar ConcatOperandRemoval på trailing DS).'
+            );
+
+            $this->assertStringEndsWith(
+                DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR,
+                $normalized,
+                'Default cachePath ska vara .../cache/views/ med trailing separator.'
+            );
+        } finally {
+            if ($original === false) {
+                putenv('VIEWS_CACHE_PATH');
+            } else {
+                putenv('VIEWS_CACHE_PATH=' . $original);
+            }
+        }
+    }
+
+    public function testViewsCachePathEnvVarCacheIsRedirectedToCacheViewsAndEndsWithSeparator(): void
+    {
+        $original = getenv('VIEWS_CACHE_PATH');
+
+        try {
+            // Pekar medvetet på cache-root så konstruktorn ska styra om till cache/views/
+            putenv('VIEWS_CACHE_PATH=cache');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+            $reflection = new ReflectionClass($viewer);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+
+            $cachePathMixed = $cachePathProperty->getValue($viewer);
+            $this->assertIsString($cachePathMixed);
+            /** @var string $cachePath */
+            $cachePath = $cachePathMixed;
+
+            $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $cachePath);
+
+            // Dödar mutanten som tar bort trailing DIRECTORY_SEPARATOR i redirect-assignen
+            $this->assertSame(
+                DIRECTORY_SEPARATOR,
+                substr($normalized, -1),
+                'Redirectad cachePath måste sluta med DIRECTORY_SEPARATOR.'
+            );
+
+            $this->assertStringEndsWith(
+                DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR,
+                $normalized,
+                'Om VIEWS_CACHE_PATH="cache" ska konstruktorn styra om till .../cache/views/.'
+            );
+        } finally {
+            if ($original === false) {
+                putenv('VIEWS_CACHE_PATH');
+            } else {
+                putenv('VIEWS_CACHE_PATH=' . $original);
+            }
+        }
+    }
+
+    public function testRenderThrowsExactMessageFromPreCheckWhenTemplateNotFound(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+        $missing = 'definitely_missing_template_name';
+
+        $expectedPathRaw = $this->tempViewsPath . $missing . '.ratio.php';
+        $expectedPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $expectedPathRaw);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Template file not found: ' . $expectedPath);
+
+        $viewer->render($missing);
+    }
+
+    public function testRenderLogsAttemptAndResolvedTemplateWhenDebugEnabled(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+        // Skapa en minimal template som finns
+        $templateLogicalName = 'debug_log_test';
+        $templateFile = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($templateFile));
+        file_put_contents($templateFile, 'OK');
+
+        $viewer->enableDebugMode(true);
+
+        $reflection = new ReflectionClass($viewer);
+
+        // Injicera testlogger så vi kan assert:a på debug-utskrifter
+        $loggerProp = $reflection->getProperty('logger');
+        $loggerProp->setAccessible(true);
+
+        $testLogger = new TestViewLogger();
+        $loggerProp->setValue($viewer, $testLogger);
+
+        $out = $viewer->render($templateLogicalName);
+        $this->assertSame('OK', $out);
+
+        $all = implode("\n", $testLogger->messages);
+
+        // Dödar MethodCallRemoval på första debug-raden i render()
+        $this->assertStringContainsString(
+            'Attempting to render template: ' . $templateLogicalName,
+            $all,
+            'När debug är på ska render() logga att render försöks.'
+        );
+
+        // Dödar MethodCallRemoval på "Template resolved to"
+        $this->assertStringContainsString(
+            'Template resolved to:',
+            $all,
+            'När debug är på ska render() logga resolved template path.'
+        );
+        $this->assertStringContainsString(
+            $templateLogicalName . '.ratio.php',
+            $all,
+            'Resolved template path ska synas i debug-loggen.'
+        );
+    }
+
+    public function testRenderDoesNotCreateCacheFilesInDevelopmentEnv(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            putenv('APP_ENV=development');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+            $reflection = new ReflectionClass($viewer);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+
+            $cacheDir = $this->tempRootPath . 'cache/dev_no_write/';
+            $this->createDirectoryIfNotExists($cacheDir);
+            $cachePathProperty->setValue($viewer, rtrim($cacheDir, '/\\') . DIRECTORY_SEPARATOR);
+
+            // Skapa en template så render() kan gå hela vägen
+            $templateLogicalName = 'dev_no_cache_write';
+            $templateFile = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+            $this->createDirectoryIfNotExists(dirname($templateFile));
+            file_put_contents($templateFile, 'OK');
+
+            $out = $viewer->render($templateLogicalName);
+            $this->assertSame('OK', $out);
+
+            $files = glob(rtrim($cacheDir, '/\\') . DIRECTORY_SEPARATOR . '*.php') ?: [];
+            $this->assertSame(
+                [],
+                $files,
+                'I development ska render() inte skapa någon cachefil (dödar APP_ENV-ternary-mutanten).'
+            );
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testRenderDoesNotCreateCacheFilesWhenAppEnvHasDifferentCase(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            // Case-variant för att döda UnwrapStrToLower-mutanten
+            putenv('APP_ENV=Development');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+            $reflection = new ReflectionClass($viewer);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+
+            $cacheDir = $this->tempRootPath . 'cache/dev_case_no_write/';
+            $this->createDirectoryIfNotExists($cacheDir);
+            $cachePathProperty->setValue($viewer, rtrim($cacheDir, '/\\') . DIRECTORY_SEPARATOR);
+
+            $templateLogicalName = 'dev_case_no_cache_write';
+            $templateFile = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+            $this->createDirectoryIfNotExists(dirname($templateFile));
+            file_put_contents($templateFile, 'OK');
+
+            $out = $viewer->render($templateLogicalName);
+            $this->assertSame('OK', $out);
+
+            $files = glob(rtrim($cacheDir, '/\\') . DIRECTORY_SEPARATOR . '*.php') ?: [];
+            $this->assertSame(
+                [],
+                $files,
+                'APP_ENV ska vara case-insensitivt för dev/development (dödar UnwrapStrToLower-mutanten).'
+            );
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testCachedRenderLogsFirst100CharactersOfOutput(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            putenv('APP_ENV=production');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+            $viewer->enableDebugMode(true);
+
+            $reflection = new ReflectionClass($viewer);
+
+            // Injicera testlogger
+            $loggerProp = $reflection->getProperty('logger');
+            $loggerProp->setAccessible(true);
+            $testLogger = new TestViewLogger();
+            $loggerProp->setValue($viewer, $testLogger);
+
+            // Sätt cachePath till en tempdir
+            $cacheDir = $this->tempRootPath . 'cache/views/';
+            $this->createDirectoryIfNotExists($cacheDir);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+            $cachePathProperty->setValue($viewer, $cacheDir);
+
+            // Förbered template + cache key
+            $resolveTemplatePath = $reflection->getMethod('resolveTemplatePath');
+            $resolveTemplatePath->setAccessible(true);
+
+            $generateCacheKey = $reflection->getMethod('generateCacheKey');
+            $generateCacheKey->setAccessible(true);
+
+            $templateLogicalName = 'cached_debug_substr_test';
+            $resolved = $resolveTemplatePath->invoke($viewer, $templateLogicalName);
+            $this->assertIsString($resolved);
+            /** @var string $resolvedPath */
+            $resolvedPath = $resolved;
+
+            $templateFile = $this->tempViewsPath . $resolvedPath;
+            $this->createDirectoryIfNotExists(dirname($templateFile));
+            file_put_contents($templateFile, 'ORIGINAL');
+
+            $data = [];
+            $key = $generateCacheKey->invoke($viewer, $resolvedPath, $data);
+            $this->assertIsString($key);
+            /** @var string $cacheKey */
+            $cacheKey = $key;
+
+            $cachedFile = $cacheDir . $cacheKey . '.php';
+
+            $payload = str_repeat('A', 150) . str_repeat('B', 150); // 300 chars
+            file_put_contents($cachedFile, '<?php echo ' . var_export($payload, true) . ';');
+
+            $out = $viewer->render($templateLogicalName, $data);
+            $this->assertSame($payload, $out);
+
+            $all = implode("\n", $testLogger->messages);
+
+            $expectedSnippet = substr($payload, 0, 100);
+            $this->assertStringContainsString(
+                'Output from cached file: ' . $expectedSnippet,
+                $all,
+                'Debug-loggen ska innehålla de första 100 tecknen (dödar substr-start-mutanten).'
+            );
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testCachedRenderLogsExactlyFirst100CharactersAndNotWholePayload(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            putenv('APP_ENV=production');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+            $viewer->enableDebugMode(true);
+
+            $reflection = new ReflectionClass($viewer);
+
+            $loggerProp = $reflection->getProperty('logger');
+            $loggerProp->setAccessible(true);
+            $testLogger = new TestViewLogger();
+            $loggerProp->setValue($viewer, $testLogger);
+
+            $cacheDir = $this->tempRootPath . 'cache/views/';
+            $this->createDirectoryIfNotExists($cacheDir);
+
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+            $cachePathProperty->setValue($viewer, $cacheDir);
+
+            $resolveTemplatePath = $reflection->getMethod('resolveTemplatePath');
+            $resolveTemplatePath->setAccessible(true);
+
+            $generateCacheKey = $reflection->getMethod('generateCacheKey');
+            $generateCacheKey->setAccessible(true);
+
+            $templateLogicalName = 'cached_debug_substr_test';
+            $resolved = $resolveTemplatePath->invoke($viewer, $templateLogicalName);
+            $this->assertIsString($resolved);
+            /** @var string $resolvedPath */
+            $resolvedPath = $resolved;
+
+            $templateFile = $this->tempViewsPath . $resolvedPath;
+            $this->createDirectoryIfNotExists(dirname($templateFile));
+            file_put_contents($templateFile, 'ORIGINAL');
+
+            $payload = str_repeat('A', 150) . str_repeat('B', 150); // 300 chars
+            $data = [];
+
+            $key = $generateCacheKey->invoke($viewer, $resolvedPath, $data);
+            $this->assertIsString($key);
+            /** @var string $cacheKey */
+            $cacheKey = $key;
+
+            $cachedFile = $cacheDir . $cacheKey . '.php';
+            file_put_contents($cachedFile, '<?php echo ' . var_export($payload, true) . ';');
+
+            $out = $viewer->render($templateLogicalName, $data);
+            $this->assertSame($payload, $out);
+
+            $expected = 'Output from cached file: ' . substr($payload, 0, 100);
+
+            // Plocka ut rätt loggrad och jämför EXAKT
+            $hit = null;
+            foreach ($testLogger->messages as $msg) {
+                if (str_starts_with($msg, 'Output from cached file: ')) {
+                    $hit = $msg;
+                    break;
+                }
+            }
+
+            $this->assertNotNull($hit, 'Expected debug row "Output from cached file:" was not logged.');
+            $this->assertSame($expected, $hit);
+
+            // Dödar UnwrapSubstr: hela payload får inte loggas
+            $all = implode("\n", $testLogger->messages);
+            $this->assertStringNotContainsString($payload, $all);
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testRenderClearsOldCacheFilesWithTtlOf3600Seconds(): void
+    {
+        $spy = new class ($this->tempViewsPath) extends RadixTemplateViewer {
+            public bool $called = false;
+            public ?int $capturedMaxAge = null;
+
+            protected function clearOldCacheFiles(int $maxAgeInSeconds = 86400, ?int $now = null): void
+            {
+                $this->called = true;
+                $this->capturedMaxAge = $maxAgeInSeconds;
+                // no-op on purpose (avoid filesystem dependency)
+            }
+        };
+
+        // Minimal template so render() runs through the "clearRenderCache()" seam.
+        $templateLogicalName = 'clear_render_cache_test';
+        $templatePath = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+        file_put_contents($templatePath, 'OK');
+
+        $out = $spy->render($templateLogicalName);
+
+        $this->assertSame('OK', $out);
+        $this->assertTrue($spy->called, 'render() must call clearRenderCache() which triggers cache cleanup.');
+        $this->assertSame(3600, $spy->capturedMaxAge, 'render() must clear old cache files using TTL=3600 seconds.');
+    }
+
+    public function testCachedRenderDebugLogsExactlyFirst100CharactersFromStartIndexZero(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            putenv('APP_ENV=production');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+            $viewer->enableDebugMode(true);
+
+            $reflection = new ReflectionClass($viewer);
+
+            $loggerProp = $reflection->getProperty('logger');
+            $loggerProp->setAccessible(true);
+            $testLogger = new TestViewLogger();
+            $loggerProp->setValue($viewer, $testLogger);
+
+            // Sätt cachePath till en tempdir
+            $cacheDir = $this->tempRootPath . 'cache/views/';
+            $this->createDirectoryIfNotExists($cacheDir);
+
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+            $cachePathProperty->setValue($viewer, $cacheDir);
+
+            $resolveTemplatePath = $reflection->getMethod('resolveTemplatePath');
+            $resolveTemplatePath->setAccessible(true);
+
+            $generateCacheKey = $reflection->getMethod('generateCacheKey');
+            $generateCacheKey->setAccessible(true);
+
+            $templateLogicalName = 'cached_debug_substr_start_zero';
+            $resolved = $resolveTemplatePath->invoke($viewer, $templateLogicalName);
+            $this->assertIsString($resolved);
+            /** @var string $resolvedPath */
+            $resolvedPath = $resolved;
+
+            // Template måste finnas för att render() ska gå vidare till cache-branch
+            $templateFile = $this->tempViewsPath . $resolvedPath;
+            $this->createDirectoryIfNotExists(dirname($templateFile));
+            file_put_contents($templateFile, 'ORIGINAL');
+
+            $payload = str_repeat('A', 150) . str_repeat('B', 150);
+            $data = [];
+
+            $key = $generateCacheKey->invoke($viewer, $resolvedPath, $data);
+            $this->assertIsString($key);
+            /** @var string $cacheKey */
+            $cacheKey = $key;
+
+            $cachedFile = $cacheDir . $cacheKey . '.php';
+            file_put_contents($cachedFile, '<?php echo ' . var_export($payload, true) . ';');
+
+            $out = $viewer->render($templateLogicalName, $data);
+            $this->assertSame($payload, $out);
+
+            $expectedLogRow = 'Output from cached file: ' . substr($payload, 0, 100);
+
+            $hit = null;
+            foreach ($testLogger->messages as $msg) {
+                if (str_starts_with($msg, 'Output from cached file: ')) {
+                    $hit = $msg;
+                    break;
+                }
+            }
+
+            $this->assertNotNull($hit, 'Expected debug row "Output from cached file:" was not logged.');
+            $this->assertSame($expectedLogRow, $hit, 'substr() must start at index 0 and take exactly 100 chars.');
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testRenderLogsCompiledTemplateCachedUnderKeyWhenCacheEnabled(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            putenv('APP_ENV=production');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+            $viewer->enableDebugMode(true);
+
+            $reflection = new ReflectionClass($viewer);
+
+            $loggerProp = $reflection->getProperty('logger');
+            $loggerProp->setAccessible(true);
+            $testLogger = new TestViewLogger();
+            $loggerProp->setValue($viewer, $testLogger);
+
+            // Template som inte matchar någon befintlig cachefil => render() kommer kompilera + cache:a
+            $templateLogicalName = 'compile_and_cache_debug_test';
+            $templateFile = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+            file_put_contents($templateFile, 'HELLO');
+
+            $out = $viewer->render($templateLogicalName);
+            $this->assertSame('HELLO', $out);
+
+            $all = implode("\n", $testLogger->messages);
+
+            $this->assertStringContainsString(
+                'Compiled template cached under key:',
+                $all,
+                'When cache is enabled, render() must log "Compiled template cached under key:".'
+            );
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testRenderLogsCacheDisabledInDevelopmentWhenDebugEnabled(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+
+        try {
+            putenv('APP_ENV=development');
+
+            $viewer = new RadixTemplateViewer($this->tempViewsPath);
+            $viewer->enableDebugMode(true);
+
+            $reflection = new ReflectionClass($viewer);
+
+            $loggerProp = $reflection->getProperty('logger');
+            $loggerProp->setAccessible(true);
+            $testLogger = new TestViewLogger();
+            $loggerProp->setValue($viewer, $testLogger);
+
+            $templateLogicalName = 'dev_cache_disabled_debug_test';
+            $templateFile = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+            file_put_contents($templateFile, 'OK');
+
+            $out = $viewer->render($templateLogicalName);
+            $this->assertSame('OK', $out);
+
+            $all = implode("\n", $testLogger->messages);
+
+            $this->assertStringContainsString(
+                'Cache disabled in development',
+                $all,
+                'When APP_ENV=development and debug enabled, render() must log "Cache disabled in development".'
+            );
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testInvalidateCacheLogsDebugMessageWhenFileWasDeleted(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+        $viewer->enableDebugMode(true);
+
+        $reflection = new ReflectionClass($viewer);
+
+        $loggerProp = $reflection->getProperty('logger');
+        $loggerProp->setAccessible(true);
+        $testLogger = new TestViewLogger();
+        $loggerProp->setValue($viewer, $testLogger);
+
+        // Sätt cachePath till temp-rootens cache/views så vi kan skapa en riktig fil som invalidateCache() tar bort
+        $cacheDir = $this->tempRootPath . 'cache/views/';
+        $this->createDirectoryIfNotExists($cacheDir);
+
+        $cachePathProperty = $reflection->getProperty('cachePath');
+        $cachePathProperty->setAccessible(true);
+        $cachePathProperty->setValue($viewer, $cacheDir);
+
+        // Skapa template som generateCacheKey() kan läsa (annars påverkar "missing" hash/mtime nyckeln)
+        $templateLogicalName = 'invalidate_debug_test';
+        $templateFile = $this->tempViewsPath . $templateLogicalName . '.ratio.php';
+        file_put_contents($templateFile, 'X');
+
+        // Bygg cachefil för exakt samma key som invalidateCache() kommer använda
+        $resolveTemplatePath = $reflection->getMethod('resolveTemplatePath');
+        $resolveTemplatePath->setAccessible(true);
+
+        $generateCacheKey = $reflection->getMethod('generateCacheKey');
+        $generateCacheKey->setAccessible(true);
+
+        $resolved = $resolveTemplatePath->invoke($viewer, $templateLogicalName);
+        $this->assertIsString($resolved);
+        /** @var string $resolvedPath */
+        $resolvedPath = $resolved;
+
+        $data = ['n' => 1];
+        $key = $generateCacheKey->invoke($viewer, $resolvedPath, $data, '');
+        $this->assertIsString($key);
+        /** @var string $cacheKey */
+        $cacheKey = $key;
+
+        $cacheFile = $cacheDir . $cacheKey . '.php';
+        file_put_contents($cacheFile, 'cached');
+
+        $this->assertFileExists($cacheFile);
+
+        $viewer->invalidateCache($templateLogicalName, $data);
+
+        $this->assertFileDoesNotExist($cacheFile);
+
+        $all = implode("\n", $testLogger->messages);
+        $this->assertStringContainsString(
+            'Cache invalidated for key: ' . $cacheKey,
+            $all,
+            'invalidateCache() must log when it deleted a cache file (debug enabled).'
+        );
+    }
+
+    public function testDefaultCachePathWhenViewsCachePathEnvMissingIsExactlyRootCacheViewsWithoutDoubleSeparators(): void
+    {
+        $original = getenv('VIEWS_CACHE_PATH');
+
+        try {
+            // Säkerställ default-branch
+            putenv('VIEWS_CACHE_PATH');
+
+            $viewer = new \Radix\Viewer\RadixTemplateViewer($this->tempViewsPath);
+
+            $reflection = new \ReflectionClass($viewer);
+            $cachePathProperty = $reflection->getProperty('cachePath');
+            $cachePathProperty->setAccessible(true);
+
+            $cachePathMixed = $cachePathProperty->getValue($viewer);
+            $this->assertIsString($cachePathMixed);
+            /** @var string $cachePath */
+            $cachePath = $cachePathMixed;
+
+            $normalizedCachePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $cachePath);
+
+            $root = defined('ROOT_PATH') ? (string) ROOT_PATH : $this->tempRootPath;
+            $normalizedRoot = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $root);
+            $normalizedRoot = rtrim($normalizedRoot, '/\\') . DIRECTORY_SEPARATOR;
+
+            $expected = $normalizedRoot
+                . 'cache' . DIRECTORY_SEPARATOR
+                . 'views' . DIRECTORY_SEPARATOR;
+
+            // KRITISKT: dödar UnwrapRtrim-mutanten som annars ger "...root//cache/views/"
+            $this->assertSame(
+                $expected,
+                $normalizedCachePath,
+                'Default cachePath ska vara exakt ROOT_PATH/cache/views/ (ingen dubbel separator).'
+            );
+
+            // Extra spik: om någon råkar ändra stringen så att den innehåller "//cache"
+            $this->assertStringNotContainsString(
+                DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR,
+                $normalizedCachePath,
+                'cachePath får inte innehålla dubbel separator före "cache".'
+            );
+        } finally {
+            if ($original === false) {
+                putenv('VIEWS_CACHE_PATH');
+            } else {
+                putenv('VIEWS_CACHE_PATH=' . $original);
+            }
+        }
+    }
+
+    public function testSharedLogsExactDebugMessageIncludingNameAndPrintedValue(): void
+    {
+        $viewer = new \Radix\Viewer\RadixTemplateViewer($this->tempViewsPath);
+        $viewer->enableDebugMode(true);
+
+        $reflection = new \ReflectionClass($viewer);
+        $loggerProp = $reflection->getProperty('logger');
+        $loggerProp->setAccessible(true);
+
+        $testLogger = new TestViewLogger();
+        $loggerProp->setValue($viewer, $testLogger);
+
+        $viewer->shared('globalVar', 'GlobalValue');
+
+        $this->assertNotEmpty($testLogger->messages, 'shared() ska logga när debug-läge är aktivt.');
+
+        // shared() loggar en rad; vi letar efter den som börjar med prefixet.
+        $hit = null;
+        foreach ($testLogger->messages as $msg) {
+            if (str_starts_with($msg, 'Registrerad global variabel: globalVar => ')) {
+                $hit = $msg;
+                break;
+            }
+        }
+
+        $this->assertNotNull($hit, 'Förväntad debug-rad från shared() saknas.');
+
+        // print_r('GlobalValue', true) returnerar strängen + newline
+        $expected = 'Registrerad global variabel: globalVar => ' . print_r('GlobalValue', true);
+
+        // KRITISKT: dödar Concat (fel ordning) samt ConcatOperandRemoval (tappat prefix/suffix)
+        $this->assertSame(
+            $expected,
+            $hit,
+            'shared() måste logga exakt: "Registrerad global variabel: {name} => " . print_r(value, true)'
+        );
+    }
+
+   public function testComputeInitialCachePathForRelativeEnvEndsWithDirectorySeparator(): void
+    {
+        $spy = new class ($this->tempViewsPath) extends \Radix\Viewer\RadixTemplateViewer {
+            public function exposeComputeInitialCachePath(string $root, string $envCachePath): string
+            {
+                return $this->computeInitialCachePath($root, $envCachePath);
+            }
+        };
+
+        $root = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'radix_root_test' . DIRECTORY_SEPARATOR;
+        $envCachePath = 'custom/views-cache';
+
+        $raw = $spy->exposeComputeInitialCachePath($root, $envCachePath);
+        $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $raw);
+
+        $this->assertStringEndsWith(
+            'custom' . DIRECTORY_SEPARATOR . 'views-cache' . DIRECTORY_SEPARATOR,
+            $normalized,
+            'Relative VIEWS_CACHE_PATH must yield a cachePath that ends with DIRECTORY_SEPARATOR.'
+        );
+    }
+
+    public function testComputeInitialCachePathDefaultContainsCacheViewsAndEndsWithSeparator(): void
+    {
+        $spy = new class ($this->tempViewsPath) extends \Radix\Viewer\RadixTemplateViewer {
+            public function exposeComputeInitialCachePath(string $root, string $envCachePath): string
+            {
+                return $this->computeInitialCachePath($root, $envCachePath);
+            }
+        };
+
+        $root = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'radix_root_test' . DIRECTORY_SEPARATOR;
+
+        $raw = $spy->exposeComputeInitialCachePath($root, '');
+        $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $raw);
+
+        $expected = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $root), '/\\') . DIRECTORY_SEPARATOR
+            . 'cache' . DIRECTORY_SEPARATOR
+            . 'views' . DIRECTORY_SEPARATOR;
+
+        // Dödar #12 (tappar "views") och #13 (tappar trailing separator)
+        $this->assertSame(
+            $expected,
+            $normalized,
+            'Default initial cachePath must be exactly ROOT/cache/views/ (before normalization).'
+        );
+
+        // Extra: fångar också varianten där "views" råkar saknas men stringen ändå slutar med "/"
+        $this->assertStringContainsString(
+            DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR,
+            $normalized
+        );
+    }
+
+    public function testStripRemainingBlockTagsRemovesBothBlockAndEndblockTags(): void
+    {
+        $spy = new class ($this->tempViewsPath) extends \Radix\Viewer\RadixTemplateViewer {
+            public function exposeStripRemainingBlockTags(string $code): string
+            {
+                return $this->stripRemainingBlockTags($code);
+            }
+        };
+
+        $input = 'A {% block body %} B {% endblock %} C';
+        $out = $spy->exposeStripRemainingBlockTags($input);
+
+        $this->assertSame('A  B  C', $out);
+        $this->assertStringNotContainsString('{% block', $out);
+        $this->assertStringNotContainsString('{% endblock', $out);
+    }
+
+    public function testRenderResolvesDotNotationTemplatePathToNestedDirectories(): void
+    {
+        $viewer = new \Radix\Viewer\RadixTemplateViewer($this->tempViewsPath);
+
+        // "a.b" ska resolve:a till "a/b.ratio.php"
+        $nestedDir = $this->tempViewsPath . 'a';
+        $this->createDirectoryIfNotExists($nestedDir);
+
+        $file = $nestedDir . DIRECTORY_SEPARATOR . 'b.ratio.php';
+        file_put_contents($file, 'OK');
+
+        $out = $viewer->render('a.b');
+        $this->assertSame('OK', $out);
+    }
+
+    public function testProcessExtendsAllowsExactlyMaxDepth50ButThrowsAt51(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+        putenv('APP_ENV=development');
+
+        try {
+            $viewer = new \Radix\Viewer\RadixTemplateViewer($this->tempViewsPath);
+
+            $makeChain = function (int $depth): string {
+                $dir = $this->tempViewsPath . 'depth_chain';
+                $this->createDirectoryIfNotExists($dir);
+
+                for ($i = 0; $i < $depth; $i++) {
+                    $path = $dir . DIRECTORY_SEPARATOR . "file_{$i}.ratio.php";
+                    $next = "depth_chain/file_" . ($i + 1) . ".ratio.php";
+                    file_put_contents($path, '{% extends "' . $next . '" %}{% block body %}X{% endblock %}');
+                }
+
+                $lastPath = $dir . DIRECTORY_SEPARATOR . "file_{$depth}.ratio.php";
+                file_put_contents($lastPath, '<html>{% yield body %}</html>');
+
+                return "depth_chain/file_0";
+            };
+
+            $tOk = $makeChain(50);
+            $outOk = $viewer->render($tOk);
+            $this->assertSame('<html>X</html>', $outOk);
+
+            $tTooDeep = $makeChain(51);
+
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Max extends depth (50) exceeded while processing templates.');
+
+            $viewer->render($tTooDeep);
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testProcessExtendsIterationsGuardAllows200ButThrowsAt201(): void
+    {
+        $originalEnv = getenv('APP_ENV');
+        putenv('APP_ENV=development');
+
+        try {
+            $viewer = new class ($this->tempViewsPath) extends \Radix\Viewer\RadixTemplateViewer {
+                protected function getMaxExtendsDepth(): int
+                {
+                    // Låt depth inte vara den begränsande faktorn här.
+                    return 1000;
+                }
+            };
+
+            $dir = $this->tempViewsPath . 'iter_chain';
+            $this->createDirectoryIfNotExists($dir);
+
+            $makeIterChain = function (int $steps): string {
+                for ($i = 0; $i < $steps; $i++) {
+                    $path = $this->tempViewsPath . 'iter_chain' . DIRECTORY_SEPARATOR . "file_{$i}.ratio.php";
+                    $next = "iter_chain/file_" . ($i + 1) . ".ratio.php";
+                    file_put_contents($path, '{% extends "' . $next . '" %}{% block body %}Z{% endblock %}');
+                }
+
+                $lastPath = $this->tempViewsPath . 'iter_chain' . DIRECTORY_SEPARATOR . "file_{$steps}.ratio.php";
+                file_put_contents($lastPath, '<html>{% yield body %}</html>');
+
+                return "iter_chain/file_0";
+            };
+
+            // Exakt 200 extends-steg ska gå igenom
+            $t200 = $makeIterChain(200);
+            $out200 = $viewer->render($t200);
+            $this->assertSame('<html>Z</html>', $out200);
+
+            // 201 extends-steg ska kasta
+            $t201 = $makeIterChain(201);
+
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Max iterations (200) exceeded while processing extends.');
+
+            $viewer->render($t201);
+        } finally {
+            if ($originalEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $originalEnv);
+            }
+        }
+    }
+
+    public function testProcessExtendsDetectsCycleEvenWhenSameFileIsReferencedWithDotSlash(): void
+    {
+        // layout extends itself but via a different string form ("./layout...") to require path normalization
+        $layoutPath = "{$this->tempViewsPath}layout.ratio.php";
+        file_put_contents(
+            $layoutPath,
+            <<<'RATIO'
+{% extends "./layout.ratio.php" %}
+{% yield content %}{% endyield content %}
+RATIO
+        );
+
+        $childPath = "{$this->tempViewsPath}child_cycle_test.ratio.php";
+        file_put_contents(
+            $childPath,
+            <<<'RATIO'
+{% extends "layout.ratio.php" %}
+{% block content %}OK{% endblock %}
+RATIO
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Extends cycle detected');
+
+        $this->viewer->render('child_cycle_test');
+    }
+
+    public function testExtendsCycleIsDetected(): void
+    {
+        // A extends B, B extends A -> måste kasta RuntimeException
+        $a = $this->tempViewsPath . 'a.ratio.php';
+        $b = $this->tempViewsPath . 'b.ratio.php';
+
+        file_put_contents($a, '{% extends "b.ratio.php" %}{% block body %}A{% endblock %}');
+        file_put_contents($b, '{% extends "a.ratio.php" %}{% yield body %}');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Extends cycle detected');
+
+        $this->viewer->render('a');
+    }
+
+    public function testLoadIncludesReplacesIncludeWithTemplateContent(): void
+    {
+        // Dödare för Foreach_ mutanten: om foreach blir [], sker ingen ersättning => output innehåller include-taggen
+        $partialPath = $this->tempViewsPath . 'partials/hello.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($partialPath));
+        file_put_contents($partialPath, 'Hello-Partial');
+
+        $hostPath = $this->tempViewsPath . 'include_host.ratio.php';
+        file_put_contents($hostPath, 'BEFORE[{% include "partials/hello.ratio.php" %}]AFTER');
+
+        $out = $this->viewer->render('include_host');
+
+        $this->assertSame('BEFORE[Hello-Partial]AFTER', $out);
+        $this->assertStringNotContainsString('{% include', $out);
+    }
+
+    public function testComponentDotNotationResolvesToSubdirectory(): void
+    {
+        // Dödare för UnwrapStrReplace-mutanten: "ui.alert" måste bli "ui/alert"
+        $componentPath = $this->tempViewsPath . 'components/ui/alert.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents($componentPath, '<div>OK</div>');
+
+        $templatePath = $this->tempViewsPath . 'dot_component_test.ratio.php';
+        file_put_contents($templatePath, '<x-ui.alert />');
+
+        $out = $this->viewer->render('dot_component_test');
+        $this->assertSame('<div>OK</div>', trim($out));
+    }
+
+    public function testParseAttributesTrimsAttributeValues(): void
+    {
+        // Dödare för UnwrapTrim-mutanten i parseAttributes(): whitespace runt värde ska bort
+        $componentPath = $this->tempViewsPath . 'components/attr_trim.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents($componentPath, '[{{ $class }}]');
+
+        $templatePath = $this->tempViewsPath . 'attr_trim_host.ratio.php';
+        file_put_contents($templatePath, '<x-attr_trim class="  my-class  " />');
+
+        $out = $this->viewer->render('attr_trim_host');
+        $this->assertSame('[my-class]', trim($out));
+    }
+
+    public function testComponentAttributesAreParsedWhenThereIsLeadingWhitespaceInTag(): void
+    {
+        // Dödare för UnwrapTrim-mutanten runt matches[2] (trim tas bort):
+        // vi stoppar in inledande whitespace före attribut så parseAttributes annars inte matchar.
+        $componentPath = $this->tempViewsPath . 'components/attr_ws.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents($componentPath, '[{{ $class }}]');
+
+        $templatePath = $this->tempViewsPath . 'attr_ws_host.ratio.php';
+        file_put_contents($templatePath, '<x-attr_ws     class="x" />');
+
+        $out = $this->viewer->render('attr_ws_host');
+        $this->assertSame('[x]', trim($out));
+    }
+
+    public function testComponentSlotContentIsTrimmedBeforeRecursivePlaceholderReplacement(): void
+    {
+        // Dödare för UnwrapTrim-mutanten på $content:
+        // om trim tas bort så kommer slot-innehåll behålla whitespace och output skiljer sig.
+        $componentPath = $this->tempViewsPath . 'components/slot_trim.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents($componentPath, '[{{ $slot }}]');
+
+        $templatePath = $this->tempViewsPath . 'slot_trim_host.ratio.php';
+        file_put_contents($templatePath, "<x-slot_trim>\n   Hello   \n</x-slot_trim>");
+
+        $out = $this->viewer->render('slot_trim_host');
+        $this->assertSame('[Hello]', trim($out));
+    }
+
+    public function testReplacePlaceholdersDebugLogContainsEscapedCodeWhenDebugEnabled(): void
+    {
+        // Dödare för ConcatOperandRemoval-mutanten: loggen måste inkludera htmlspecialchars($code)
+        $this->viewer->enableDebugMode(true);
+
+        $reflection = new ReflectionClass($this->viewer);
+        $loggerProp = $reflection->getProperty('logger');
+        $loggerProp->setAccessible(true);
+
+        $testLogger = new TestViewLogger();
+        $loggerProp->setValue($this->viewer, $testLogger);
+
+        $templatePath = $this->tempViewsPath . 'debug_placeholder_log.ratio.php';
+        file_put_contents($templatePath, '<div><b>X</b></div>');
+
+        $this->viewer->render('debug_placeholder_log');
+
+        $all = implode("\n", $testLogger->messages);
+
+        // Vi letar efter escaped HTML så vi vet att htmlspecialchars($code) faktiskt loggats
+        $this->assertStringContainsString('Original kod före placeholder-bearbetning:', $all);
+        $this->assertStringContainsString('&lt;div&gt;&lt;b&gt;X&lt;/b&gt;&lt;/div&gt;', $all);
+    }
+
+    public function testGlobalVariablePlaceholderIsRewrittenToVariableVariableEcho(): void
+    {
+        // Dödare för Coalesce-mutanten: replacement måste alltid köras, inte "$code ?? preg_replace(...)"
+        $templatePath = $this->tempViewsPath . 'global_var_rewrite_test.ratio.php';
+        file_put_contents($templatePath, 'Value={{ $globalVar }}');
+
+        $this->viewer->shared('globalVar', 'OK');
+
+        $out = $this->viewer->render('global_var_rewrite_test');
+        $this->assertSame('Value=OK', $out);
     }
 }
