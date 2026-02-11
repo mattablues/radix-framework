@@ -242,6 +242,11 @@
         "Radix\\Viewer\\RadixTemplateViewer::processExtends"
       ]
     },
+    "ArrayItemRemoval": {
+      "ignore": [
+        "Radix\\Config\\EnvValidator::writablePath"
+      ]
+    },
     "GreaterThan": {
       "ignore": [
         "Radix\\Database\\QueryBuilder\\Concerns\\Pagination::paginate",

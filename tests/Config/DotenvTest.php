@@ -470,5 +470,29 @@ namespace Radix\Tests\Config {
 
             $this->assertSame('a=b', getenv('FOO'));
         }
+
+        public function testLineWithWhitespaceOnlyKeyThrowsMissingKeyException(): void
+        {
+            // Skapa temporär .env-fil
+            $path = tempnam(sys_get_temp_dir(), 'radix-dotenv-');
+            if ($path === false) {
+                self::fail('Failed to create temporary file for Dotenv test');
+            }
+
+            // En rad där nyckeln bara är whitespace före "="
+            $envContent = "   =value\n";
+            file_put_contents($path, $envContent);
+
+            $dotenv = new Dotenv($path);
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage("Invalid .env line (missing key)");
+
+            try {
+                $dotenv->load();
+            } finally {
+                @unlink($path);
+            }
+        }
     }
 }
