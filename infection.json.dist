@@ -16,7 +16,13 @@
     "Concat": {
       "ignore": [
         "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders",
-        "Radix\\Viewer\\RadixTemplateViewer::debug"
+        "Radix\\Viewer\\RadixTemplateViewer::debug",
+        "Radix\\Viewer\\RadixTemplateViewer::renderComponent",
+        "Radix\\Viewer\\RadixTemplateViewer::extractNamedSlots",
+        "Radix\\Viewer\\RadixTemplateViewer::mergeData",
+        "Radix\\Viewer\\RadixTemplateViewer::minifyPHP",
+        "Radix\\Viewer\\RadixTemplateViewer::getFilterKey",
+        "Radix\\Viewer\\RadixTemplateViewer::__construct"
       ]
     },
     "Continue_": {
@@ -28,13 +34,19 @@
       "ignore": [
         "Radix\\Routing\\Router::add",
         "Radix\\Routing\\Router::addRoute",
-        "Radix\\Support\\FileCache::__construct"
+        "Radix\\Support\\FileCache::__construct",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate",
+        "Radix\\Viewer\\RadixTemplateViewer::generateCacheKey",
+        "Radix\\Viewer\\RadixTemplateViewer::computeInitialCachePath",
+        "Radix\\Viewer\\RadixTemplateViewer::processExtends"
       ]
     },
     "UnwrapLtrim": {
       "ignore": [
         "Radix\\Routing\\Router::add",
-        "Radix\\Routing\\Router::addRoute"
+        "Radix\\Routing\\Router::addRoute",
+        "Radix\\Viewer\\RadixTemplateViewer::generateCacheKey",
+        "Radix\\Viewer\\RadixTemplateViewer::processExtends"
       ]
     },
     "MBString": {
@@ -54,7 +66,10 @@
         "Radix\\File\\Image::pngCompressionLevel",
         "Radix\\Support\\FileCache::get",
         "Radix\\Support\\FileCache::__construct",
-        "Radix\\File\\Reader::detectDelimiter"
+        "Radix\\File\\Reader::detectDelimiter",
+        "Radix\\Viewer\\RadixTemplateViewer::generateCacheKey",
+        "Radix\\Viewer\\RadixTemplateViewer::__construct",
+        "Radix\\Error\\ErrorResponder::respond"
       ]
     },
     "ProtectedVisibility": {
@@ -63,7 +78,9 @@
         "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCtePrefix",
         "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCteBindings",
         "Radix\\Database\\QueryBuilder\\Concerns\\GroupingSets::compileGroupByClause",
-        "Radix\\Database\\QueryBuilder\\Concerns\\Windows::compileWindowSelects"
+        "Radix\\Database\\QueryBuilder\\Concerns\\Windows::compileWindowSelects",
+        "Radix\\Viewer\\RadixTemplateViewer::clearRenderCache",
+        "Radix\\Viewer\\RadixTemplateViewer::getMaxExtendsIterations"
       ]
     },
     "IncrementInteger": {
@@ -79,13 +96,18 @@
         "Radix\\File\\Image::resizeImage",
         "Radix\\File\\Image::pngCompressionLevel",
         "Radix\\Support\\FileCache::__construct",
-        "Radix\\File\\Reader::detectDelimiter"
+        "Radix\\File\\Reader::detectDelimiter",
+        "Radix\\Viewer\\RadixTemplateViewer::minifyPHP",
+        "Radix\\Viewer\\RadixTemplateViewer::generateCacheKey",
+        "Radix\\Viewer\\RadixTemplateViewer::render",
+        "Radix\\Viewer\\RadixTemplateViewer::__construct"
       ]
     },
     "CastInt": {
       "ignore": [
         "Radix\\Support\\FileCache::ttlToExpires",
-        "Radix\\Support\\Validator::validateMax"
+        "Radix\\Support\\Validator::validateMax",
+        "Radix\\Viewer\\RadixTemplateViewer::generateCacheKey"
       ]
     },
     "CastFloat": {
@@ -96,7 +118,8 @@
     },
     "Throw_": {
       "ignore": [
-        "Radix\\File\\Image::openImage"
+        "Radix\\File\\Image::openImage",
+        "Radix\\Viewer\\RadixTemplateViewer::render"
       ]
     },
     "UnwrapArrayValues": {
@@ -108,17 +131,22 @@
     "Ternary": {
       "ignore": [
         "Radix\\Database\\ORM\\Model::load",
-        "Radix\\Support\\FileCache::__construct"
+        "Radix\\Support\\FileCache::__construct",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate",
+        "Radix\\Viewer\\RadixTemplateViewer::generateCacheKey",
+        "Radix\\Viewer\\RadixTemplateViewer::processExtends"
       ]
     },
     "LogicalOrAllSubExprNegation": {
       "ignore": [
-        "Radix\\Database\\ORM\\Model::load"
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
       ]
     },
     "LogicalOrNegation": {
       "ignore": [
-        "Radix\\Database\\ORM\\Model::load"
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
       ]
     },
     "LogicalAnd": {
@@ -146,14 +174,21 @@
         "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
         "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect",
         "Radix\\Container\\Argument\\Literal\\ArrayArgument::__construct",
-        "Radix\\Container\\Argument\\Literal\\ObjectArgument::__construct"
+        "Radix\\Container\\Argument\\Literal\\ObjectArgument::__construct",
+        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders",
+        "Radix\\Viewer\\RadixTemplateViewer::renderComponent",
+        "Radix\\Viewer\\RadixTemplateViewer::evaluateTemplate",
+        "Radix\\Viewer\\RadixTemplateViewer::extractNamedSlots",
+        "Radix\\Viewer\\RadixTemplateViewer::mergeData",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
       ]
     },
     "PregMatchRemoveCaret": {
       "ignore": [
         "Radix\\Database\\QueryBuilder\\Concerns\\Functions::wrapColumnsForFunction",
         "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::wrapColumn",
-        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::select"
+        "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::select",
+        "Radix\\Viewer\\RadixTemplateViewer::computeInitialCachePath"
       ]
     },
     "PregMatchRemoveDollar": {
@@ -172,14 +207,27 @@
     "UnwrapTrim": {
       "ignore": [
         "Radix\\Database\\QueryBuilder\\Concerns\\CompilesSelect::compileWhere",
-        "Radix\\Routing\\Router::group"
+        "Radix\\Routing\\Router::group",
+        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders",
+        "Radix\\Viewer\\RadixTemplateViewer::renderComponent",
+        "Radix\\Viewer\\RadixTemplateViewer::replacePHPDirectives",
+        "Radix\\Viewer\\RadixTemplateViewer::replaceVariableOutput",
+        "Radix\\Viewer\\RadixTemplateViewer::minifyPHP",
+        "Radix\\Viewer\\RadixTemplateViewer::parseAttributes",
+        "Radix\\Config\\Dotenv::load"
+      ]
+    },
+    "UnwrapArrayMap": {
+      "ignore": [
+        "Radix\\Viewer\\RadixTemplateViewer::renderComponent"
       ]
     },
     "TrueValue": {
       "ignore": [
         "Radix\\Database\\ORM\\Model::load",
         "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
-        "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect"
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect",
+        "Radix\\Viewer\\RadixTemplateViewer::processExtends"
       ]
     },
     "LogicalOr": {
@@ -188,12 +236,21 @@
         "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
         "Radix\\Database\\QueryBuilder\\QueryBuilder::addRelationCountSelect",
         "Radix\\Routing\\Router::addRoute",
-        "Radix\\Support\\Validator::validateUnique"
+        "Radix\\Support\\Validator::validateUnique",
+        "Radix\\Viewer\\RadixTemplateViewer::replaceVariableOutput",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
+      ]
+    },
+    "LogicalNot": {
+      "ignore": [
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
       ]
     },
     "Identical": {
       "ignore": [
-        "Radix\\Database\\ORM\\Model::load"
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Viewer\\RadixTemplateViewer::replacePHPDirectives",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
       ]
     },
     "InstanceOf_": {
@@ -203,7 +260,11 @@
     },
     "Coalesce": {
       "ignore": [
-        "Radix\\Database\\ORM\\Model::load"
+        "Radix\\Database\\ORM\\Model::load",
+        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders",
+        "Radix\\Viewer\\RadixTemplateViewer::replaceVariableOutput",
+        "Radix\\Viewer\\RadixTemplateViewer::replaceYields",
+        "Radix\\Viewer\\RadixTemplateViewer::__construct"
       ]
     },
     "LogicalAndNegation": {
@@ -221,7 +282,20 @@
         "Radix\\Database\\ORM\\Model::isFillable",
         "Radix\\Database\\QueryBuilder\\Concerns\\WithCtes::compileCteBindings",
         "Radix\\Database\\QueryBuilder\\Concerns\\Functions::wrapColumnsForFunction",
-        "Radix\\Support\\FileCache::get"
+        "Radix\\Support\\FileCache::get",
+        "Radix\\Viewer\\RadixTemplateViewer::applyFilters"
+      ]
+    },
+    "ConcatOperandRemoval": {
+      "ignore": [
+        "Radix\\Viewer\\RadixTemplateViewer::replacePlaceholders",
+        "Radix\\Viewer\\RadixTemplateViewer::debug",
+        "Radix\\Viewer\\RadixTemplateViewer::renderComponent",
+        "Radix\\Viewer\\RadixTemplateViewer::extractNamedSlots",
+        "Radix\\Viewer\\RadixTemplateViewer::mergeData",
+        "Radix\\Viewer\\RadixTemplateViewer::minifyPHP",
+        "Radix\\Viewer\\RadixTemplateViewer::computeInitialCachePath",
+        "Radix\\Viewer\\RadixTemplateViewer::__construct"
       ]
     },
     "UnwrapUcWords": {
@@ -233,6 +307,11 @@
     "UnwrapUcFirst": {
       "ignore": [
         "Radix\\Database\\ORM\\Model::__set"
+      ]
+    },
+    "UnwrapStrToLower": {
+      "ignore": [
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate"
       ]
     },
     "UnwrapArrayMerge": {
@@ -259,7 +338,12 @@
         "Radix\\Database\\QueryBuilder\\Concerns\\JsonFunctions::whereJsonContains",
         "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
         "Radix\\File\\Writer::validateRows",
-        "Radix\\File\\Reader::csv"
+        "Radix\\File\\Reader::csv",
+        "Radix\\Viewer\\RadixTemplateViewer::replacePHPDirectives",
+        "Radix\\Viewer\\RadixTemplateViewer::replaceYields",
+        "Radix\\Viewer\\RadixTemplateViewer::cacheTemplate",
+        "Radix\\Viewer\\RadixTemplateViewer::__construct",
+        "Radix\\Viewer\\RadixTemplateViewer::processExtends"
       ]
     },
     "CastBool": {

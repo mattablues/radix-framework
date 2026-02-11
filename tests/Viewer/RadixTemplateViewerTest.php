@@ -3459,4 +3459,29 @@ RATIO
         $out = $this->viewer->render('global_var_rewrite_test');
         $this->assertSame('Value=OK', $out);
     }
+
+    public function testYieldWithFallbackUsesBlockWhenPresentAndFallbackWhenMissing(): void
+    {
+        // Layout med yield + fallback
+        $layoutPath = $this->tempViewsPath . 'layouts/yield_fallback.ratio.php';
+        $this->createDirectoryIfNotExists(dirname($layoutPath));
+        file_put_contents(
+            $layoutPath,
+            '<html>{% yield body %}<p>Fallback</p>{% endyield body %}</html>'
+        );
+
+        // 1) Rendera layouten direkt → ska använda fallback-innehållet
+        $directOutput = $this->viewer->render('layouts/yield_fallback');
+        $this->assertSame('<html><p>Fallback</p></html>', $directOutput);
+
+        // 2) Child-template som override:ar body-blocket
+        $childPath = $this->tempViewsPath . 'home_with_body.ratio.php';
+        file_put_contents(
+            $childPath,
+            '{% extends "layouts/yield_fallback.ratio.php" %}{% block body %}<h1>Body</h1>{% endblock %}'
+        );
+
+        $childOutput = $this->viewer->render('home_with_body');
+        $this->assertSame('<html><h1>Body</h1></html>', $childOutput);
+    }
 }
