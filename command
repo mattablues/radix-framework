@@ -72,7 +72,7 @@ APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist
   --skip-initial-tests \
   --coverage=build/coverage \
   --log-verbosity=all \
-  --filter=src/Viewer/RadixTemplateViewer.php \
+  --filter=src/File/\
   --no-interaction \
   --logger-text=infection-report.txt \
   --no-progress

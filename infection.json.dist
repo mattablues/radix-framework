@@ -53,7 +53,8 @@
         "Radix\\Database\\QueryBuilder\\Concerns\\BuildsWhere::whereNotIn",
         "Radix\\File\\Image::pngCompressionLevel",
         "Radix\\Support\\FileCache::get",
-        "Radix\\Support\\FileCache::__construct"
+        "Radix\\Support\\FileCache::__construct",
+        "Radix\\File\\Reader::detectDelimiter"
       ]
     },
     "ProtectedVisibility": {
@@ -77,7 +78,8 @@
         "Radix\\Routing\\Dispatcher::handle",
         "Radix\\File\\Image::resizeImage",
         "Radix\\File\\Image::pngCompressionLevel",
-        "Radix\\Support\\FileCache::__construct"
+        "Radix\\Support\\FileCache::__construct",
+        "Radix\\File\\Reader::detectDelimiter"
       ]
     },
     "CastInt": {
@@ -250,7 +252,9 @@
       "ignore": [
         "Radix\\Database\\QueryBuilder\\QueryBuilder::debugSqlInterpolated",
         "Radix\\Database\\QueryBuilder\\Concerns\\JsonFunctions::whereJsonContains",
-        "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere"
+        "Radix\\Database\\QueryBuilder\\QueryBuilder::withCountWhere",
+        "Radix\\File\\Writer::validateRows",
+        "Radix\\File\\Reader::csv"
       ]
     },
     "CastBool": {
@@ -260,7 +264,8 @@
     },
     "Break_": {
       "ignore": [
-        "Radix\\Support\\Validator::validateRequiredWith"
+        "Radix\\Support\\Validator::validateRequiredWith",
+        "Radix\\File\\Reader::detectDelimiter"
       ]
     }
   },

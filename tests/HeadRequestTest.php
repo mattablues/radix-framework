@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use PHPUnit\Framework\TestCase;
 use Radix\Container\Container;
 use Radix\EventDispatcher\EventDispatcher;

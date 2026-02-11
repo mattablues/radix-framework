@@ -70,7 +70,7 @@ final class Writer
             $headers = [];
         }
 
-        if ($isAssoc && $headers === []) {
+        if (self::shouldCollectHeaders($isAssoc, $headers)) {
             $headers = self::collectHeaders($rows);
         }
 
@@ -91,7 +91,7 @@ final class Writer
                     continue;
                 }
 
-                if (is_bool($v) || is_int($v) || is_float($v) || is_string($v)) {
+                if (self::isCsvScalarValue($v)) {
                     $normalized[$k] = $v;
                 } else {
                     // Oväntad typ: serialisera till sträng
@@ -171,7 +171,7 @@ final class Writer
                     continue;
                 }
 
-                if (is_bool($v) || is_int($v) || is_float($v) || is_string($v)) {
+                if (self::isCsvScalarValue($v)) {
                     $normalized[$k] = $v;
                 } else {
                     $encoded = json_encode($v);
@@ -328,8 +328,12 @@ final class Writer
      * @param array<string,mixed>            $schema
      * @return array<int,array<string,mixed>>
      */
-    public static function validateRows(array $rows, array $schema, string $onError = 'throw'): array
-    {
+    public static function validateRows(
+        array $rows,
+        array $schema,
+        string $onError = 'throw',
+        ?callable $onRequiredChecked = null
+    ): array {
         // Normalisera schema-delar till säkra typer
         $requiredRaw = $schema['required'] ?? [];
         $required = is_array($requiredRaw) ? array_values($requiredRaw) : [];
@@ -340,17 +344,16 @@ final class Writer
         $defaultsRaw = $schema['defaults'] ?? [];
         $defaults = is_array($defaultsRaw) ? $defaultsRaw : [];
 
-        $trim = (bool) ($schema['trim'] ?? false);
+        $trimRaw = $schema['trim'] ?? false;
+        $trim = self::normalizeBoolLike($trimRaw, 'trim');
 
         $nullableRaw = $schema['nullable'] ?? [];
         $nullableList = [];
         if (is_array($nullableRaw)) {
             foreach ($nullableRaw as $name) {
                 if (is_scalar($name) || $name === null) {
-                    // bool|int|float|string|null → ok för strval
                     $nullableList[] = strval($name);
                 } else {
-                    // Oväntad typ: serialisera eller använd tom sträng
                     $encoded = json_encode($name);
                     $nullableList[] = $encoded !== false ? $encoded : '';
                 }
@@ -371,16 +374,21 @@ final class Writer
             // Normalisera radernas nycklar till strängar
             $normalizedRow = [];
             foreach ($row as $rk => $rv) {
-                // arraynycklar i PHP är alltid int|string, så detta är säkert
                 $normalizedRow[(string) $rk] = $rv;
             }
             /** @var array<string,mixed> $row */
             $row = $normalizedRow;
 
             $skipRow = false;
-            foreach ($required as $reqKey) {
+
+                $requiredCount = count($required);
+            for ($i = 0; $i < $requiredCount; $i++) {
                 /** @var string $key */
-                $key = $reqKey;
+                $key = $required[$i];
+
+                if ($onRequiredChecked !== null) {
+                    $onRequiredChecked($key);
+                }
 
                 if (
                     !array_key_exists($key, $row)
@@ -431,7 +439,10 @@ final class Writer
 
                 switch ($t) {
                     case 'int':
-                        if (is_numeric($val) && (string) (int) $val == (string) $val) {
+                        if (is_int($val)) {
+                            break;
+                        }
+                        if (is_string($val) && self::isIntLikeString($val)) {
                             $row[$k] = (int) $val;
                             break;
                         }
@@ -479,10 +490,8 @@ final class Writer
                         if (is_string($val)) {
                             $row[$k] = $val;
                         } elseif (is_int($val) || is_float($val) || is_bool($val) || $val === null) {
-                            // scalar/null → ok att casta
                             $row[$k] = (string) $val;
                         } else {
-                            // Oväntad typ: serialisera till sträng
                             $encoded = json_encode($val);
                             $row[$k] = $encoded !== false ? $encoded : '';
                         }
@@ -593,5 +602,64 @@ final class Writer
         // Fallback: försök serialisera (för arrays/objekt utan __toString/etc)
         $encoded = json_encode($value);
         return $encoded !== false ? $encoded : '';
+    }
+
+    /**
+     * Bryt ut villkoret så att det går att enhetstesta och därmed döda mutationer.
+     *
+     * @param array<int,string> $headers
+     */
+    private static function shouldCollectHeaders(bool $isAssoc, array $headers): bool
+    {
+        return $isAssoc && $headers === [];
+    }
+
+    private static function isCsvScalarValue(mixed $v): bool
+    {
+        return is_bool($v) || is_int($v) || is_float($v) || is_string($v);
+    }
+
+    private static function normalizeBoolLike(mixed $value, string $fieldName): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            if ($value === 0) {
+                return false;
+            }
+            if ($value === 1) {
+                return true;
+            }
+            throw new RuntimeException("Schema-fältet '{$fieldName}' måste vara boolean-like (0/1/true/false)");
+        }
+
+        if (is_string($value)) {
+            $v = strtolower(trim($value));
+            if ($v === '0' || $v === 'false') {
+                return false;
+            }
+            if ($v === '1' || $v === 'true') {
+                return true;
+            }
+
+            // Viktigt: särskilj "ogiltig sträng" från "ogiltig typ" så Throw_-mutanten blir dödbar.
+            throw new RuntimeException("Schema-fältet '{$fieldName}' måste vara boolean-like (0/1/true/false), fick: '{$value}'");
+        }
+
+        throw new RuntimeException("Schema-fältet '{$fieldName}' måste vara boolean-like (0/1/true/false)");
+    }
+
+    private static function isIntLikeString(string $value): bool
+    {
+        // Tillåt ev. whitespace runt värdet (t.ex. från CSV) men inga decimaler/exp.
+        $value = trim($value);
+
+        if ($value === '') {
+            return false;
+        }
+
+        return preg_match('/\A[+-]?\d+\z/', $value) === 1;
     }
 }
