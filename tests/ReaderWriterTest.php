@@ -191,8 +191,7 @@ if (!function_exists('Radix\\File\\fclose')) {
     }');
 }
 
-final class
-ReaderWriterTest extends TestCase
+final class ReaderWriterTest extends TestCase
 {
     private string $tmpDir;
 
@@ -1622,7 +1621,7 @@ ReaderWriterTest extends TestCase
         $this->assertStringNotContainsString('\u003C', $raw, 'Om JSON_HEX_TAG råkar vara på skulle < bli \\u003C.');
     }
 
-     public function testCsvDelimiterAutodetectAccumulatesCountsAcrossLinesNotJustLastLine(): void
+    public function testCsvDelimiterAutodetectAccumulatesCountsAcrossLinesNotJustLastLine(): void
     {
         $path = $this->tmpDir . 'detect_delimiter_accumulate.csv';
 
@@ -2184,7 +2183,7 @@ ReaderWriterTest extends TestCase
         );
     }
 
-     public function testXmlParseDoesNotEmitLibxmlWarningsBecauseInternalErrorsAreEnabled(): void
+    public function testXmlParseDoesNotEmitLibxmlWarningsBecauseInternalErrorsAreEnabled(): void
     {
         $path = $this->tmpDir . 'broken.xml';
         file_put_contents($path, '<root><unclosed></root>');

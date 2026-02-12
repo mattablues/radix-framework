@@ -34,8 +34,11 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Check code style
+        run: composer format:check
+
       - name: Run PHPUnit
-        run: vendor/bin/phpunit
+        run: composer test
 
       - name: Run PHPStan
-        run: vendor/bin/phpstan analyse -c phpstan.neon.dist
+        run: composer stan

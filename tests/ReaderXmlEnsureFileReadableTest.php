@@ -6,6 +6,7 @@ namespace Radix\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Radix\File\Reader;
+use RuntimeException;
 
 final class ReaderXmlEnsureFileReadableTest extends TestCase
 {
@@ -18,7 +19,7 @@ final class ReaderXmlEnsureFileReadableTest extends TestCase
 
         $this->assertFileDoesNotExist($missing);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Filen finns inte: ' . $missing);
 
         Reader::xml($missing, assoc: true);

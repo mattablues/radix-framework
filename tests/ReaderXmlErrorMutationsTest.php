@@ -6,6 +6,7 @@ namespace Radix\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Radix\File\Reader;
+use RuntimeException;
 
 final class ReaderXmlErrorMutationsTest extends TestCase
 {
@@ -39,7 +40,7 @@ final class ReaderXmlErrorMutationsTest extends TestCase
         try {
             Reader::xml($path, assoc: true);
             $this->fail('Reader::xml ska kasta på trasigt XML.');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             $msg = $e->getMessage();
 
             // Dödar Concat + ConcatOperandRemoval: prefix måste ligga först och något mer måste finnas.
@@ -63,7 +64,7 @@ final class ReaderXmlErrorMutationsTest extends TestCase
         try {
             Reader::xml($p1, assoc: true);
             $this->fail('Första Reader::xml ska kasta.');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             $m1 = $e->getMessage();
         }
 
@@ -71,7 +72,7 @@ final class ReaderXmlErrorMutationsTest extends TestCase
         try {
             Reader::xml($p2, assoc: true);
             $this->fail('Andra Reader::xml ska kasta.');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             $m2 = $e->getMessage();
         }
 
