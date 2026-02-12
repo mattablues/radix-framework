@@ -39,6 +39,7 @@ storage/
 .php-cs-fixer.cache
 infection-report.html
 infection-report.txt
+infection-summary.json
 
 # Framework-repo: runtime/test-artifacts (ska inte committas)
 app/

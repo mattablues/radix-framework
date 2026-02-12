@@ -6,8 +6,7 @@
   },
   "tmpDir": "build/infection-tmp",
   "logs": {
-    "text": "php://stdout",
-    "html": "infection-report.html"
+    "text": "php://stdout"
   },
   "timeout": 25,
   "mutators": {
