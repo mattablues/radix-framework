@@ -52,22 +52,20 @@ Några viktiga `composer`‑kommandon från repo‑roten:
 ```bash
 Snabb testrunda (PHPUnit, utan coverage)
 composer test
-PHPUnit med enkel coverage‑output (text, Xdebug)
-composer test:cov
-Generera XML‑coverage till build/coverage (pcov) – används av Infection
-composer test:coverage
+
 Statisk analys (PHPStan)
 composer stan
-Mutationstester (Infection) mot build/coverage
+
+Mutationstester (Infection)
 composer infect
-# standard (APP_ENV=development)
+# pcov-scenario
 composer infect:pcov
-# explicit pcov-scenario
+# Xdebug-scenario
 composer infect:xdebug
-# explicit Xdebug-scenario
+
 Kodstil (PHP-CS-Fixer)
 composer format
-# auto‑fixar kodstil
+# auto-fixar kodstil
 composer format:check
 # bara kontroll (failar om något behöver fixas)
 ```
@@ -77,11 +75,9 @@ Kortfattad översikt av scripts (ur `composer.json`):
 "scripts": {
   "stan": "phpstan analyse -c phpstan.neon.dist",
   "test": "php -d xdebug.mode=off vendor/bin/phpunit",
-  "test:cov": "php -d xdebug.mode=coverage vendor/bin/phpunit --coverage-text",
-  "test:coverage": "php -d pcov.enabled=1 -d pcov.directory=src vendor/bin/phpunit -c phpunit.xml --order-by=default --do-not-cache-result --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml",
-  "infect:pcov": "APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist --threads=1 --skip-initial-tests --coverage=build/coverage --log-verbosity=all --no-interaction --no-progress",
-  "infect:xdebug": "XDEBUG_MODE=coverage APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist --threads=1 --skip-initial-tests --coverage=build/coverage --log-verbosity=all --no-interaction --no-progress",
-  "infect": "APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist --threads=1 --skip-initial-tests --coverage=build/coverage --log-verbosity=all --no-interaction --no-progress",
+  "infect": "php tools/infection.php",
+  "infect:pcov": "php tools/infection.php pcov",
+  "infect:xdebug": "php tools/infection.php xdebug",
   "format": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix",
   "format:check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix --dry-run --diff"
 }
