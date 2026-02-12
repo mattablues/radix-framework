@@ -485,26 +485,26 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Convert `{% directive %}` to PHP code.
      */
-        private function replacePHPDirectives(?string $code): string
-        {
-            $code = (string) $code;
+    private function replacePHPDirectives(?string $code): string
+    {
+        $code = (string) $code;
 
-            return preg_replace_callback(
-                "#{%\s*(?<directive>.+?)\s*%}#s",
-                function (array $m): string {
-                    $directive = trim((string) $m['directive']);
+        return preg_replace_callback(
+            "#{%\s*(?<directive>.+?)\s*%}#s",
+            function (array $m): string {
+                $directive = trim((string) $m['directive']);
 
-                    // Template-direktiv som absolut INTE får bli PHP (annars kan eval() dö med fatal, t.ex. "yield")
-                    if (preg_match('/\A(yield|endyield|block|endblock|extends|include)\b/', $directive) === 1) {
-                        return '';
-                    }
+                // Template-direktiv som absolut INTE får bli PHP (annars kan eval() dö med fatal, t.ex. "yield")
+                if (preg_match('/\A(yield|endyield|block|endblock|extends|include)\b/', $directive) === 1) {
+                    return '';
+                }
 
-                    // Allt annat behandlas som PHP (t.ex. if/foreach/endif etc.)
-                    return "<?php {$directive} ?>";
-                },
-                $code
-            ) ?? $code;
-        }
+                // Allt annat behandlas som PHP (t.ex. if/foreach/endif etc.)
+                return "<?php {$directive} ?>";
+            },
+            $code
+        ) ?? $code;
+    }
 
     /**
      * Bearbeta och escapa variabelbaserade placeholders.

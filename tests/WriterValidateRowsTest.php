@@ -6,6 +6,7 @@ namespace Radix\Tests\File;
 
 use PHPUnit\Framework\TestCase;
 use Radix\File\Writer;
+use ReflectionMethod;
 use RuntimeException;
 
 final class WriterValidateRowsTest extends TestCase
@@ -171,7 +172,7 @@ final class WriterValidateRowsTest extends TestCase
 
     public function testCastMixedToStringCastsIntFloatAndBool(): void
     {
-        $rm = new \ReflectionMethod(Writer::class, 'castMixedToString');
+        $rm = new ReflectionMethod(Writer::class, 'castMixedToString');
         $rm->setAccessible(true);
 
         self::assertSame('123', $rm->invoke(null, 123));
@@ -226,7 +227,7 @@ final class WriterValidateRowsTest extends TestCase
 
     public function testCastMixedToStringCastsInfFloatSoItDoesNotBecomeEmptyString(): void
     {
-        $rm = new \ReflectionMethod(Writer::class, 'castMixedToString');
+        $rm = new ReflectionMethod(Writer::class, 'castMixedToString');
         $rm->setAccessible(true);
 
         // KRITISKT:
@@ -238,7 +239,7 @@ final class WriterValidateRowsTest extends TestCase
 
     public function testCastMixedToStringSerializesArraysToJsonNotLiteralArrayString(): void
     {
-        $rm = new \ReflectionMethod(Writer::class, 'castMixedToString');
+        $rm = new ReflectionMethod(Writer::class, 'castMixedToString');
         $rm->setAccessible(true);
 
         // Korrekt: arrays ska gå via json_encode => '{"x":1}'
@@ -292,7 +293,7 @@ final class WriterValidateRowsTest extends TestCase
 
     public function testCastMixedToStringUsesMagicToStringForStringableObjects(): void
     {
-        $rm = new \ReflectionMethod(Writer::class, 'castMixedToString');
+        $rm = new ReflectionMethod(Writer::class, 'castMixedToString');
         $rm->setAccessible(true);
 
         $obj = new class {
@@ -315,7 +316,7 @@ final class WriterValidateRowsTest extends TestCase
         ]);
     }
 
-   public function testIntTypeAcceptsWhitespaceAroundIntLikeString(): void
+    public function testIntTypeAcceptsWhitespaceAroundIntLikeString(): void
     {
         $schema = [
             'required' => ['id'],

@@ -54,8 +54,7 @@ final class MarkableObject
     public bool $marked = false;
 }
 
-class
-RadixTemplateViewerTest extends TestCase
+class RadixTemplateViewerTest extends TestCase
 {
     private RadixTemplateViewer $viewer;
     private string $tempRootPath;
@@ -3049,7 +3048,7 @@ RadixTemplateViewerTest extends TestCase
 
             $viewer = new \Radix\Viewer\RadixTemplateViewer($this->tempViewsPath);
 
-            $reflection = new \ReflectionClass($viewer);
+            $reflection = new ReflectionClass($viewer);
             $cachePathProperty = $reflection->getProperty('cachePath');
             $cachePathProperty->setAccessible(true);
 
@@ -3095,7 +3094,7 @@ RadixTemplateViewerTest extends TestCase
         $viewer = new \Radix\Viewer\RadixTemplateViewer($this->tempViewsPath);
         $viewer->enableDebugMode(true);
 
-        $reflection = new \ReflectionClass($viewer);
+        $reflection = new ReflectionClass($viewer);
         $loggerProp = $reflection->getProperty('logger');
         $loggerProp->setAccessible(true);
 
@@ -3128,7 +3127,7 @@ RadixTemplateViewerTest extends TestCase
         );
     }
 
-   public function testComputeInitialCachePathForRelativeEnvEndsWithDirectorySeparator(): void
+    public function testComputeInitialCachePathForRelativeEnvEndsWithDirectorySeparator(): void
     {
         $spy = new class ($this->tempViewsPath) extends \Radix\Viewer\RadixTemplateViewer {
             public function exposeComputeInitialCachePath(string $root, string $envCachePath): string
@@ -3244,7 +3243,7 @@ RadixTemplateViewerTest extends TestCase
 
             $tTooDeep = $makeChain(51);
 
-            $this->expectException(\RuntimeException::class);
+            $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('Max extends depth (50) exceeded while processing templates.');
 
             $viewer->render($tTooDeep);
@@ -3295,7 +3294,7 @@ RadixTemplateViewerTest extends TestCase
             // 201 extends-steg ska kasta
             $t201 = $makeIterChain(201);
 
-            $this->expectException(\RuntimeException::class);
+            $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('Max iterations (200) exceeded while processing extends.');
 
             $viewer->render($t201);
@@ -3315,21 +3314,21 @@ RadixTemplateViewerTest extends TestCase
         file_put_contents(
             $layoutPath,
             <<<'RATIO'
-{% extends "./layout.ratio.php" %}
-{% yield content %}{% endyield content %}
-RATIO
+                {% extends "./layout.ratio.php" %}
+                {% yield content %}{% endyield content %}
+                RATIO
         );
 
         $childPath = "{$this->tempViewsPath}child_cycle_test.ratio.php";
         file_put_contents(
             $childPath,
             <<<'RATIO'
-{% extends "layout.ratio.php" %}
-{% block content %}OK{% endblock %}
-RATIO
+                {% extends "layout.ratio.php" %}
+                {% block content %}OK{% endblock %}
+                RATIO
         );
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Extends cycle detected');
 
         $this->viewer->render('child_cycle_test');

@@ -33,9 +33,12 @@
     "stan": "phpstan analyse -c phpstan.neon.dist",
     "test": "php -d xdebug.mode=off vendor/bin/phpunit",
     "test:cov": "php -d xdebug.mode=coverage vendor/bin/phpunit --coverage-text",
-    "format": "php-cs-fixer fix",
-    "format:check": "php-cs-fixer fix --dry-run --diff",
-    "infect": "php -d xdebug.mode=coverage vendor/bin/infection --configuration=infection.json.dist --threads=4 --min-msi=90 --min-covered-msi=95"
+    "test:coverage": "php -d pcov.enabled=1 -d pcov.directory=src vendor/bin/phpunit -c phpunit.xml --order-by=default --do-not-cache-result --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml",
+    "infect:pcov": "APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist --threads=1 --skip-initial-tests --coverage=build/coverage --log-verbosity=all --no-interaction --no-progress",
+    "infect:xdebug": "XDEBUG_MODE=coverage APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist --threads=1 --skip-initial-tests --coverage=build/coverage --log-verbosity=all --no-interaction --no-progress",
+    "infect": "APP_ENV=development php vendor/bin/infection --configuration=infection.json.dist --threads=1 --skip-initial-tests --coverage=build/coverage --log-verbosity=all --no-interaction --no-progress",
+    "format": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix",
+    "format:check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix --dry-run --diff"
   },
   "config": {
     "allow-plugins": {

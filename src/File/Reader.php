@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Radix\File;
 
+use function defined;
+
 use RuntimeException;
 use SimpleXMLElement;
 use SplFileObject;
@@ -94,7 +96,7 @@ final class Reader
         libxml_use_internal_errors(true);
 
         $options = LIBXML_NOCDATA;
-        if (\defined('LIBXML_PARSEHUGE')) {
+        if (defined('LIBXML_PARSEHUGE')) {
             $options |= LIBXML_PARSEHUGE;
         }
 

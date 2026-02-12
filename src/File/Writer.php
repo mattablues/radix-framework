@@ -381,7 +381,7 @@ final class Writer
 
             $skipRow = false;
 
-                $requiredCount = count($required);
+            $requiredCount = count($required);
             for ($i = 0; $i < $requiredCount; $i++) {
                 /** @var string $key */
                 $key = $required[$i];
