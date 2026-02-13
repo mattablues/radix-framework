@@ -63,11 +63,15 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         // 1. Ladda mallkoden först för att kunna extrahera block direkt
         $templatePath = $this->resolveTemplatePath($template);
-        $filePath = $this->viewsDirectory . $templatePath;
+
+        $filePathRaw = $this->viewsDirectory . $templatePath;
+        $filePath = preg_replace('~[\\\\/]~', DIRECTORY_SEPARATOR, $filePathRaw) ?? $filePathRaw;
+
         if (!file_exists($filePath)) {
             throw new RuntimeException("Template file not found: $filePath");
         }
         $rawCode = $this->loadTemplate($filePath);
+
 
         // 2. Extrahera block (pageId, pageClass etc.) och lägg till i data-arrayen
         // Detta görs INNAN vi kollar cachen så att variablerna alltid finns tillgängliga.
@@ -206,8 +210,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Load a template file, enforcing it exists.
      */
+    /**
+     * Load a template file, enforcing it exists.
+     */
     private function loadTemplate(string $filePath): string
     {
+        $filePath = preg_replace('~[\\\\/]~', DIRECTORY_SEPARATOR, $filePath) ?? $filePath;
+
         if (!file_exists($filePath)) {
             // Debug-log för sökvägar
             throw new RuntimeException("Template file not found: $filePath. Check if the directory and file exist.");
@@ -322,15 +331,11 @@ class RadixTemplateViewer implements TemplateViewerInterface
 
         foreach ($matches as $match) {
             $key = $match[1];
-            $value = preg_replace_callback(
-                "#{{\s*(.+?)\s*}}#",
-                static function (array $matches): string {
-                    return '<?php echo ' . $matches[1] . '; ?>';
-                },
-                $match[2]
-            );
 
-            $attributes[$key] = trim((string) $value);
+            // Viktigt:
+            // Låt "{{ ... }}" ligga kvar här så att renderComponent() kan köra replaceVariableOutput()
+            // och därmed få konsekvent auto-escaping via secure_output().
+            $attributes[$key] = trim((string) $match[2]);
         }
 
         return $attributes;
@@ -341,8 +346,9 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $this->debug("Original kod före placeholder-bearbetning:\n" . htmlspecialchars($code));
 
         // 1. Hantera komponentinstanser (<x-komponent>) - nu med stöd för självstängande taggar
+        // Viktigt: attributdelen måste tåla '>' inuti citerade attributvärden (t.ex. title="<b>..</b>")
         $code = preg_replace_callback(
-            '#<x-([\w\.\-]+)([^>]*?)(?:/>|>(.*?)<\/x-\1>)#s',
+            '#<x-([\w\.\-]+)((?:\s+(?:[^>"\']+|"[^"]*"|\'[^\']*\')*)?)\s*(?:/>|>(.*?)<\/x-\1>)#s',
             function (array $matches) {
                 $componentName = str_replace('.', '/', $matches[1]);
                 $attributes = $this->parseAttributes(trim($matches[2]));
@@ -355,11 +361,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
         ) ?? $code;
 
         // 2. Specifik hantering av globala variabler (t.ex., {{ $globalVar }})
-        // Undvik callback + strängkonkatenering här: Infection-mutanter kan annars skapa trasig PHP (parse errors).
-        // $$ i replacement => literal '$', följt av $1 (capture group) => t.ex. "$globalVar".
+        // Behåll special-caset, men gå via secure_output så att globals auto-escapas som allt annat.
         $code = preg_replace(
             "#{{\s*\\$(global\\w+)\s*}}#",
-            '<?php echo $$1; ?>',
+            '<?php echo secure_output((string) $$1); ?>',
             (string) $code
         ) ?? $code;
 
@@ -515,6 +520,8 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $code = preg_replace_callback(
             "#{{\s*slot\s*}}#",
             function (): string {
+                // OBS: {{ slot }} används i tester som “renderad slot” (kan innehålla HTML från nästlade komponenter)
+                // och ska därför inte auto-escapas här.
                 return '<?php echo trim($slot); ?>';
             },
             $code
@@ -526,8 +533,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
             function (array $matches): string {
                 $expr = trim((string) $matches[1]);
 
-                // Säkerhetsbälte: om mutanter (eller annat) stoppar in hela token "{{ ... }}"
-                // så skulle det skapa ogiltig PHP i eval(). Då fallbackar vi till null.
                 if ($expr === '' || str_contains($expr, '{{') || str_contains($expr, '}}')) {
                     $expr = 'null';
                 }
@@ -544,7 +549,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
             function (array $matches): string {
                 $expr = trim((string) $matches[1]);
 
-                // Samma säkerhetsbälte här
                 if ($expr === '' || str_contains($expr, '{{') || str_contains($expr, '}}')) {
                     $expr = 'null';
                 }

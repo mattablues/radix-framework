@@ -151,6 +151,106 @@ class RadixTemplateViewerTest extends TestCase
         }
     }
 
+    public function testLoadTemplateNormalizesSlashesBeforeFileExistsCheck(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+        $ref = new ReflectionClass($viewer);
+        $m = $ref->getMethod('loadTemplate');
+        $m->setAccessible(true);
+
+        // Medvetet: filen finns inte, och vi använder "\" för att tvinga normalisering även på Linux.
+        $rawPath = 'this\\does\\not\\exist\\template.ratio.php';
+
+        try {
+            $m->invoke($viewer, $rawPath);
+            $this->fail('loadTemplate() borde kasta RuntimeException för saknad fil.');
+        } catch (RuntimeException $e) {
+            $msg = $e->getMessage();
+
+            $this->assertStringContainsString('Template file not found:', $msg);
+
+            if (DIRECTORY_SEPARATOR === '\\') {
+                // Windows: "/" ska inte finnas efter normalisering
+                $this->assertStringNotContainsString('/', $msg);
+            } else {
+                // Linux/macOS: "\" ska inte finnas efter normalisering
+                $this->assertStringNotContainsString('\\', $msg);
+            }
+        }
+    }
+
+    public function testRenderNormalizesTemplatePathBeforeFileExistsCheck(): void
+    {
+        // Tvinga in "\" i filePathRaw även på Linux genom att ge en viewsDirectory som slutar med "\".
+        $viewer = new RadixTemplateViewer($this->tempViewsPath . '\\');
+
+        $templateLogicalName = 'definitely_missing_template_name';
+
+        $expectedRaw = ($this->tempViewsPath . '\\') . $templateLogicalName . '.ratio.php';
+        $expectedNormalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $expectedRaw);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Template file not found: ' . $expectedNormalized);
+
+        $viewer->render($templateLogicalName);
+    }
+
+    public function testComputeInitialCachePathTrimsLeadingSlashForRelativeEnvPath(): void
+    {
+        $spy = new class ($this->tempViewsPath) extends \Radix\Viewer\RadixTemplateViewer {
+            public function exposeComputeInitialCachePath(string $root, string $envCachePath): string
+            {
+                return $this->computeInitialCachePath($root, $envCachePath);
+            }
+        };
+
+        $root = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'radix_root_test' . DIRECTORY_SEPARATOR;
+
+        // Välj en ledande "slash" som INTE gör pathen absolut på aktuellt OS,
+        // men som ltrim('/\\') måste ta bort i relativa grenen.
+        $envCachePath = DIRECTORY_SEPARATOR === '\\'
+            ? '/custom/views-cache'      // Windows: "/" är inte absolut i vår logik
+            : '\\custom/views-cache';    // Linux/macOS: "\" är inte absolut i vår logik
+
+        $raw = $spy->exposeComputeInitialCachePath($root, $envCachePath);
+        $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $raw);
+        $normalized = rtrim($normalized, '/\\') . DIRECTORY_SEPARATOR;
+
+        // Dödar UnwrapLtrim-mutanten: utan ltrim blir det ett extra tomt segment före "custom"
+        $this->assertStringNotContainsString(
+            DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR . 'custom' . DIRECTORY_SEPARATOR,
+            $normalized,
+            'Leading slash/backslash i relativ VIEWS_CACHE_PATH måste trimmas bort för att undvika tomt path-segment.'
+        );
+
+        $this->assertStringEndsWith(
+            'custom' . DIRECTORY_SEPARATOR . 'views-cache' . DIRECTORY_SEPARATOR,
+            $normalized,
+            'computeInitialCachePath() ska producera .../custom/views-cache/ även om env börjar med "/" eller "\\".'
+        );
+    }
+
+    public function testComponentPropValuesAreAutoEscapedWhenRenderedViaMustache(): void
+    {
+        $componentPath = "{$this->tempViewsPath}components/prop_escape.ratio.php";
+        $this->createDirectoryIfNotExists(dirname($componentPath));
+        file_put_contents(
+            $componentPath,
+            '<h1>{{ $title }}</h1>'
+        );
+
+        $templatePath = "{$this->tempViewsPath}prop_escape_host.ratio.php";
+        file_put_contents(
+            $templatePath,
+            '<x-prop_escape title="<b>NOPE</b>"></x-prop_escape>'
+        );
+
+        $out = $this->viewer->render('prop_escape_host');
+
+        $this->assertSame('<h1>&lt;b&gt;NOPE&lt;/b&gt;</h1>', trim($out));
+    }
+
     public function testViewsCachePathEnvVarRelativeIsAppliedInsteadOfDefault(): void
     {
         $original = getenv('VIEWS_CACHE_PATH');
