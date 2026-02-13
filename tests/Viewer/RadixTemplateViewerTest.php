@@ -159,10 +159,8 @@ class RadixTemplateViewerTest extends TestCase
         $m = $ref->getMethod('loadTemplate');
         $m->setAccessible(true);
 
-        // Medvetet: en path som INTE finns, och som innehåller "/" oavsett OS.
-        // På Windows ska loadTemplate() normalisera "/" -> "\" innan file_exists()
-        // och exception-meddelandet ska därför inte innehålla "/".
-        $rawPath = 'this/does/not/exist/template.ratio.php';
+        // Medvetet: filen finns inte, och vi använder "\" för att tvinga normalisering även på Linux.
+        $rawPath = 'this\\does\\not\\exist\\template.ratio.php';
 
         try {
             $m->invoke($viewer, $rawPath);
@@ -173,21 +171,29 @@ class RadixTemplateViewerTest extends TestCase
             $this->assertStringContainsString('Template file not found:', $msg);
 
             if (DIRECTORY_SEPARATOR === '\\') {
-                // Dödar ArrayItemRemoval (tar bort '/') och UnwrapStrReplace (tar bort normalisering helt)
-                $this->assertStringNotContainsString(
-                    '/',
-                    $msg,
-                    'På Windows ska "/" normaliseras bort i loadTemplate() innan file_exists()-kollen.'
-                );
+                // Windows: "/" ska inte finnas efter normalisering
+                $this->assertStringNotContainsString('/', $msg);
             } else {
-                // På Unix: "\" ska inte förekomma som path-separator efter normalisering
-                $this->assertStringNotContainsString(
-                    '\\',
-                    $msg,
-                    'På Unix ska "\\" normaliseras bort i loadTemplate() innan file_exists()-kollen.'
-                );
+                // Linux/macOS: "\" ska inte finnas efter normalisering
+                $this->assertStringNotContainsString('\\', $msg);
             }
         }
+    }
+
+    public function testRenderNormalizesTemplatePathBeforeFileExistsCheck(): void
+    {
+        // Tvinga in "\" i filePathRaw även på Linux genom att ge en viewsDirectory som slutar med "\".
+        $viewer = new RadixTemplateViewer($this->tempViewsPath . '\\');
+
+        $templateLogicalName = 'definitely_missing_template_name';
+
+        $expectedRaw = ($this->tempViewsPath . '\\') . $templateLogicalName . '.ratio.php';
+        $expectedNormalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $expectedRaw);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Template file not found: ' . $expectedNormalized);
+
+        $viewer->render($templateLogicalName);
     }
 
     public function testComputeInitialCachePathTrimsLeadingSlashForRelativeEnvPath(): void

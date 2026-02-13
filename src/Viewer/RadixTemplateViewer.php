@@ -65,7 +65,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
         $templatePath = $this->resolveTemplatePath($template);
 
         $filePathRaw = $this->viewsDirectory . $templatePath;
-        $filePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePathRaw);
+        $filePath = preg_replace('~[\\\\/]~', DIRECTORY_SEPARATOR, $filePathRaw) ?? $filePathRaw;
 
         if (!file_exists($filePath)) {
             throw new RuntimeException("Template file not found: $filePath");
@@ -210,9 +210,12 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * Load a template file, enforcing it exists.
      */
+    /**
+     * Load a template file, enforcing it exists.
+     */
     private function loadTemplate(string $filePath): string
     {
-        $filePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath);
+        $filePath = preg_replace('~[\\\\/]~', DIRECTORY_SEPARATOR, $filePath) ?? $filePath;
 
         if (!file_exists($filePath)) {
             // Debug-log för sökvägar
