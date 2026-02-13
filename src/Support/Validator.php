@@ -16,6 +16,13 @@ class Validator
     protected array $rules;
     /** @var array<string,array<int,string>> */
     protected array $errors = [];
+    /**
+     * Appen kan override:a field translations här (t.ex. från radix-app).
+     *
+     * @var array<string,string>|null
+     */
+    private static ?array $fieldTranslationsOverride = null;
+
     /** @var array<string,string> */
     protected array $fieldTranslations = [
         'name' => 'namn',
@@ -28,10 +35,6 @@ class Validator
         'honeypot' => 'honeypot',
         'category' => 'kategori',
         'description' => 'beskrivning',
-        'id' => 'bana',
-        'course' => 'bana',
-        'profit' => 'vinst',
-        'amount_per_share' => 'kostnad per andel',
         'current_password' => 'nuvarande lösenord',
     ];
 
@@ -43,6 +46,33 @@ class Validator
     {
         $this->data = $data;
         $this->rules = $rules;
+
+        if (self::$fieldTranslationsOverride !== null) {
+            $this->fieldTranslations = array_replace(
+                $this->fieldTranslations,
+                self::$fieldTranslationsOverride
+            );
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $config
+     */
+    public static function setFieldTranslationsConfig(array $config): void
+    {
+        $out = [];
+        foreach ($config as $k => $v) {
+            if (is_string($k) && is_string($v)) {
+                $out[$k] = $v;
+            }
+        }
+
+        self::$fieldTranslationsOverride = $out;
+    }
+
+    public static function resetFieldTranslationsConfig(): void
+    {
+        self::$fieldTranslationsOverride = null;
     }
 
     /**
