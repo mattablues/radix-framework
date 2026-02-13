@@ -40,6 +40,52 @@ $data = Reader::json(__DIR__ . '/data.json', assoc: true);
 var_dump($data);
 // ['id' => 1, 'name' => 'Alice']
 ```
+## Funktioner i Radix Framework (översikt)
+
+Det här är en snabb översikt – för en komplett, fungerande app, se
+[`mattablues/radix-app`](https://github.com/mattablues/radix-app).
+
+Radix Framework innehåller bland annat:
+
+- **Routing & HTTP**
+  - Flexibel router (`Radix\Routing`) med middleware‑stöd (`Radix\Middleware`)
+  - HTTP‑request/response‑abstraktion (`Radix\Http`)
+
+- **Controller‑lager**
+  - Bascontrollers för web och API (`Radix\Controller\AbstractController`, `AbstractApiController`)
+
+- **Console & CLI**
+  - Konsolapplikation (`Radix\Console\ConsoleApplication`)
+  - Kommandoregister (`CommandsRegistry`)
+  - Inbyggda kommandon för bl.a. migrationer och generatorer (`Radix\Console\Commands\...`)
+
+- **Databas, ORM & migrationer**
+  - Databasanslutningar och manager (`Radix\Database\Connection`, `DatabaseManager`)
+  - Query builder (`Radix\Database\QueryBuilder`)
+  - Enkel ORM‑modellering (`Radix\Database\ORM`)
+  - Migrationer + CLI‑stöd för att skapa och köra migrationer (`Radix\Database\Migration`)
+
+- **Container & Service Providers**
+  - Dependency Injection‑container (`Radix\Container\Container`, `ApplicationContainer`)
+  - Definitioner, parametrar och referenser (`Definition`, `Parameter`, `Reference`, `Resolver`)
+  - Service providers för att registrera tjänster (`Radix\ServiceProvider`)
+
+- **View‑motor**
+  - Template‑engine med ratio‑templates, extends/yield, komponenter och slots (`Radix\Viewer\RadixTemplateViewer`)
+  - Cache‑hantering för vyer och enkla filter
+
+- **Session & autentiseringsstöd**
+  - Anpassningsbar sessionshanterare (`Radix\Session\RadixSessionHandler`) med fil- eller databaserad lagring
+
+- **Fil, dataformat & utilities**
+  - Fil‑ och data‑hjälpare (`Radix\File`), t.ex. CSV/NDJSON/XML/JSON‑läsning och skrivning
+  - Datum/tid‑hjälpare (`Radix\DateTime`)
+  - Stödklasser (`Radix\Support`), collections (`Radix\Collection`), enums (`Radix\Enums`)
+
+- **Övrigt**
+  - Event dispatcher (`Radix\EventDispatcher`)
+  - Mailer‑stöd (`Radix\Mailer`)
+  - Felhantering och fel‑svar (`Radix\Error`)
 
 Ett typiskt flöde i en applikation som använder Radix kan vara:
 
