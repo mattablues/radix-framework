@@ -229,12 +229,130 @@ final class FakeUniqueModel extends \Radix\Database\ORM\Model
 
 class ValidatorTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Validator::resetFieldTranslationsConfig();
+        parent::tearDown();
+    }
+
     public function testStringRulePasses(): void
     {
         $data = ['name' => 'John'];
         $rules = ['name' => 'string'];
         $validator = new Validator($data, $rules);
         $this->assertTrue($validator->validate());
+    }
+
+    public function testFieldTranslationsCanBeOverriddenFromAppConfig(): void
+    {
+        Validator::setFieldTranslationsConfig([
+            'email' => 'mejl',
+            'new_field' => 'nytt fält',
+        ]);
+
+        $data = [];
+        $rules = [
+            'email' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+        $this->assertSame(
+            ['Fältet mejl är obligatoriskt.'],
+            $errors['email'] ?? null
+        );
+    }
+
+    public function testFieldTranslationsOverrideDoesNotRemoveDefaults(): void
+    {
+        // Override bara ett fält. Default-översättningar ska fortfarande fungera.
+        Validator::setFieldTranslationsConfig([
+            'email' => 'mejl',
+        ]);
+
+        $data = [];
+        $rules = [
+            'name' => 'required',
+            'email' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        $this->assertSame(
+            ['Fältet namn är obligatoriskt.'],
+            $errors['name'] ?? null,
+            'Default-translation för "name" ska finnas kvar även när override är satt.'
+        );
+
+        $this->assertSame(
+            ['Fältet mejl är obligatoriskt.'],
+            $errors['email'] ?? null,
+            'Override ska användas för "email".'
+        );
+    }
+
+    public function testSetFieldTranslationsConfigIgnoresNonStringKeysOrValues(): void
+    {
+        /** @var array<string,mixed> $config */
+        $config = [];
+        $config['email'] = 123;      // ska ignoreras (value är inte string)
+        $config['name'] = 'namn';    // giltig (spelar ingen roll i just detta test)
+        $config['email_ok'] = 'mejl'; // giltig key->value, men inte den vi validerar på
+
+        Validator::setFieldTranslationsConfig($config);
+
+        $data = [];
+        $rules = [
+            'email' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        // Om icke-strängvärde för 'email' INTE ignoreras, blir fältnamnet "123" i meddelandet.
+        // Rätt beteende: fallback till default "e-post".
+        $this->assertSame(
+            ['Fältet e-post är obligatoriskt.'],
+            $errors['email'] ?? null,
+            'Icke-strängvärden ska inte påverka field translations.'
+        );
+    }
+
+    public function testSetFieldTranslationsConfigIgnoresNonStringValuesEvenWhenKeyIsString(): void
+    {
+        /** @var array<string,mixed> $config */
+        $config = [];
+        $config['email'] = 123;       // icke-strängvärde => ska ignoreras av setFieldTranslationsConfig()
+        $config['name'] = 'namn-app'; // giltig override
+
+        Validator::setFieldTranslationsConfig($config);
+
+        $data = [];
+        $rules = [
+            'email' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        // Om mutanten (||) lever så skulle 'email' => 123 användas och då blir fältnamnet "123".
+        // Original (&&): ignorerar och använder default "e-post".
+        $this->assertSame(
+            ['Fältet e-post är obligatoriskt.'],
+            $errors['email'] ?? null
+        );
     }
 
     public function testHoneypotRuleUsesOverridableMethod(): void
