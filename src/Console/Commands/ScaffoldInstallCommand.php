@@ -108,18 +108,111 @@ final class ScaffoldInstallCommand extends BaseCommand
         $sourceFile = $sourceDir . '.stub';
 
         if (is_dir($sourceDir)) {
+            // Dependency-check (valfri): .requires.php i preset-katalogen
+            $projectRootReal = $this->requireProjectRootRealpath();
+            $this->ensureRequirementsInstalled($sourceDir, $normalizedPreset, $projectRootReal);
+
             // Katalog‑preset: kopiera allt rekursivt
             $this->installFromDirectory($sourceDir, $force, $dryRun);
+
+            // Markera installerat (även vid dry-run? jag rekommenderar nej)
+            if (!$dryRun) {
+                $this->writeInstalledMarker($normalizedPreset, $projectRootReal);
+            }
             return;
         }
 
         if (is_file($sourceFile)) {
             // Enstaka stub‑fil: kopiera denna
+            $projectRootReal = $this->requireProjectRootRealpath();
+            $this->ensureRequirementsInstalled(dirname($sourceFile), $normalizedPreset, $projectRootReal);
+
             $this->installSingleStubFile($sourceFile, $normalizedPreset, $force, $dryRun);
+
+            if (!$dryRun) {
+                $this->writeInstalledMarker($normalizedPreset, $projectRootReal);
+            }
             return;
         }
 
         throw new RuntimeException("Preset '{$preset}' kunde inte hittas under {$this->presetsRoot}.");
+    }
+
+
+    /**
+     * @return array<int,string>
+     */
+    private function readRequires(string $presetDir): array
+    {
+        $file = rtrim($presetDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.requires.php';
+
+        if (!is_file($file)) {
+            return [];
+        }
+
+        $requires = require $file;
+
+        if (!is_array($requires)) {
+            throw new RuntimeException(".requires.php måste returnera en array.");
+        }
+
+        $out = [];
+        foreach ($requires as $r) {
+            if (is_string($r) && $r !== '') {
+                $out[] = $r;
+            }
+        }
+
+        return $out;
+    }
+
+    private function ensureRequirementsInstalled(string $presetDir, string $normalizedPreset, string $projectRootReal): void
+    {
+        $requires = $this->readRequires($presetDir);
+        if ($requires === []) {
+            return;
+        }
+
+        foreach ($requires as $req) {
+            if (!$this->isPresetInstalled($req, $projectRootReal)) {
+                throw new RuntimeException(sprintf(
+                    "Preset '%s' kräver att '%s' är installerat först.",
+                    $normalizedPreset,
+                    $req
+                ));
+            }
+        }
+    }
+
+    private function isPresetInstalled(string $presetName, string $projectRootReal): bool
+    {
+        $marker = $projectRootReal
+            . DIRECTORY_SEPARATOR . '.radix'
+            . DIRECTORY_SEPARATOR . 'scaffolds'
+            . DIRECTORY_SEPARATOR . $presetName . '.installed';
+
+        return is_file($marker);
+    }
+
+    private function writeInstalledMarker(string $normalizedPreset, string $projectRootReal): void
+    {
+        // Normalisera: "routes/auth" => "routes-auth" som marker-namn
+        $name = str_replace(DIRECTORY_SEPARATOR, '-', $normalizedPreset);
+
+        $dir = $projectRootReal
+            . DIRECTORY_SEPARATOR . '.radix'
+            . DIRECTORY_SEPARATOR . 'scaffolds';
+
+        if (!is_dir($dir) && !mkdir($dir, 0o755, true) && !is_dir($dir)) {
+            throw new RuntimeException("Kunde inte skapa marker-katalog: {$dir}");
+        }
+
+        $marker = $dir . DIRECTORY_SEPARATOR . $name . '.installed';
+
+        // En markerfil räcker (innehållet spelar ingen roll)
+        if (!is_file($marker)) {
+            file_put_contents($marker, 'installed');
+        }
     }
 
     private function installFromDirectory(string $sourceDir, bool $force, bool $dryRun): void
