@@ -42,3 +42,11 @@ jobs:
 
       - name: Run PHPStan
         run: composer stan
+
+  testExpected:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark expected check as passed
+        run: |
+          echo "Satisfy required status check: CI / testExpected"
