@@ -44,9 +44,10 @@ jobs:
         run: composer stan
 
   testExpected:
+    name: "test Expected"
     needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Mark expected check as passed
         run: |
-          echo "Satisfy required status check: CI / testExpected"
+          echo "Satisfy required status check"

@@ -10,7 +10,6 @@ I en konsumerande applikation:
 ```bash
 composer require mattablues/radix-framework
 ```
-
 Ramverket kräver:
 
 - PHP **8.3** eller senare inom 8.x‑serien
