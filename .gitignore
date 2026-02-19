@@ -47,7 +47,6 @@ public/
 views/
 cacheapp/
 
-
 # Om verktyg/tester skapar .1, .2, ... i repo-roten
 .[0-9]*
 
