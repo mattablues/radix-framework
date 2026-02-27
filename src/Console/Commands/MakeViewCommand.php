@@ -34,10 +34,10 @@ class MakeViewCommand extends BaseCommand
      */
     public function __invoke(array $args): void
     {
-        $usage = 'make:view <path> [--layout=main|sidebar|admin|auth] [--ext=ratio.php]';
+        $usage = 'make:view <path> [--layout=main|sidebar|app|auth] [--ext=ratio.php]';
         $options = [
             '<path>' => "View path, e.g. 'about/index' or 'docs/guide/intro'.",
-            '--layout=main|sidebar|admin|auth' => 'Choose layout (default: main).',
+            '--layout=main|sidebar|app|auth' => 'Choose layout (default: main).',
             '--ext=ratio.php' => 'File extension (default: ratio.php).',
             '--help, -h' => 'Display this help message.',
             '--md, --markdown' => 'Output help as Markdown.',
@@ -45,7 +45,7 @@ class MakeViewCommand extends BaseCommand
         $examples = [
             'make:view about/index --layout=main',
             'make:view auth/login --layout=auth',
-            'make:view admin/dashboard --layout=admin',
+            'make:view admin/dashboard --layout=app',
             'make:view docs/guide/intro --layout=sidebar --ext=ratio.php',
         ];
 
@@ -81,8 +81,8 @@ class MakeViewCommand extends BaseCommand
         $layout  = $options['layout'] ?? 'main';
         $ext     = $options['ext'] ?? 'ratio.php';
 
-        if (!in_array($layout, ['main', 'sidebar', 'admin', 'auth'], true)) {
-            $this->coloredOutput("Error: Invalid --layout. Allowed: main, sidebar, admin, auth.", "red");
+        if (!in_array($layout, ['main', 'sidebar', 'app', 'auth'], true)) {
+            $this->coloredOutput("Error: Invalid --layout. Allowed: main, sidebar, app, auth.", "red");
             return;
         }
 
