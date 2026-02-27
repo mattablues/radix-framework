@@ -35,8 +35,8 @@
     "infect": "php tools/infection.php",
     "infect:pcov": "php tools/infection.php pcov",
     "infect:xdebug": "php tools/infection.php xdebug",
-    "format": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix",
-    "format:check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix --dry-run --diff"
+    "format": "@php tools/php-cs-fixer.php",
+    "format:check": "@php tools/php-cs-fixer.php --dry-run --diff"
   },
   "config": {
     "allow-plugins": {

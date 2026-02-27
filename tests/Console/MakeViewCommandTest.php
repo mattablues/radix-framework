@@ -281,7 +281,7 @@ final class MakeViewCommandTest extends TestCase
             /** @var array<int|string,string> $args */
             $args = [
                 0 => 'admin/dashboard',
-                1 => '--layout=admin',
+                1 => '--layout=app',
                 2 => '--ext=php',
             ];
             $cmd->__invoke($args);
@@ -296,7 +296,7 @@ final class MakeViewCommandTest extends TestCase
         $lines = $this->readCreatedFileLines($expectedFile);
 
         // Stubformat: [LAYOUT]\n[TITLE]\n[PAGEID]\n
-        self::assertSame('admin', $lines[0] ?? null, 'Layout ska komma från --layout=admin (inte alltid main).');
+        self::assertSame('app', $lines[0] ?? null, 'Layout ska komma från --layout=app (inte alltid main).');
         self::assertSame('Dashboard', $lines[1] ?? null);
         self::assertSame('admin-dashboard', $lines[2] ?? null);
     }

@@ -15,7 +15,7 @@ $finder = Finder::create()
     ->ignoreDotFiles(true)
     ->ignoreVCS(true);
 
-return (new Config())
+$config = (new Config())
     ->setRiskyAllowed(true)
     ->setRules([
         // Modern standard (efterföljare till PSR-12)
@@ -35,3 +35,7 @@ return (new Config())
         ],
     ])
     ->setFinder($finder);
+
+$config->setUnsupportedPhpVersionAllowed(true);
+
+return $config;

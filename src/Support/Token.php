@@ -35,9 +35,4 @@ class Token
 
         return $hashHmac;
     }
-
-    public static function hashCrc32(int|string $identifier): string
-    {
-        return hash('crc32', microtime(true) . mt_rand() . $identifier);
-    }
 }
