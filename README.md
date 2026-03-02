@@ -1,7 +1,35 @@
+# README.md
+
 # Radix Framework
 
 Radix Framework är ett fristående PHP‑ramverk som levereras som ett Composer‑paket.  
 Det är byggt för att vara enkelt att konsumera från andra projekt – utan att du behöver checka in framework‑kod i din applikation.
+
+För en komplett, körbar referensapp/starter, se:
+- **`mattablues/radix-app`**: https://github.com/mattablues/radix-app
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+<!-- doctoc will insert TOC here -->
+
+- [Installation](#installation)
+- [Snabbstart](#snabbstart)
+- [Funktioner i Radix Framework (översikt)](#funktioner-i-radix-framework-översikt)
+- [Dokumentation](#dokumentation)
+- [Projektlayout](#projektlayout)
+- [Autoloading](#autoloading)
+- [För ramverksutvecklare](#för-ramverksutvecklare)
+  - [Lokalt dev-setup](#lokalt-dev-setup)
+  - [Kommandon (composer scripts)](#kommandon-composer-scripts)
+  - [Tester (PHPUnit)](#tester-phpunit)
+  - [Statisk analys (PHPStan)](#statisk-analys-phpstan)
+  - [Mutationstester (Infection)](#mutationstester-infection)
+  - [Kodstil (PHP-CS-Fixer)](#kodstil-php-cs-fixer)
+  - [CI (GitHub Actions)](#ci-github-actions)
+- [Versionering och användning från andra projekt](#versionering-och-användning-från-andra-projekt)
+- [Licens](#licens)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Installation
 
@@ -18,15 +46,15 @@ Ramverket kräver:
 
 ## Snabbstart
 
-Ett enkelt exempel på hur Radix kan användas (anpassa efter hur du faktiskt använder det i dina appar):
+Ett enkelt exempel på hur Radix kan användas:
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-use Radix\File\Writer;
 use Radix\File\Reader;
+use Radix\File\Writer;
 
 // Skriv JSON till fil
 Writer::json(__DIR__ . '/data.json', [
@@ -40,10 +68,8 @@ $data = Reader::json(__DIR__ . '/data.json', assoc: true);
 var_dump($data);
 // ['id' => 1, 'name' => 'Alice']
 ```
-## Funktioner i Radix Framework (översikt)
 
-Det här är en snabb översikt – för en komplett, fungerande app, se
-[`mattablues/radix-app`](https://github.com/mattablues/radix-app).
+## Funktioner i Radix Framework (översikt)
 
 Radix Framework innehåller bland annat:
 
@@ -63,12 +89,12 @@ Radix Framework innehåller bland annat:
   - Databasanslutningar och manager (`Radix\Database\Connection`, `DatabaseManager`)
   - Query builder (`Radix\Database\QueryBuilder`)
   - Enkel ORM‑modellering (`Radix\Database\ORM`)
-  - Migrationer + CLI‑stöd för att skapa och köra migrationer (`Radix\Database\Migration`)
+  - Migrationer + CLI‑stöd (`Radix\Database\Migration`)
 
 - **Container & Service Providers**
   - Dependency Injection‑container (`Radix\Container\Container`, `ApplicationContainer`)
   - Definitioner, parametrar och referenser (`Definition`, `Parameter`, `Reference`, `Resolver`)
-  - Service providers för att registrera tjänster (`Radix\ServiceProvider`)
+  - Service providers (`Radix\ServiceProvider`)
 
 - **View‑motor**
   - Template‑engine med ratio‑templates, extends/yield, komponenter och slots (`Radix\Viewer\RadixTemplateViewer`)
@@ -78,7 +104,7 @@ Radix Framework innehåller bland annat:
   - Anpassningsbar sessionshanterare (`Radix\Session\RadixSessionHandler`) med fil- eller databaserad lagring
 
 - **Fil, dataformat & utilities**
-  - Fil‑ och data‑hjälpare (`Radix\File`), t.ex. CSV/NDJSON/XML/JSON‑läsning och skrivning
+  - Fil‑ och data‑hjälpare (`Radix\File`) för CSV/NDJSON/XML/JSON m.m.
   - Datum/tid‑hjälpare (`Radix\DateTime`)
   - Stödklasser (`Radix\Support`), collections (`Radix\Collection`), enums (`Radix\Enums`)
 
@@ -87,28 +113,28 @@ Radix Framework innehåller bland annat:
   - Mailer‑stöd (`Radix\Mailer`)
   - Felhantering och fel‑svar (`Radix\Error`)
 
-Ett typiskt flöde i en applikation som använder Radix kan vara:
+## Dokumentation
 
-- Skriva och läsa **CSV** (inkl. autodetekterad delimiter, streaming, icke‑skalära värden → JSON, osv.).
-- Skriva och läsa **NDJSON** (newline‑delimited JSON) effektivt som stream.
-- Skriva och läsa **XML** med kontrollerad encoding, libxml‑felhantering och assoc‑lägen.
+För en djupdykning i hur Radix fungerar, se:
 
----
+- **Docs-index:** `docs/INDEX.md`
+
+För en komplett, fungerande applikation som använder ramverket, se:
+
+- **Radix App:** https://github.com/mattablues/radix-app
 
 ## Projektlayout
 
-Ramverket lever i ett eget repo och är tänkt att konsumeras via Composer:
+Radix är ett eget repo och konsumeras via Composer:
 
-- `mattablues/radix-framework` (Packagist‑paketet, källkod i [mattablues/radix-framework](https://github.com/mattablues/radix-framework)) innehåller själva ramverket.
-- Applikationer (t.ex. [`mattablues/radix-app`](https://github.com/mattablues/radix-app) eller ditt eget projekt) lägger till ramverket via:
+- `mattablues/radix-framework` innehåller själva ramverket.
+- Applikationer (t.ex. `mattablues/radix-app` eller ditt eget projekt) lägger till ramverket via:
 
   ```bash
   composer require mattablues/radix-framework
   ```
 
 Ingen framework‑kod ska checkas in direkt i app‑repon.
-
----
 
 ## Autoloading
 
@@ -135,13 +161,11 @@ Tester autoloadas via:
 }
 ```
 
----
-
 ## För ramverksutvecklare
 
 Det här avsnittet är framför allt för dig som utvecklar **själva Radix Framework** (inte bara använder det som beroende).
 
-### Lokalt dev‑setup
+### Lokalt dev-setup
 
 I `mattablues/radix-framework`‑repon:
 
@@ -149,23 +173,18 @@ I `mattablues/radix-framework`‑repon:
 composer install
 ```
 
-Några viktiga `composer`‑kommandon:
+### Kommandon (composer scripts)
+
+De vanligaste kommandona:
 
 ```bash
-# Snabb testrunda (PHPUnit, utan coverage)
-composer test
-
-# Statisk analys (PHPStan)
+composer format
+composer format:check
 composer stan
-
-# Mutationstester (Infection)
+composer test
 composer infect
 composer infect:pcov
 composer infect:xdebug
-
-# Kodstil (PHP-CS-Fixer)
-composer format
-composer format:check
 ```
 
 Direkt från `composer.json`:
@@ -177,25 +196,21 @@ Direkt från `composer.json`:
   "infect": "php tools/infection.php",
   "infect:pcov": "php tools/infection.php pcov",
   "infect:xdebug": "php tools/infection.php xdebug",
-  "format": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix",
-  "format:check": "PHP_CS_FIXER_IGNORE_ENV=1 php-cs-fixer fix --dry-run --diff"
+  "format": "@php tools/php-cs-fixer.php",
+  "format:check": "@php tools/php-cs-fixer.php --dry-run --diff"
 }
 ```
 
 ### Tester (PHPUnit)
 
 Ramverket använder PHPUnit 11.  
-Konfigurationen finns i `phpunit.xml`. Kör alla tester med:
+Kör alla tester:
 
 ```bash
 composer test
 ```
 
-Coverage är konfigurerat mot `src/` och används bl.a. för mutationstester.
-
 ### Statisk analys (PHPStan)
-
-Regler och nivåer styrs av `phpstan.neon.dist`.
 
 ```bash
 composer stan
@@ -203,49 +218,28 @@ composer stan
 
 ### Mutationstester (Infection)
 
-Infection 0.32 används för att säkerställa hög testkvalitet.
-
-1. Generera coverage:
-
-   ```bash
-   rm -rf build/coverage
-   mkdir -p build/coverage
-
-   vendor/bin/phpunit \
-     -c phpunit.xml \
-     --order-by=default \
-     --do-not-cache-result \
-     --coverage-xml=build/coverage/coverage-xml \
-     --log-junit=build/coverage/junit.xml
-   ```
-
-2. Kör Infection:
-
-   ```bash
-   composer infect
-   # eller
-   composer infect:pcov
-   composer infect:xdebug
-   ```
+```bash
+composer infect
+# eller
+composer infect:pcov
+composer infect:xdebug
+```
 
 Inställningar finns i `infection.json.dist`.
 
 ### Kodstil (PHP-CS-Fixer)
 
-PHP-CS-Fixer konfigureras i `.php-cs-fixer.dist.php` och kör mot:
-
-- `src/`
-- `tests/`
+Auto-fix:
 
 ```bash
-# Auto-fix
 composer format
-
-# Endast kontroll (används i CI)
-composer format:check
 ```
 
-`PHP_CS_FIXER_IGNORE_ENV=1` används för att slippa varningar om okänd PHP‑version.
+Endast kontroll (bra i CI):
+
+```bash
+composer format:check
+```
 
 ### CI (GitHub Actions)
 
@@ -254,11 +248,7 @@ Repo:t innehåller GitHub Actions‑workflows som kör:
 - Kodstil (`composer format:check`)
 - Tester (`composer test`)
 - PHPStan (`composer stan`)
-- Schemalagd Infection‑körning som laddar upp html/text/JSON‑rapporter.
-
-Detaljerna finns i `.github/workflows/*.yml` om du vill justera pipelines.
-
----
+- Schemalagd Infection (om aktiverad i workflow)
 
 ## Versionering och användning från andra projekt
 
@@ -277,11 +267,6 @@ Rekommenderat:
    composer require mattablues/radix-framework:^0.1
    ```
 
-Nya versioner läggs upp genom att skapa nya taggar (`v0.2.0`, `v1.0.0`, …) och låta Packagist plocka upp dem via GitHub‑hooken.
-
----
-
 ## Licens
 
-Radix Framework är licensierat under **MIT**.  
-Se `LICENSE` för full licenstext.
+MIT. Se `LICENSE`.
