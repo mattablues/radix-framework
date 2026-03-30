@@ -56,6 +56,56 @@ class Validator
     }
 
     /**
+     * Översätt ett fältnamn.
+     *
+     * Stöder både:
+     * - exakt match: "results.12.1.3.horse_name"
+     * - sista segmentet: "horse_name" (när fältet är dot-notation)
+     */
+    protected function translateField(string $field): string
+    {
+        $normalizedField = str_replace('hp_', 'honeypot', $field);
+
+        if (isset($this->fieldTranslations[$normalizedField])) {
+            return $this->fieldTranslations[$normalizedField];
+        }
+
+        if (str_contains($field, '.')) {
+            $pos = strrpos($field, '.');
+            if ($pos !== false) {
+                $lastRaw = substr($field, $pos + 1);
+                $last = str_replace('hp_', 'honeypot', $lastRaw);
+
+                if (isset($this->fieldTranslations[$last])) {
+                    return $this->fieldTranslations[$last];
+                }
+            }
+        }
+
+        return $normalizedField;
+    }
+
+    /**
+     * Översätt en ev. kommaseparerad lista av fält (t.ex. required_with-parametrar).
+     */
+    protected function translateFieldList(?string $csv): ?string
+    {
+        if ($csv === null) {
+            return null;
+        }
+
+        $parts = array_map('trim', explode(',', $csv));
+        $parts = array_filter($parts, static fn(string $s): bool => $s !== '');
+
+        $translated = [];
+        foreach ($parts as $p) {
+            $translated[] = $this->translateField($p);
+        }
+
+        return implode(', ', $translated);
+    }
+
+    /**
      * @param array<string,mixed> $config
      */
     public static function setFieldTranslationsConfig(array $config): void
@@ -199,8 +249,8 @@ class Validator
 
     protected function getErrorMessage(string $field, string $rule, mixed $parameter = null): string
     {
-        // Översätt huvudfältet
-        $translatedField = $this->fieldTranslations[str_replace('hp_', 'honeypot', $field)] ?? $field;
+        // Översätt huvudfältet (stödjer dot-notation)
+        $translatedField = $this->translateField($field);
 
         // Normalisera parameter till sträng (för string-interpolation) eller null
         $parameterString = null;
@@ -215,14 +265,14 @@ class Validator
         if ($rule === 'confirmed') {
             // Korrekt huvudfält för "_confirmation"-fält
             $parameterField = $parameterString ?? rtrim($field, '_confirmation');
-            $translatedParameter = $this->fieldTranslations[$parameterField] ?? $parameterField;
+            $translatedParameter = $this->translateField($parameterField);
 
             return "Fältet $translatedField måste matcha fältet $translatedParameter.";
         }
 
-        // Översätt parameterfältet, t.ex. password i regeln 'confirmed'
+        // Översätt parameterfältet (stödjer dot-notation + listor)
         $translatedParameter = $parameterString !== null
-            ? ($this->fieldTranslations[$parameterString] ?? $parameterString)
+            ? $this->translateFieldList($parameterString)
             : null;
 
         // Standardfelmeddelanden
@@ -317,13 +367,30 @@ class Validator
         // Kontrollera om något av de angivna fälten har ett värde
         $areRequiredFieldsFilled = false;
         foreach ($requiredFields as $field) {
-            if (!empty($this->data[$field])) {
+            $field = trim($field);
+            if ($field === '') {
+                continue;
+            }
+
+            $dep = $this->getValueForDotNotation($field);
+
+            // Om beroendet är en array: betrakta som "fyllt" om den inte är tom
+            if (is_array($dep)) {
+                if ($dep !== []) {
+                    $areRequiredFieldsFilled = true;
+                    break;
+                }
+                continue;
+            }
+
+            // För scalars/null: betrakta som "fyllt" om != null och != ''
+            if ($dep !== null && $dep !== '') {
                 $areRequiredFieldsFilled = true;
                 break;
             }
         }
 
-        // Om något av de angivna fälten har ett värde, kontrollera att det aktuella fältet också har ett värde
+        // Om något beroendefält är ifyllt, krävs att aktuellt fält också är ifyllt
         if ($areRequiredFieldsFilled) {
             return !is_null($value) && $value !== '';
         }
@@ -781,11 +848,5 @@ class Validator
         }
 
         return $value;
-    }
-
-    // Konvertera bytes till MB
-    protected function convertSizeToMB(int $sizeInBytes): float
-    {
-        return round((float) $sizeInBytes / (1024 * 1024), 2, PHP_ROUND_HALF_UP);
     }
 }

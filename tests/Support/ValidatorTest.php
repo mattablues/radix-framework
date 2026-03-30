@@ -2034,4 +2034,215 @@ class ValidatorTest extends TestCase
 
         $this->assertFalse($validator->validate());
     }
+
+    public function testFieldTranslationWorksForDotNotationByLastSegment(): void
+    {
+        Validator::setFieldTranslationsConfig([
+            'horse_name' => 'hästnamn',
+        ]);
+
+        $data = [
+            'results' => [
+                '12' => [
+                    '3' => [
+                        '1' => [
+                            'horse_name' => '',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $rules = [
+            'results.12.3.1.horse_name' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        $this->assertSame(
+            ['Fältet hästnamn är obligatoriskt.'],
+            $errors['results.12.3.1.horse_name'] ?? null,
+            'Dot-notation ska översättas via sista segmentet ("horse_name").'
+        );
+    }
+
+    public function testFieldTranslationPrefersExactDotNotationKeyOverLastSegment(): void
+    {
+        Validator::setFieldTranslationsConfig([
+            'horse_name' => 'hästnamn',
+            'results.12.3.1.horse_name' => 'hästnamn (rad 1)',
+        ]);
+
+        $data = [
+            'results' => [
+                '12' => [
+                    '3' => [
+                        '1' => [
+                            'horse_name' => '',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $rules = [
+            'results.12.3.1.horse_name' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        $this->assertSame(
+            ['Fältet hästnamn (rad 1) är obligatoriskt.'],
+            $errors['results.12.3.1.horse_name'] ?? null,
+            'Exakt dot-nyckel ska ha företräde framför fallback på sista segmentet.'
+        );
+    }
+
+    public function testFieldTranslationReplacesHpPrefixBeforeLookup(): void
+    {
+        // translateField() gör str_replace('hp_', 'honeypot', ...)
+        // så vi lägger translation på det normaliserade nyckelnamnet.
+        Validator::setFieldTranslationsConfig([
+            'honeypottest' => 'spamfält',
+        ]);
+
+        $data = [
+            'hp_test' => '',
+        ];
+
+        $rules = [
+            'hp_test' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        $this->assertSame(
+            ['Fältet spamfält är obligatoriskt.'],
+            $errors['hp_test'] ?? null,
+            'hp_-prefix ska normaliseras innan translation-lookup, annars blir fältnamnet "hp_test".'
+        );
+    }
+
+    public function testRequiredWithWorksWithDotNotationDependencies(): void
+    {
+        Validator::setFieldTranslationsConfig([
+            'horse_name' => 'hästnamn',
+            'odds' => 'odds',
+        ]);
+
+        $rules = [
+            'results.12.3.1.horse_name' => 'required_with:results.12.3.1.odds',
+            'results.12.3.1.odds' => 'nullable|string',
+        ];
+
+        $data = [
+            'results' => [
+                '12' => [
+                    '3' => [
+                        '1' => [
+                            'odds' => '12.50',
+                            'horse_name' => '',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse(
+            $validator->validate(),
+            'horse_name ska krävas när odds (dot-notation) är ifyllt.'
+        );
+
+        $errors = $validator->errors();
+        $this->assertArrayHasKey('results.12.3.1.horse_name', $errors);
+
+        $this->assertSame(
+            ['Fältet hästnamn krävs när odds anges.'],
+            $errors['results.12.3.1.horse_name'] ?? null,
+            'required_with ska översätta både huvudfält och dot-parameter via translateFieldList()/translateField().'
+        );
+    }
+
+    public function testFieldTranslationReplacesHpPrefixInLastDotSegment(): void
+    {
+        // OBS: vi sätter INTE translation för "a.honeypottest" (hela vägen),
+        // utan bara för sista segmentet, så att translateField måste nå last-segment-logiken.
+        Validator::setFieldTranslationsConfig([
+            'honeypottest' => 'spamfält',
+        ]);
+
+        $data = [
+            'a' => [
+                'hp_test' => '',
+            ],
+        ];
+
+        $rules = [
+            'a.hp_test' => 'required',
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        $this->assertSame(
+            ['Fältet spamfält är obligatoriskt.'],
+            $errors['a.hp_test'] ?? null,
+            'hp_-prefix ska normaliseras i sista segmentet för dot-notation.'
+        );
+    }
+
+    public function testRequiredWithTrimsDependencyFieldNames(): void
+    {
+        Validator::setFieldTranslationsConfig([
+            'horse_name' => 'hästnamn',
+            'odds' => 'odds',
+        ]);
+
+        $rules = [
+            'results.12.3.1.horse_name' => 'required_with:  results.12.3.1.odds  ',
+            'results.12.3.1.odds' => 'nullable|string',
+        ];
+
+        $data = [
+            'results' => [
+                '12' => [
+                    '3' => [
+                        '1' => [
+                            'odds' => '12.50',
+                            'horse_name' => '',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $validator = new Validator($data, $rules);
+
+        $this->assertFalse($validator->validate());
+
+        $errors = $validator->errors();
+
+        $this->assertSame(
+            ['Fältet hästnamn krävs när odds anges.'],
+            $errors['results.12.3.1.horse_name'] ?? null,
+            'required_with ska trimma whitespace runt dependencies så att dot-notation-lookup fungerar.'
+        );
+    }
 }
