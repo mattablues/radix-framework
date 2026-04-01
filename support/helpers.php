@@ -219,21 +219,84 @@ if (!function_exists('error')) {
 }
 
 if (!function_exists('old')) {
+    /**
+     * Hämta tidigare inskickat formulärvärde från sessionen.
+     *
+     * Bakåtkompatibilitet:
+     * - Försöker alltid exakt nyckel först (viktigt om nyckeln innehåller punkt).
+     *
+     * Utökning:
+     * - Om exakt nyckel saknas och $key innehåller dot-notation, traversera nästlade arrayer.
+     */
     function old(string $key, string $default = ''): string
     {
         /** @var \Radix\Session\SessionInterface $session */
         $session = app(\Radix\Session\SessionInterface::class);
 
-        // Kan vara vad som helst → typ-säkra det
         $oldData = $session->get('old', []);
 
         if (!is_array($oldData)) {
             return $default;
         }
 
-        $value = $oldData[$key] ?? $default;
+        // Exakt match först (bakåtkompatibilitet för nycklar som råkar innehålla punkt)
+        if (array_key_exists($key, $oldData)) {
+            $value = $oldData[$key];
+            return is_string($value) ? $value : $default;
+        }
+
+        // Ingen dot-notation -> default (behåll tidigare beteende)
+        if (!str_contains($key, '.')) {
+            return $default;
+        }
+
+        // Dot-notation traversal (för nästlade old-arrayer från t.ex. request->post)
+        $value = $oldData;
+        foreach (explode('.', $key) as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return $default;
+            }
+            $value = $value[$segment];
+        }
 
         return is_string($value) ? $value : $default;
+    }
+}
+
+if (!function_exists('old_or')) {
+    /**
+     * Returnerar old($key) om nyckeln finns (även om den är tom sträng),
+     * annars returneras $fallback.
+     *
+     * Används för att skilja "saknas" från "finns men är tomt".
+     */
+    function old_or(string $key, string $fallback = ''): string
+    {
+        // Sentinel som i praktiken inte kan komma från normal forminput
+        $sentinel = "\0__MISSING__\0";
+        $v = old($key, $sentinel);
+
+        return ($v === $sentinel) ? $fallback : $v;
+    }
+}
+
+if (!function_exists('route_exists')) {
+    function route_exists(string $name): bool
+    {
+        return array_key_exists($name, \Radix\Routing\Router::routeNames());
+    }
+}
+
+if (!function_exists('build_thumb_path')) {
+    function build_thumb_path(?string $imagePath): string
+    {
+        if (!is_string($imagePath) || trim($imagePath) === '') {
+            return '';
+        }
+
+        $thumbPath = preg_replace('/(\.[^.]+)$/', '.thumb$1', $imagePath);
+
+        return is_string($thumbPath) ? $thumbPath : '';
     }
 }
 
