@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Radix\Database\Migration;
 
+use PDO;
 use Radix\Database\Connection;
+use Throwable;
 
 class Migrator
 {
@@ -23,11 +25,36 @@ class Migrator
      */
     private function ensureMigrationsTable(): void
     {
-        $this->connection->execute("CREATE TABLE IF NOT EXISTS `migrations` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `migration` VARCHAR(255) NOT NULL,
-            `run_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
+        $driver = 'mysql';
+
+        try {
+            $name = $this->connection->getPDO()->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if (is_string($name) && $name !== '') {
+                $driver = strtolower($name);
+            }
+        } catch (Throwable) {
+            $driver = 'mysql';
+        }
+
+        if ($driver === 'sqlite') {
+            $this->connection->execute(
+                "CREATE TABLE IF NOT EXISTS `migrations` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+                    `migration` VARCHAR(255) NOT NULL,
+                    `run_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+                );"
+            );
+            return;
+        }
+
+        // MySQL/MariaDB
+        $this->connection->execute(
+            "CREATE TABLE IF NOT EXISTS `migrations` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `migration` VARCHAR(255) NOT NULL,
+                `run_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );"
+        );
     }
 
     /**

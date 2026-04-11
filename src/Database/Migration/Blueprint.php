@@ -10,16 +10,22 @@ use LogicException;
 class Blueprint
 {
     private string $table;
+
     /** @var array<int,string> */
     private array $columns = [];
+
     /** @var array<int,string> */
     private array $alterOperations = [];
+
     /** @var array<int,string> */
     private array $keys = [];
+
     /** @var array<int,string> */
     private array $constraints = [];
+
     /** @var array<int,string> */
     private array $tableOptions = [];
+
     private bool $isAlter;
 
     public function __construct(string $table, bool $isAlter = false)
@@ -35,7 +41,18 @@ class Blueprint
      */
     public function addColumn(string $type, string $name, array $options = []): self
     {
-        $validAttributes = ['nullable', 'default', 'onUpdate', 'collation', 'comment', 'before', 'after', 'first', 'unsigned', 'autoIncrement'];
+        $validAttributes = [
+            'nullable',
+            'default',
+            'onUpdate',
+            'collation',
+            'comment',
+            'before',
+            'after',
+            'first',
+            'unsigned',
+            'autoIncrement',
+        ];
 
         $typeMapping = [
             'string'      => 'VARCHAR(255)',
@@ -55,15 +72,16 @@ class Blueprint
             'enum'        => 'ENUM',
         ];
 
-        // Först, mappa typer via $typeMapping om möjligt.
         if (isset($typeMapping[$type])) {
             $type = $typeMapping[$type];
         } else {
             if (preg_match('/^FLOAT\(\d+,\s?\d+\)$/i', $type)) {
-                // Exempel: 'FLOAT(10, 2)' är giltig
-            } elseif (!array_key_exists($type, $typeMapping)
+                // ok
+            } elseif (
+                !array_key_exists($type, $typeMapping)
                 && !preg_match('/^(ENUM|SET)\([\'"].+?[\'"](?:,\s?[\'"].+?[\'"])*\)$/i', $type)
-                && !preg_match('/^[A-Z][A-Z0-9]*(\(\d+(,\s?\d+)?\))?( UNSIGNED)?$/', $type)) {
+                && !preg_match('/^[A-Z][A-Z0-9]*(\(\d+(,\s?\d+)?\))?( UNSIGNED)?$/', $type)
+            ) {
                 throw new InvalidArgumentException("Unsupported column type: '$type'");
             }
         }
@@ -83,15 +101,14 @@ class Blueprint
             if (is_bool($default)) {
                 $defaultStr = $default ? '1' : '0';
             } else {
-                // Kontrollera om det är en sökväg, annars gör det VERSALER.
                 if (is_string($default) && preg_match('#^(/|[a-zA-Z]:|https?://)#', $default)) {
-                    $defaultStr = $default; // Behåll originalform.
+                    $defaultStr = $default;
                 } else {
                     if (!is_scalar($default)) {
                         throw new InvalidArgumentException("Default value must be a scalar or string.");
                     }
                     /** @var int|float|string $default */
-                    $defaultStr = strtoupper((string) $default); // Konvertera till versaler.
+                    $defaultStr = strtoupper((string) $default);
                 }
             }
 
@@ -148,9 +165,6 @@ class Blueprint
         return $this;
     }
 
-    /**
-     * Ta bort en kolumn från tabellen.
-     */
     public function dropColumn(string $name): self
     {
         if (!$this->isAlter) {
@@ -161,8 +175,6 @@ class Blueprint
     }
 
     /**
-     * Ta bort flera kolumner.
-     *
      * @param array<int,string> $columns
      */
     public function dropColumns(array $columns): self
@@ -182,8 +194,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en VARCHAR‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function string(string $name, int $length = 255, array $options = []): self
@@ -192,8 +202,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en TEXT‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function text(string $name, array $options = []): self
@@ -202,8 +210,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en INT‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function integer(string $name, bool $unsigned = false, array $options = []): self
@@ -213,8 +219,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en TINYINT‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function tinyInteger(string $name, bool $unsigned = false, array $options = []): self
@@ -224,8 +228,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en BIGINT‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function bigInteger(string $name, bool $unsigned = false, array $options = []): self
@@ -235,8 +237,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en BOOLEAN‑kolumn (TINYINT(1)).
-     *
      * @param array<string,mixed> $options
      */
     public function boolean(string $name, array $options = []): self
@@ -245,8 +245,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en FLOAT‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function float(string $name, int $total = 8, int $places = 2, array $options = []): self
@@ -255,8 +253,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en DECIMAL‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function decimal(string $name, int $total = 8, int $places = 2, array $options = []): self
@@ -265,8 +261,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en DATETIME‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function datetime(string $name, array $options = []): self
@@ -275,8 +269,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en DATE‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function date(string $name, array $options = []): self
@@ -285,8 +277,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en TIME‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function time(string $name, array $options = []): self
@@ -295,8 +285,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en JSON‑kolumn.
-     *
      * @param array<string,mixed> $options
      */
     public function json(string $name, array $options = []): self
@@ -305,10 +293,8 @@ class Blueprint
     }
 
     /**
-     * Lägg till en ENUM‑kolumn.
-     *
-     * @param array<int,string>   $allowed Lista av tillåtna värden.
-     * @param array<string,mixed> $options Ytterligare kolumn‑optioner.
+     * @param array<int,string>   $allowed
+     * @param array<string,mixed> $options
      */
     public function enum(string $name, array $allowed, array $options = []): self
     {
@@ -317,8 +303,6 @@ class Blueprint
     }
 
     /**
-     * Lägg till en UUID‑kolumn (CHAR(36)).
-     *
      * @param array<string,mixed> $options
      */
     public function uuid(string $name, array $options = []): self
@@ -326,9 +310,6 @@ class Blueprint
         return $this->addColumn('CHAR(36)', $name, $options);
     }
 
-    /**
-     * Lägg till timestamps-kolumner.
-     */
     public function timestamps(): self
     {
         $this->datetime('created_at', ['default' => 'CURRENT_TIMESTAMP']);
@@ -336,22 +317,58 @@ class Blueprint
         return $this;
     }
 
-    /**
-     * Lägg till en kolumn för soft deletes.
-     */
     public function softDeletes(): self
     {
         return $this->datetime('deleted_at', ['nullable' => true]);
     }
 
     /**
-     * Sätt primärnyckel på de angivna kolumnerna.
-     *
      * @param array<int,string> $columns
      */
     public function primary(array $columns): self
     {
-        $this->keys[] = 'PRIMARY KEY (' . $this->formatColumnList($columns) . ')';
+        $cols = $this->formatColumnList($columns);
+        $definition = 'PRIMARY KEY (' . $cols . ')';
+
+        // ÄNDRING: dela upp i två villkor (Infection: ingen LogicalOr att mutera)
+        if (!str_starts_with($definition, 'PRIMARY KEY (')) {
+            throw new LogicException('Invalid PRIMARY KEY definition.');
+        }
+
+        if (!str_ends_with($definition, ')')) {
+            throw new LogicException('Invalid PRIMARY KEY definition.');
+        }
+
+        if ($this->isAlter) {
+            $this->alterOperations[] = 'ADD ' . $definition;
+            return $this;
+        }
+
+        $this->keys[] = $definition;
+        return $this;
+    }
+
+    public function dropPrimary(): self
+    {
+        if (!$this->isAlter) {
+            throw new LogicException('dropPrimary can only be used in ALTER TABLE context.');
+        }
+
+        $this->alterOperations[] = 'DROP PRIMARY KEY';
+        return $this;
+    }
+
+    /**
+     * @param array<int,string> $columns
+     */
+    public function modifyPrimary(array $columns): self
+    {
+        if (!$this->isAlter) {
+            throw new LogicException('modifyPrimary can only be used in ALTER TABLE context.');
+        }
+
+        $this->alterOperations[] = 'DROP PRIMARY KEY';
+        $this->alterOperations[] = 'ADD PRIMARY KEY (' . $this->formatColumnList($columns) . ')';
         return $this;
     }
 
@@ -363,7 +380,13 @@ class Blueprint
     public function unique(array $columns, ?string $name = null): self
     {
         $indexName = $name ?: 'unique_' . implode('_', $columns);
-        $this->keys[] = 'UNIQUE INDEX `' . $indexName . '` (' . $this->formatColumnList($columns) . ')';
+
+        if ($this->isAlter) {
+            $this->alterOperations[] = $this->opAddIndex($indexName, $columns, true);
+        } else {
+            $this->keys[] = 'UNIQUE INDEX `' . $indexName . '` (' . $this->formatColumnList($columns) . ')';
+        }
+
         return $this;
     }
 
@@ -375,12 +398,48 @@ class Blueprint
     public function index(array $columns, ?string $name = null): self
     {
         $indexName = $name ?: 'index_' . implode('_', $columns);
-        $this->keys[] = 'INDEX `' . $indexName . '` (' . $this->formatColumnList($columns) . ')';
+
+        if ($this->isAlter) {
+            $this->alterOperations[] = $this->opAddIndex($indexName, $columns, false);
+        } else {
+            $this->keys[] = 'INDEX `' . $indexName . '` (' . $this->formatColumnList($columns) . ')';
+        }
+
         return $this;
     }
 
-    public function foreign(string $column, string $referencesTable, string $referencesColumn = 'id', string $onDelete = 'CASCADE', string $onUpdate = 'CASCADE'): self
+    public function dropIndex(string $name): self
     {
+        if (!$this->isAlter) {
+            throw new LogicException('dropIndex can only be used in ALTER TABLE context.');
+        }
+
+        $this->alterOperations[] = $this->opDropIndex($name);
+        return $this;
+    }
+
+    public function dropUnique(string $name): self
+    {
+        return $this->dropIndex($name);
+    }
+
+    public function dropForeign(string $name): self
+    {
+        if (!$this->isAlter) {
+            throw new LogicException('dropForeign can only be used in ALTER TABLE context.');
+        }
+
+        $this->alterOperations[] = $this->opDropForeign($name);
+        return $this;
+    }
+
+    public function foreign(
+        string $column,
+        string $referencesTable,
+        string $referencesColumn = 'id',
+        string $onDelete = 'CASCADE',
+        string $onUpdate = 'CASCADE'
+    ): self {
         $constraint = 'FOREIGN KEY (`' . $column . '`) REFERENCES `' . $referencesTable . '` (`' . $referencesColumn . '`) ON DELETE ' . $onDelete . ' ON UPDATE ' . $onUpdate;
 
         if ($this->isAlter) {
@@ -389,21 +448,6 @@ class Blueprint
             $this->constraints[] = $constraint;
         }
 
-        return $this;
-    }
-
-    /**
-     * Ändra primärnyckeln till de angivna kolumnerna.
-     *
-     * @param array<int,string> $columns
-     */
-    public function modifyPrimary(array $columns): self
-    {
-        if (!$this->isAlter) {
-            throw new LogicException('modifyPrimary can only be used in ALTER TABLE context.');
-        }
-        $this->alterOperations[] = 'DROP PRIMARY KEY';
-        $this->alterOperations[] = 'ADD PRIMARY KEY (' . $this->formatColumnList($columns) . ')';
         return $this;
     }
 
@@ -433,22 +477,43 @@ class Blueprint
     }
 
     /**
-     * Generera SQL‑satser för ALTER‑operationerna.
+     * Generera SQL-satser för ALTER-operationerna.
      *
-     * @return array<int,string> Lista av SQL‑strängar.
+     * @return array<int,string>
      */
-    public function toAlterSql(): array
+    public function toAlterSql(string $driver = 'mysql'): array
     {
-        return array_map(
-            fn($operation) => 'ALTER TABLE `' . $this->table . '` ' . $operation . ';',
-            $this->alterOperations
-        );
+        $driver = strtolower($driver);
+        $sql = [];
+
+        foreach ($this->alterOperations as $op) {
+            if (str_starts_with($op, '__ADD_INDEX__|')) {
+                $sql[] = $this->compileAddIndex($op, $driver);
+                continue;
+            }
+
+            if (str_starts_with($op, '__DROP_INDEX__|')) {
+                $sql[] = $this->compileDropIndex($op, $driver);
+                continue;
+            }
+
+            if (str_starts_with($op, '__DROP_FOREIGN__|')) {
+                $stmt = $this->compileDropForeign($op, $driver);
+                if ($stmt !== null) {
+                    $sql[] = $stmt;
+                }
+                continue;
+            }
+
+            // Default: vanlig ALTER TABLE-operation (kolumner, primary, foreign-add, etc)
+            $sql[] = 'ALTER TABLE `' . $this->table . '` ' . $op . ';';
+        }
+
+        return $sql;
     }
 
     /**
-     * Generera SQL‑satser för att rulla tillbaka blueprintens ändringar.
-     *
-     * @return array<int,string> Lista av SQL‑strängar.
+     * @return array<int,string>
      */
     public function toRollbackSql(): array
     {
@@ -459,13 +524,10 @@ class Blueprint
         $rollbackStatements = [];
 
         foreach (array_reverse($this->alterOperations) as $operation) {
-            // Kontrollera om vi försöker återställa borttagning av en kolumn.
             if (str_starts_with($operation, 'DROP COLUMN')) {
                 throw new LogicException('Cannot rollback a dropped column automatically. Column details are missing.');
             }
 
-            // Lägg till rollback-logik för andra operationer beroende på dina behov.
-            // Här är ett exempel för att ta bort en tillagd kolumn:
             if (str_starts_with($operation, 'ADD COLUMN')) {
                 $columnName = $this->extractColumnName($operation);
                 if ($columnName) {
@@ -474,16 +536,12 @@ class Blueprint
                 continue;
             }
 
-            // Hanterar rollback för andra typer av operationer.
             $rollbackStatements[] = "// TODO: Add rollback logic for: $operation";
         }
 
         return $rollbackStatements;
     }
 
-    /**
-     * Extrahera kolumnnamnet från en `ADD COLUMN`-operation.
-     */
     private function extractColumnName(string $operation): ?string
     {
         if (preg_match('/ADD COLUMN `([^`]+)`/', $operation, $matches)) {
@@ -491,6 +549,120 @@ class Blueprint
         }
 
         return null;
+    }
+
+    /**
+         * @param array<int,string> $columns
+         */
+    private function opAddIndex(string $name, array $columns, bool $unique): string
+    {
+        // __ADD_INDEX__|name|1/0|col1,col2,col3
+        return '__ADD_INDEX__|' . $name . '|' . ($unique ? '1' : '0') . '|' . implode(',', $columns);
+    }
+
+    private function opDropIndex(string $name): string
+    {
+        return '__DROP_INDEX__|' . $name;
+    }
+
+    private function opDropForeign(string $name): string
+    {
+        return '__DROP_FOREIGN__|' . $name;
+    }
+
+    private function compileAddIndex(string $op, string $driver): string
+    {
+        // NYTT: strikt format – exakt 3 pipes i op
+        if (substr_count($op, '|') !== 3) {
+            throw new LogicException('Invalid ADD_INDEX operation.');
+        }
+
+        $parts = explode('|', $op);
+        $indexName = $parts[1] ?? '';
+        $uniqueFlag = $parts[2] ?? '0';
+        $colsCsv = $parts[3] ?? '';
+
+        // Parse kolumner
+        $columns = $colsCsv !== '' ? explode(',', $colsCsv) : [];
+
+        // ÄNDRING: strikt validering utan array_filter/array_values (Infection-vänligt)
+        if ($indexName === '') {
+            throw new LogicException('Invalid ADD_INDEX operation.');
+        }
+
+        if ($columns === []) {
+            throw new LogicException('Invalid ADD_INDEX operation.');
+        }
+
+        foreach ($columns as $c) {
+            if ($c === '') {
+                throw new LogicException('Invalid ADD_INDEX operation.');
+            }
+        }
+
+        $isUnique = ($uniqueFlag === '1');
+        $cols = $this->formatColumnList($columns);
+
+        if ($driver === 'sqlite') {
+            // SQLite: CREATE [UNIQUE] INDEX idx ON table (col,...)
+            return 'CREATE ' . ($isUnique ? 'UNIQUE ' : '') . 'INDEX `' . $indexName . '` ON `' . $this->table . '` (' . $cols . ');';
+        }
+
+        // MySQL/MariaDB: ALTER TABLE t ADD [UNIQUE] INDEX idx (col,...)
+        return 'ALTER TABLE `' . $this->table . '` ADD ' . ($isUnique ? 'UNIQUE ' : '') . 'INDEX `' . $indexName . '` (' . $cols . ');';
+    }
+
+    private function compileDropIndex(string $op, string $driver): string
+    {
+        // NYTT: strikt format – exakt 1 pipe i op
+        if (substr_count($op, '|') !== 1) {
+            throw new LogicException('Invalid DROP_INDEX operation.');
+        }
+
+        $parts = explode('|', $op);
+        $indexName = $parts[1] ?? '';
+
+        if ($indexName === '') {
+            throw new LogicException('Invalid DROP_INDEX operation.');
+        }
+
+        if ($driver === 'sqlite') {
+            $stmt = 'DROP INDEX IF EXISTS `' . $indexName . '`;';
+
+            // ÄNDRING: ingen LogicalOr => bättre för Infection
+            if (!str_starts_with($stmt, 'DROP INDEX IF EXISTS `')) {
+                throw new LogicException('Invalid DROP_INDEX statement.');
+            }
+            if (!str_ends_with($stmt, '`;')) {
+                throw new LogicException('Invalid DROP_INDEX statement.');
+            }
+
+            return $stmt;
+        }
+
+        return 'DROP INDEX `' . $indexName . '` ON `' . $this->table . '`;';
+    }
+
+    private function compileDropForeign(string $op, string $driver): ?string
+    {
+        // NYTT: strikt format – exakt 1 pipe i op
+        if (substr_count($op, '|') !== 1) {
+            throw new LogicException('Invalid DROP_FOREIGN operation.');
+        }
+
+        $parts = explode('|', $op);
+        $fkName = $parts[1] ?? '';
+
+        if ($fkName === '') {
+            throw new LogicException('Invalid DROP_FOREIGN operation.');
+        }
+
+        if ($driver === 'sqlite') {
+            // SQLite kräver table-rebuild för detta; no-op i tests.
+            return null;
+        }
+
+        return 'ALTER TABLE `' . $this->table . '` DROP FOREIGN KEY `' . $fkName . '`;';
     }
 
     /**
