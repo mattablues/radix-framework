@@ -710,4 +710,138 @@ class BlueprintTest extends TestCase
 
         $blueprint->addColumn('invalid_type', 'unknown_column');
     }
+
+    public function testAlterTableIndexesCompileForSqlite(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        $blueprint->index(['user_id', 'created_at'], 'idx_users_user_created');
+        $blueprint->unique(['email'], 'uniq_users_email');
+        $blueprint->dropIndex('idx_users_user_created');
+
+        $expected = [
+            "CREATE INDEX `idx_users_user_created` ON `users` (`user_id`, `created_at`);",
+            "CREATE UNIQUE INDEX `uniq_users_email` ON `users` (`email`);",
+            "DROP INDEX IF EXISTS `idx_users_user_created`;",
+        ];
+
+        $this->assertSame($expected, $blueprint->toAlterSql('sqlite'));
+    }
+
+    public function testAlterTableIndexesCompileForMysql(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        $blueprint->index(['user_id', 'created_at'], 'idx_users_user_created');
+        $blueprint->unique(['email'], 'uniq_users_email');
+        $blueprint->dropIndex('idx_users_user_created');
+
+        $expected = [
+            "ALTER TABLE `users` ADD INDEX `idx_users_user_created` (`user_id`, `created_at`);",
+            "ALTER TABLE `users` ADD UNIQUE INDEX `uniq_users_email` (`email`);",
+            "DROP INDEX `idx_users_user_created` ON `users`;",
+        ];
+
+        $this->assertSame($expected, $blueprint->toAlterSql('mysql'));
+    }
+
+    public function testDropForeignIsNoOpInSqlite(): void
+    {
+        $blueprint = new Blueprint('users', true);
+        $blueprint->dropForeign('fk_users_role_id');
+
+        $this->assertSame([], $blueprint->toAlterSql('sqlite'));
+    }
+
+    public function testAlterUniqueAndIndexAreFluent(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        $ret = $blueprint
+            ->unique(['email'], 'uniq_users_email')
+            ->index(['user_id'], 'idx_users_user_id');
+
+        $this->assertSame($blueprint, $ret);
+
+        $this->assertSame(
+            [
+                "ALTER TABLE `users` ADD UNIQUE INDEX `uniq_users_email` (`email`);",
+                "ALTER TABLE `users` ADD INDEX `idx_users_user_id` (`user_id`);",
+            ],
+            $blueprint->toAlterSql('mysql')
+        );
+    }
+
+    public function testToAlterSqlNormalizesDriverNameCase(): void
+    {
+        $blueprint = new Blueprint('users', true);
+        $blueprint->dropIndex('idx_users_user_created');
+
+        $this->assertSame(
+            ["DROP INDEX IF EXISTS `idx_users_user_created`;"],
+            $blueprint->toAlterSql('SQLite')
+        );
+
+        $this->assertSame(
+            ["DROP INDEX `idx_users_user_created` ON `users`;"],
+            $blueprint->toAlterSql('MySQL')
+        );
+    }
+
+    public function testToAlterSqlContinuesAfterDropIndexVirtualOp(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        $blueprint->dropIndex('idx_users_user_created');
+        $blueprint->addColumn('string', 'nickname', ['nullable' => true]);
+
+        $this->assertSame(
+            [
+                "DROP INDEX `idx_users_user_created` ON `users`;",
+                "ALTER TABLE `users` ADD COLUMN `nickname` VARCHAR(255) NULL;",
+            ],
+            $blueprint->toAlterSql('mysql')
+        );
+    }
+
+    public function testAlterIndexRejectsEmptyColumnNames(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        // Viktigt: detta blir colsCsv "user_id," -> explode => ["user_id", ""]
+        $blueprint->index(['user_id', ''], 'idx_bad');
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Invalid ADD_INDEX operation.');
+
+        $blueprint->toAlterSql('mysql');
+    }
+
+    public function testToAlterSqlContinuesAfterDropForeignVirtualOp(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        $blueprint->dropForeign('fk_users_role_id');
+        $blueprint->addColumn('string', 'nickname', ['nullable' => true]);
+
+        $this->assertSame(
+            [
+                "ALTER TABLE `users` DROP FOREIGN KEY `fk_users_role_id`;",
+                "ALTER TABLE `users` ADD COLUMN `nickname` VARCHAR(255) NULL;",
+            ],
+            $blueprint->toAlterSql('mysql')
+        );
+    }
+
+    public function testDropForeignUsesProvidedConstraintName(): void
+    {
+        $blueprint = new Blueprint('users', true);
+
+        $blueprint->dropForeign('fk_users_role_id');
+
+        $this->assertSame(
+            ["ALTER TABLE `users` DROP FOREIGN KEY `fk_users_role_id`;"],
+            $blueprint->toAlterSql('mysql')
+        );
+    }
 }

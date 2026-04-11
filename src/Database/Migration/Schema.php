@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Radix\Database\Migration;
 
+use PDO;
 use Radix\Database\Connection;
+use Throwable;
 
 class Schema
 {
@@ -25,7 +27,7 @@ class Schema
 
     public function drop(string $table): void
     {
-        $sql = "DROP TABLE IF EXISTS `$table`";
+        $sql = "DROP TABLE IF EXISTS `$table`;";
         $this->connection->execute($sql);
     }
 
@@ -39,9 +41,21 @@ class Schema
         $blueprint = new Blueprint($table, true);
         $callback($blueprint);
 
-        $sqlStatements = $blueprint->toAlterSql();
+        $driver = $this->driverName();
+
+        $sqlStatements = $blueprint->toAlterSql($driver);
         foreach ($sqlStatements as $sql) {
             $this->connection->execute($sql);
+        }
+    }
+
+    private function driverName(): string
+    {
+        try {
+            $name = $this->connection->getPDO()->getAttribute(PDO::ATTR_DRIVER_NAME);
+            return is_string($name) ? strtolower($name) : 'mysql';
+        } catch (Throwable) {
+            return 'mysql';
         }
     }
 }
