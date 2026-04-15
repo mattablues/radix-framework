@@ -49,11 +49,31 @@ class Schema
         }
     }
 
+    /**
+     * Kör ett rått SQL-statement i en migration.
+     *
+     * @param array<int|string, mixed> $bindings
+     */
+    public function statement(string $sql, array $bindings = []): void
+    {
+        $this->connection->execute($sql, $bindings);
+    }
+
+    public function getDriverName(): string
+    {
+        return $this->driverName();
+    }
+
     private function driverName(): string
     {
         try {
             $name = $this->connection->getPDO()->getAttribute(PDO::ATTR_DRIVER_NAME);
-            return is_string($name) ? strtolower($name) : 'mysql';
+
+            if (!is_string($name) || $name === '') {
+                return 'mysql';
+            }
+
+            return strtolower($name);
         } catch (Throwable) {
             return 'mysql';
         }
