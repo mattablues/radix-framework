@@ -57,6 +57,28 @@ class QueryBuilderTest extends TestCase
         );
     }
 
+    public function testOrWhereAcceptsClosureAndMergesBindingsAsNestedOrGroup(): void
+    {
+        $query = (new QueryBuilder())
+            ->setConnection($this->connection)
+            ->from('users')
+            ->where('status', '=', 'active')
+            ->orWhere(function (QueryBuilder $q): void {
+                $q->where('age', '>=', 18)
+                  ->where('country', '=', 'Sweden');
+            });
+
+        $this->assertSame(
+            'SELECT * FROM `users` WHERE `status` = ? OR (`age` >= ? AND `country` = ?)',
+            $query->toSql()
+        );
+
+        $this->assertSame(
+            ['active', 18, 'Sweden'],
+            $query->getBindings()
+        );
+    }
+
     public function testExistsUsesCloneLimitOneSelectOneAndDoesNotMutateOriginalBuilder(): void
     {
         $conn = $this->createMock(Connection::class);
@@ -1322,6 +1344,54 @@ class QueryBuilderTest extends TestCase
             [100, 'active'],
             $mainQuery->getBindings(),
             'QueryBuilder should merge bindings correctly for subqueries.'
+        );
+    }
+
+    public function testWhereExistsAcceptsClosureAndMergesBindings(): void
+    {
+        $query = (new QueryBuilder())
+            ->setConnection($this->connection)
+            ->from('users')
+            ->whereExists(function (QueryBuilder $sub): void {
+                $sub->setConnection($this->connection)
+                    ->select(['1'])
+                    ->from('orders')
+                    ->whereColumn('orders.user_id', '=', 'users.id')
+                    ->where('status', '=', 'paid');
+            });
+
+        $this->assertSame(
+            'SELECT * FROM `users` WHERE EXISTS (SELECT 1 FROM `orders` WHERE `orders`.`user_id` = `users`.`id` AND `status` = ?)',
+            $query->toSql()
+        );
+
+        $this->assertSame(
+            ['paid'],
+            $query->getBindings()
+        );
+    }
+
+    public function testWhereNotExistsAcceptsClosureAndMergesBindings(): void
+    {
+        $query = (new QueryBuilder())
+            ->setConnection($this->connection)
+            ->from('users')
+            ->whereNotExists(function (QueryBuilder $sub): void {
+                $sub->setConnection($this->connection)
+                    ->select(['1'])
+                    ->from('orders')
+                    ->whereColumn('orders.user_id', '=', 'users.id')
+                    ->where('status', '=', 'pending');
+            });
+
+        $this->assertSame(
+            'SELECT * FROM `users` WHERE NOT EXISTS (SELECT 1 FROM `orders` WHERE `orders`.`user_id` = `users`.`id` AND `status` = ?)',
+            $query->toSql()
+        );
+
+        $this->assertSame(
+            ['pending'],
+            $query->getBindings()
         );
     }
 

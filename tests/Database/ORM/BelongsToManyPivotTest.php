@@ -421,6 +421,43 @@ class BelongsToManyPivotTest extends TestCase
         $this->assertSame([1, 2, 3], $userIds);
     }
 
+    public function testGetUsesPrebuiltQueryBuilderBranchWhenBuilderIsAlreadySet(): void
+    {
+        $role = $this->makeRoleModel();
+        $role->forceFill(['id' => 1])->markAsExisting();
+
+        $rel = (new BelongsToMany(
+            $this->conn,
+            get_class($this->makeUserModel()),
+            'role_user',
+            'role_id',
+            'user_id',
+            'id'
+        ))->setParent($role);
+
+        // Lägg en rad i pivot-tabellen som fallback-SQL-vägen annars skulle hitta.
+        $rel->attach(1);
+
+        $builder = $this->createMock(\Radix\Database\QueryBuilder\QueryBuilder::class);
+
+        $builder->expects($this->once())
+            ->method('get')
+            ->willReturn(new \Radix\Collection\Collection([]));
+
+        $ref = new ReflectionClass($rel);
+        $prop = $ref->getProperty('builder');
+        $prop->setAccessible(true);
+        $prop->setValue($rel, $builder);
+
+        $result = $rel->get();
+
+        $this->assertSame(
+            [],
+            $result,
+            'BelongsToMany::get() ska använda den redan satta QueryBuilder-instansen och returnera dess resultat.'
+        );
+    }
+
     public function testBelongsToManyQueryIncludesPivotColumnsWhenUsingWithPivot(): void
     {
         $role = $this->makeRoleModel();

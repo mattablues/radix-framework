@@ -3041,6 +3041,53 @@ class RelationshipsTest extends TestCase
         }
     }
 
+    public function testWithCountConvertsCamelCaseRelationNameToLowerSnakeCaseAlias(): void
+    {
+        $connection = $this->createMock(\Radix\Database\Connection::class);
+
+        $model = new class extends \Radix\Database\ORM\Model {
+            protected string $table = 'parents';
+            /** @var array<int,string> */
+            protected array $fillable = ['id'];
+
+            public function userRoles(): \Radix\Database\ORM\Relationships\HasMany
+            {
+                $child = new class extends \Radix\Database\ORM\Model {
+                    protected string $table = 'user_roles';
+                    /** @var array<int,string> */
+                    protected array $fillable = ['id', 'parent_id'];
+                };
+
+                return new \Radix\Database\ORM\Relationships\HasMany(
+                    $this->getConnection(),
+                    get_class($child),
+                    'parent_id',
+                    'id'
+                );
+            }
+        };
+
+        $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
+            ->setConnection($connection)
+            ->setModelClass(get_class($model))
+            ->from('parents')
+            ->withCount('userRoles');
+
+        $sql = $qb->toSql();
+
+        $this->assertStringContainsString(
+            'AS `user_roles_count`',
+            $sql,
+            'withCount() ska normalisera camelCase-relationer till lowercase snake_case i alias.'
+        );
+
+        $this->assertStringNotContainsString(
+            'AS `user_Roles_count`',
+            $sql,
+            'Alias får inte behålla versaler efter snake_case-konvertering.'
+        );
+    }
+
     public function testLoadDoesNotCallGetOnClassStringRelation(): void
     {
         // Hjälparklass med get()-metod som INTE ska köras
