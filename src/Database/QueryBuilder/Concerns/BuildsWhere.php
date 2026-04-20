@@ -96,7 +96,7 @@ trait BuildsWhere
         return $this;
     }
 
-    public function orWhere(string $column, string $operator, mixed $value): self
+    public function orWhere(string|Closure $column, ?string $operator = null, mixed $value = null): self
     {
         return $this->where($column, $operator, $value, 'OR');
     }
@@ -259,8 +259,14 @@ trait BuildsWhere
     }
 
     // NYTT: whereExists / whereNotExists
-    public function whereExists(QueryBuilder $sub, string $boolean = 'AND'): self
+    public function whereExists(QueryBuilder|Closure $sub, string $boolean = 'AND'): self
     {
+        if ($sub instanceof Closure) {
+            $query = new QueryBuilder();
+            $sub($query);
+            $sub = $query;
+        }
+
         $this->addWhereBindings($sub->getBindings());
 
         $this->where[] = [
@@ -272,8 +278,14 @@ trait BuildsWhere
         return $this;
     }
 
-    public function whereNotExists(QueryBuilder $sub, string $boolean = 'AND'): self
+    public function whereNotExists(QueryBuilder|Closure $sub, string $boolean = 'AND'): self
     {
+        if ($sub instanceof Closure) {
+            $query = new QueryBuilder();
+            $sub($query);
+            $sub = $query;
+        }
+
         $this->addWhereBindings($sub->getBindings());
 
         $this->where[] = [

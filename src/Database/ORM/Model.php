@@ -70,16 +70,16 @@ use Throwable;
  * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhere(string $column, string $operator, mixed $value)
  * @method static \Radix\Database\QueryBuilder\QueryBuilder whereIn(string $column, array<int,mixed> $values, string $boolean = 'AND')
  * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotIn(string $column, array<int,mixed> $values, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereBetween(string $column, array<int,mixed> $range, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotBetween(string $column, array<int,mixed> $range, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereColumn(string $left, string $operator, string $right, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereExists(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotExists(\Radix\Database\QueryBuilder\QueryBuilder $sub, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereRaw(string $sql, array<int,mixed> $bindings = [], string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNull(string $column, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotNull(string $column, string $boolean = 'AND')
- * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhereNotNull(string $column)
- * @method static \Radix\Database\QueryBuilder\QueryBuilder whereLike(string $column, string $value, string $boolean = 'AND')
+ * @method static \Radix\Database\QueryBuilder\QueryBuilder whereBetween(string $column, array<int, mixed> $range, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotBetween(string $column, array<int, mixed> $range, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereColumn(string $left, string $operator, string $right, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereExists(\Radix\Database\QueryBuilder\QueryBuilder|\Closure $sub, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotExists(\Radix\Database\QueryBuilder\QueryBuilder|\Closure $sub, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereRaw(string $sql, array<int, mixed> $bindings = [], string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNull(string $column, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereNotNull(string $column, string $boolean = 'AND')
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder orWhereNotNull(string $column)
+ * * @method static \Radix\Database\QueryBuilder\QueryBuilder whereLike(string $column, string $value, string $boolean = 'AND')
  *
  * JSON
  * @method static \Radix\Database\QueryBuilder\QueryBuilder jsonExtract(string $column, string $path, ?string $alias = null)
@@ -406,7 +406,7 @@ abstract class Model implements JsonSerializable
         $guardAll = !empty($this->guarded) && in_array('*', $this->guarded, true);
 
         foreach ($row as $key => $value) {
-            if ($guardAll || in_array($key, $this->guarded ?? [], true)) {
+            if ($guardAll || in_array($key, $this->guarded, true)) {
                 continue; // hoppa över guarded vid hydrering
             }
             $this->attributes[$key] = $value;
@@ -714,7 +714,7 @@ abstract class Model implements JsonSerializable
             $originalGuarded = $this->guarded;
 
             // Temporärt tillåt att manipulera `deleted_at`
-            $this->setGuarded(array_diff($this->guarded ?? [], ['deleted_at']));
+            $this->setGuarded(array_diff($this->guarded, ['deleted_at']));
 
             // Kontrollera om `deleted_at` är satt i attributen
             if (!isset($this->attributes['deleted_at'])) {
