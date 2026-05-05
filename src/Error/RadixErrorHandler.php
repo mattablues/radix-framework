@@ -47,21 +47,7 @@ class RadixErrorHandler
 
         $statusCode = $exception instanceof HttpException ? $exception->getStatusCode() : 500;
 
-        // Logga via Logger (inkl. stacktrace)
-        self::logger()->error(
-            'Exception [{class}]: {message} in {file} on line {line}',
-            [
-                'class' => get_class($exception),
-                'message' => $exception->getMessage(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-                'trace' => $exception->getTraceAsString(),
-                'uri' => $requestUri,
-                'method' => $method,
-                'accept' => $accept,
-                'status' => $statusCode,
-            ]
-        );
+        self::logException($exception, $statusCode, $requestUri, $method, $accept);
 
         if ($isApiRequest) {
             $body = [
@@ -125,6 +111,42 @@ class RadixErrorHandler
         }
 
         exit;
+    }
+
+    private static function logException(
+        Throwable $exception,
+        int $statusCode,
+        string $requestUri,
+        string $method,
+        string $accept,
+    ): void {
+        $logContext = [
+            'class' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => $exception->getTraceAsString(),
+            'uri' => $requestUri,
+            'method' => $method,
+            'accept' => $accept,
+            'status' => $statusCode,
+        ];
+
+        if ($statusCode >= 500) {
+            self::logger()->error(
+                "Exception [{class}]: {message} in {file} on line {line}\nStack trace:\n{trace}",
+                $logContext
+            );
+
+            return;
+        }
+
+        if ($statusCode >= 400 && $statusCode !== 404) {
+            self::logger()->warning(
+                'HTTP exception [{status}]: {message} for {method} {uri}',
+                $logContext
+            );
+        }
     }
 
     private static function logger(): \Radix\Support\Logger
