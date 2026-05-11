@@ -8,7 +8,30 @@ use Radix\Http\Exception\GeoLocatorException;
 
 class GeoLocator
 {
-    private string $baseUrl = 'http://ip-api.com/json'; // Ny URL till IP-API
+    private string $baseUrl = 'http://ip-api.com/json';
+
+    private int $timeout = 2;
+
+    public function __construct(?string $baseUrl = null, ?int $timeout = null)
+    {
+        $configuredBaseUrl = $baseUrl ?? getenv('GEOLOCATOR_BASE_URL');
+
+        if (is_string($configuredBaseUrl) && trim($configuredBaseUrl) !== '') {
+            $this->baseUrl = rtrim(trim($configuredBaseUrl), '/');
+        }
+
+        $configuredTimeout = $timeout ?? getenv('GEOLOCATOR_TIMEOUT');
+
+        if (is_int($configuredTimeout) && $configuredTimeout > 0) {
+            $this->timeout = $configuredTimeout;
+        } elseif (is_string($configuredTimeout) && ctype_digit($configuredTimeout)) {
+            $parsedTimeout = (int) $configuredTimeout;
+
+            if ($parsedTimeout > 0) {
+                $this->timeout = $parsedTimeout;
+            }
+        }
+    }
 
     /**
      * @return array<string,mixed>
@@ -18,11 +41,18 @@ class GeoLocator
         $serverIp = $_SERVER['REMOTE_ADDR'] ?? null;
 
         if ($ip === null) {
-            $ip = is_string($serverIp) ? $serverIp : '';
+            $ip = is_string($serverIp) ? trim($serverIp) : '';
         }
 
         $url = $this->baseUrl . '/' . $ip;
-        $data = @file_get_contents($url);
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => $this->timeout,
+            ],
+        ]);
+
+        $data = @file_get_contents($url, false, $context);
 
         if ($data === false) {
             throw new GeoLocatorException("Kunde inte nå API: $url");
@@ -54,6 +84,7 @@ class GeoLocator
     public function get(string $key, ?string $ip = null): mixed
     {
         $location = $this->getLocation($ip);
+
         return $location[$key] ?? null;
     }
 }
