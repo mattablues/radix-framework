@@ -61,6 +61,7 @@ if (!function_exists(__NAMESPACE__ . '\\mkdir')) {
 
             _fsSpyIncrement($spyClass, 'mkdirCallCount');
             _fsSpySetString($spyClass, 'lastMkdirPath', $directory);
+
             if (property_exists($spyClass, 'lastMkdirPermissions')) {
                 $spyClass::$lastMkdirPermissions = $permissions;
             }
@@ -79,7 +80,7 @@ if (!function_exists(__NAMESPACE__ . '\\file_get_contents')) {
         int $offset = 0,
         ?int $length = null
     ): string|false {
-        // Stöd för GeoLocatorTest: om en HTTP-spy finns och är aktiv, returnera fake body
+        // Stöd för GeoLocatorTest: om en HTTP-spy finns, spara anropad URL.
         if (class_exists(__NAMESPACE__ . '\\GeoLocatorHttpSpy')) {
             /** @var class-string $spyClass */
             $spyClass = __NAMESPACE__ . '\\GeoLocatorHttpSpy';
@@ -88,20 +89,13 @@ if (!function_exists(__NAMESPACE__ . '\\file_get_contents')) {
                 $spyClass::$lastFilename = $filename;
             }
 
-            if (property_exists($spyClass, 'lastUseIncludePath')) {
-                $spyClass::$lastUseIncludePath = $use_include_path;
-            }
-
-            if (property_exists($spyClass, 'lastContext')) {
-                $spyClass::$lastContext = $context;
-            }
-
             /** @var mixed $useFake */
             $useFake = property_exists($spyClass, 'useFake') ? $spyClass::$useFake : false;
 
             if ($useFake === true) {
                 /** @var mixed $fakeBody */
                 $fakeBody = property_exists($spyClass, 'fakeBody') ? $spyClass::$fakeBody : null;
+
                 return is_string($fakeBody) ? $fakeBody : '';
             }
         }
