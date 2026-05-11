@@ -46,6 +46,11 @@ final class EnvValidator
         $this->require('LOCATOR_CITY');
         $this->require('LOCATOR_CITY_URL');
 
+        // --- Presence (GeoLocator) ---
+        $this->require('GEOLOCATOR_ENABLED');
+        $this->require('GEOLOCATOR_BASE_URL');
+        $this->require('GEOLOCATOR_TIMEOUT');
+
         // --- Presence (ORM) ---
         // Krävs i production för att undvika “magiska” autoload-problem.
         $this->requireInProduction('ORM_MODEL_NAMESPACE');
@@ -104,7 +109,7 @@ final class EnvValidator
         $this->enum('MAIL_SECURE', ['none', 'ssl', 'tls'], allowEmpty: true);
 
         // --- Bools (0/1, true/false) ---
-        foreach (['APP_DEBUG', 'APP_MAINTENANCE', 'APP_PRIVATE', 'MAIL_AUTH', 'MAIL_DEBUG', 'CORS_ALLOW_CREDENTIALS', 'HEALTH_REQUIRE_TOKEN', 'SESSION_COOKIE_HTTPONLY'] as $b) {
+        foreach (['APP_DEBUG', 'APP_MAINTENANCE', 'APP_PRIVATE', 'MAIL_AUTH', 'MAIL_DEBUG', 'CORS_ALLOW_CREDENTIALS', 'HEALTH_REQUIRE_TOKEN', 'SESSION_COOKIE_HTTPONLY', 'GEOLOCATOR_ENABLED'] as $b) {
             $this->boolLike($b, allowEmpty: true);
         }
 
@@ -112,11 +117,13 @@ final class EnvValidator
         $this->intLike('DB_PORT', min: 1, max: 65535);
         $this->intLike('MAIL_PORT', min: 1, max: 65535);
         $this->intLike('SESSION_LIFETIME', allowEmpty: true);
+        $this->intLike('GEOLOCATOR_TIMEOUT', min: 1, max: 10);
         $this->intLike('APP_COPY_YEAR', min: 1970, max: 3000);
 
         // --- Formats ---
         $this->url('APP_URL');
         $this->url('LOCATOR_CITY_URL');
+        $this->url('GEOLOCATOR_BASE_URL');
         $this->url('CORS_ALLOW_ORIGIN');
         $this->email('MAIL_EMAIL');
 

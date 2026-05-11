@@ -53,6 +53,11 @@ final class EnvValidatorTest extends TestCase
         $this->setEnv('LOCATOR_CITY', 'Stockholm');
         $this->setEnv('LOCATOR_CITY_URL', 'https://example.com/city');
 
+        // GeoLocator
+        $this->setEnv('GEOLOCATOR_ENABLED', '0');
+        $this->setEnv('GEOLOCATOR_BASE_URL', 'http://ip-api.com/json');
+        $this->setEnv('GEOLOCATOR_TIMEOUT', '2');
+
         // CORS
         $this->setEnv('CORS_ALLOW_ORIGIN', 'http://localhost');
         $this->setEnv('CORS_ALLOW_CREDENTIALS', '1');

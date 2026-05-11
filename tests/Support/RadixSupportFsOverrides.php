@@ -84,6 +84,18 @@ if (!function_exists(__NAMESPACE__ . '\\file_get_contents')) {
             /** @var class-string $spyClass */
             $spyClass = __NAMESPACE__ . '\\GeoLocatorHttpSpy';
 
+            if (property_exists($spyClass, 'lastFilename')) {
+                $spyClass::$lastFilename = $filename;
+            }
+
+            if (property_exists($spyClass, 'lastUseIncludePath')) {
+                $spyClass::$lastUseIncludePath = $use_include_path;
+            }
+
+            if (property_exists($spyClass, 'lastContext')) {
+                $spyClass::$lastContext = $context;
+            }
+
             /** @var mixed $useFake */
             $useFake = property_exists($spyClass, 'useFake') ? $spyClass::$useFake : false;
 

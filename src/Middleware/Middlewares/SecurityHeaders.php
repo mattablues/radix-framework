@@ -58,6 +58,10 @@ final class SecurityHeaders implements MiddlewareInterface
         $response->setHeader('X-Content-Type-Options', 'nosniff');
         $response->setHeader('X-Frame-Options', 'DENY');
         $response->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+        $response->setHeader(
+            'Permissions-Policy',
+            'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), fullscreen=(self)'
+        );
         $response->setHeader('X-XSS-Protection', '0'); // moderna browsers, CSP istället
 
         return $response;

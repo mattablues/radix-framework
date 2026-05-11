@@ -53,6 +53,7 @@ namespace Radix\Tests\Config {
                     'APP_ENV', 'APP_URL', 'APP_LANG', 'APP_NAME', 'APP_TIMEZONE', 'APP_COPY', 'APP_COPY_YEAR',
                     'APP_DEBUG', 'APP_MAINTENANCE', 'APP_PRIVATE',
                     'LOCATOR_COUNTRY', 'LOCATOR_CITY', 'LOCATOR_CITY_URL',
+                    'GEOLOCATOR_ENABLED', 'GEOLOCATOR_BASE_URL', 'GEOLOCATOR_TIMEOUT',
                     'CORS_ALLOW_ORIGIN', 'CORS_ALLOW_CREDENTIALS',
                     'HEALTH_REQUIRE_TOKEN', 'API_TOKEN', 'HEALTH_IP_ALLOWLIST', 'TRUSTED_PROXY',
                     'ORM_MODEL_NAMESPACE',
@@ -99,6 +100,9 @@ namespace Radix\Tests\Config {
                 . "LOCATOR_COUNTRY=SE\n"
                 . "LOCATOR_CITY=Stockholm\n"
                 . "LOCATOR_CITY_URL=https://example.com/city\n"
+                . "GEOLOCATOR_ENABLED=0\n"
+                . "GEOLOCATOR_BASE_URL=http://ip-api.com/json\n"
+                . "GEOLOCATOR_TIMEOUT=2\n"
                 . "CORS_ALLOW_ORIGIN=http://localhost\n"
                 . "CORS_ALLOW_CREDENTIALS=1\n"
                 . "HEALTH_REQUIRE_TOKEN=0\n"
@@ -2224,6 +2228,175 @@ namespace Radix\Tests\Config {
             } catch (RuntimeException $e) {
                 $this->assertStringContainsString(
                     'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_SAMESITE=None',
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateWhenGeoLocatorEnabledIsEmptyHasPresenceBullet(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_ENABLED=0\n", "GEOLOCATOR_ENABLED=\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_enabled_empty_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertMatchesRegularExpression(
+                    "/\n - GEOLOCATOR_ENABLED is required(\n|$)/",
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateFailsWhenGeoLocatorEnabledIsNotBooleanLike(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_ENABLED=0\n", "GEOLOCATOR_ENABLED=maybe\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_enabled_bad_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Invalid environment configuration:');
+
+            (new EnvValidator())->validate($basePath);
+        }
+
+        public function testValidateWhenGeoLocatorBaseUrlIsEmptyHasPresenceBullet(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_BASE_URL=http://ip-api.com/json\n", "GEOLOCATOR_BASE_URL=\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_base_url_empty_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertMatchesRegularExpression(
+                    "/\n - GEOLOCATOR_BASE_URL is required(\n|$)/",
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateFailsWhenGeoLocatorBaseUrlIsInvalid(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_BASE_URL=http://ip-api.com/json\n", "GEOLOCATOR_BASE_URL=not-a-url\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_base_url_bad_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Invalid environment configuration:');
+
+            (new EnvValidator())->validate($basePath);
+        }
+
+        public function testValidateWhenGeoLocatorTimeoutIsEmptyHasPresenceBullet(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_TIMEOUT=2\n", "GEOLOCATOR_TIMEOUT=\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_timeout_empty_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertMatchesRegularExpression(
+                    "/\n - GEOLOCATOR_TIMEOUT is required(\n|$)/",
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateFailsWhenGeoLocatorTimeoutIsNotInteger(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_TIMEOUT=2\n", "GEOLOCATOR_TIMEOUT=not-an-int\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_timeout_bad_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Invalid environment configuration:');
+
+            (new EnvValidator())->validate($basePath);
+        }
+
+        public function testValidateAcceptsGeoLocatorTimeoutAtMinAndMaxBounds(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_timeout_bounds_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            $envMin = str_replace("GEOLOCATOR_TIMEOUT=2\n", "GEOLOCATOR_TIMEOUT=1\n", $env);
+            (new Dotenv($this->writeTempEnv($envMin), $basePath))->load();
+            (new EnvValidator())->validate($basePath);
+
+            $envMax = str_replace("GEOLOCATOR_TIMEOUT=2\n", "GEOLOCATOR_TIMEOUT=10\n", $env);
+            (new Dotenv($this->writeTempEnv($envMax), $basePath))->load();
+            (new EnvValidator())->validate($basePath);
+        }
+
+        public function testValidateFailsWhenGeoLocatorTimeoutIsBelowMin(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_TIMEOUT=2\n", "GEOLOCATOR_TIMEOUT=0\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_timeout_zero_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString(
+                    'GEOLOCATOR_TIMEOUT must be >= 1',
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateFailsWhenGeoLocatorTimeoutIsOutOfRange(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("GEOLOCATOR_TIMEOUT=2\n", "GEOLOCATOR_TIMEOUT=11\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_geolocator_timeout_range_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString(
+                    'GEOLOCATOR_TIMEOUT must be <= 10',
                     $e->getMessage()
                 );
             }
