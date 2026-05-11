@@ -62,8 +62,12 @@ final class EnvValidator
         // --- Presence (Session) ---
         $this->require('SESSION_DRIVER');
         $this->require('SESSION_LIFETIME');
+        $this->require('SESSION_COOKIE_SECURE');
+        $this->require('SESSION_COOKIE_HTTPONLY');
+        $this->require('SESSION_COOKIE_SAMESITE');
         $this->requireIfEquals('SESSION_DRIVER', 'file', 'SESSION_FILE_PATH');
         $this->requireIfEquals('SESSION_DRIVER', 'database', 'SESSION_TABLE');
+
 
         // --- Presence (Keys) ---
         $this->require('SECURE_TOKEN_HMAC');
@@ -95,10 +99,12 @@ final class EnvValidator
         $this->enum('APP_ENV', ['prod', 'production', 'dev', 'development', 'local', 'test']);
         $this->enum('DB_DRIVER', ['mysql', 'sqlite']);
         $this->enum('SESSION_DRIVER', ['file', 'database']);
+        $this->enum('SESSION_COOKIE_SECURE', ['auto', '1', '0', 'true', 'false']);
+        $this->enum('SESSION_COOKIE_SAMESITE', ['Lax', 'Strict', 'None']);
         $this->enum('MAIL_SECURE', ['none', 'ssl', 'tls'], allowEmpty: true);
 
         // --- Bools (0/1, true/false) ---
-        foreach (['APP_DEBUG', 'APP_MAINTENANCE', 'APP_PRIVATE', 'MAIL_AUTH', 'MAIL_DEBUG', 'CORS_ALLOW_CREDENTIALS', 'HEALTH_REQUIRE_TOKEN'] as $b) {
+        foreach (['APP_DEBUG', 'APP_MAINTENANCE', 'APP_PRIVATE', 'MAIL_AUTH', 'MAIL_DEBUG', 'CORS_ALLOW_CREDENTIALS', 'HEALTH_REQUIRE_TOKEN', 'SESSION_COOKIE_HTTPONLY'] as $b) {
             $this->boolLike($b, allowEmpty: true);
         }
 
@@ -126,6 +132,8 @@ final class EnvValidator
         if (strtolower($this->get('SESSION_DRIVER')) === 'file') {
             $this->writablePath('SESSION_FILE_PATH', $basePath);
         }
+
+        $this->validateSessionCookieSecurity();
 
         if ($this->errors !== []) {
             throw new RuntimeException("Invalid environment configuration:\n - " . implode("\n - ", $this->errors));
@@ -171,6 +179,16 @@ final class EnvValidator
         $v = strtolower($this->get($key));
         if ($v === strtolower($equals) && $this->get($requiredKey) === '') {
             $this->errors[] = "$requiredKey is required when $key=$equals";
+        }
+    }
+
+    private function validateSessionCookieSecurity(): void
+    {
+        $sameSite = strtolower($this->get('SESSION_COOKIE_SAMESITE'));
+        $secure = strtolower($this->get('SESSION_COOKIE_SECURE'));
+
+        if ($sameSite === 'none' && !in_array($secure, ['1', 'true'], true)) {
+            $this->errors[] = 'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_SAMESITE=None';
         }
     }
 

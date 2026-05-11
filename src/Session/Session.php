@@ -39,6 +39,8 @@ class Session implements SessionInterface
             return true;
         }
 
+        $this->configureSessionCookie();
+
         session_start();
         $this->isStarted = true;
 
@@ -89,15 +91,16 @@ class Session implements SessionInterface
                 throw new RuntimeException('Unable to determine session name for cookie destruction.');
             }
 
-            setcookie(
-                $name,
-                '',
-                time() - 86400,
-                $params['path'],
-                $params['domain'],
-                (bool) $params['secure'],
-                (bool) $params['httponly']
-            );
+            $sameSite = $this->resolveCookieSameSite();
+
+            setcookie($name, '', [
+                'expires' => time() - 86400,
+                'path' => $params['path'],
+                'domain' => $params['domain'],
+                'secure' => $this->resolveCookieSecure($sameSite),
+                'httponly' => $this->resolveCookieHttpOnly(),
+                'samesite' => $sameSite,
+            ]);
         }
 
         session_destroy();
@@ -264,6 +267,135 @@ class Session implements SessionInterface
         }
 
         if ($sessionUserAgent === $_SERVER['HTTP_USER_AGENT']) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function configureSessionCookie(): void
+    {
+        $params = session_get_cookie_params();
+        $sameSite = $this->resolveCookieSameSite();
+        $secure = $this->resolveCookieSecure($sameSite);
+        $httpOnly = $this->resolveCookieHttpOnly();
+
+        session_set_cookie_params([
+            'lifetime' => $params['lifetime'],
+            'path' => $params['path'],
+            'domain' => $params['domain'],
+            'secure' => $secure,
+            'httponly' => $httpOnly,
+            'samesite' => $sameSite,
+        ]);
+
+        ini_set('session.cookie_httponly', $httpOnly ? '1' : '0');
+        ini_set('session.cookie_secure', $secure ? '1' : '0');
+        ini_set('session.cookie_samesite', $sameSite);
+        ini_set('session.use_only_cookies', '1');
+        ini_set('session.use_strict_mode', '1');
+    }
+
+    /**
+     * @param 'Lax'|'Strict'|'None' $sameSite
+     */
+    private function resolveCookieSecure(string $sameSite): bool
+    {
+        if ($sameSite === 'None') {
+            return true;
+        }
+
+        $value = getenv('SESSION_COOKIE_SECURE');
+
+        if ($value === false || strtolower((string) $value) === 'auto') {
+            return $this->isHttpsRequest();
+        }
+
+        return $this->envBool((string) $value, $this->isHttpsRequest());
+    }
+
+    private function resolveCookieHttpOnly(): bool
+    {
+        $value = getenv('SESSION_COOKIE_HTTPONLY');
+
+        if ($value === false) {
+            return true;
+        }
+
+        return $this->envBool((string) $value, true);
+    }
+
+    /**
+     * @return 'Lax'|'Strict'|'None'
+     */
+    private function resolveCookieSameSite(): string
+    {
+        $value = getenv('SESSION_COOKIE_SAMESITE');
+
+        if ($value === false) {
+            return 'Lax';
+        }
+
+        return $this->normalizeSameSite((string) $value);
+    }
+
+    /**
+     * @return 'Lax'|'Strict'|'None'
+     */
+    private function normalizeSameSite(mixed $sameSite): string
+    {
+        if (!is_string($sameSite)) {
+            return 'Lax';
+        }
+
+        $sameSite = ucfirst(strtolower($sameSite));
+
+        if ($sameSite === 'Strict') {
+            return 'Strict';
+        }
+
+        if ($sameSite === 'None') {
+            return 'None';
+        }
+
+        return 'Lax';
+    }
+
+    private function envBool(string $value, bool $default): bool
+    {
+        $normalized = strtolower(trim($value));
+
+        if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+            return true;
+        }
+
+        if (in_array($normalized, ['0', 'false', 'no', 'off'], true)) {
+            return false;
+        }
+
+        return $default;
+    }
+
+    private function isHttpsRequest(): bool
+    {
+        $https = $_SERVER['HTTPS'] ?? null;
+        $scheme = $_SERVER['REQUEST_SCHEME'] ?? null;
+        $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? null;
+        $forwardedSsl = $_SERVER['HTTP_X_FORWARDED_SSL'] ?? null;
+
+        if ($https === 'on' || $https === '1') {
+            return true;
+        }
+
+        if ($scheme === 'https') {
+            return true;
+        }
+
+        if (is_string($forwardedProto) && str_contains($forwardedProto, 'https')) {
+            return true;
+        }
+
+        if ($forwardedSsl === 'on') {
             return true;
         }
 
