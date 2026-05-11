@@ -89,6 +89,17 @@ if (!function_exists(__NAMESPACE__ . '\\file_get_contents')) {
                 $spyClass::$lastFilename = $filename;
             }
 
+            if (property_exists($spyClass, 'lastUseIncludePath')) {
+                $spyClass::$lastUseIncludePath = $use_include_path;
+            }
+
+            if (property_exists($spyClass, 'lastContextOptions') && is_resource($context)) {
+                $options = stream_context_get_options($context);
+
+                /** @var array<string,mixed> $options */
+                $spyClass::$lastContextOptions = $options;
+            }
+
             /** @var mixed $useFake */
             $useFake = property_exists($spyClass, 'useFake') ? $spyClass::$useFake : false;
 
