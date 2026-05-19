@@ -277,13 +277,22 @@ class Session implements SessionInterface
     {
         $params = session_get_cookie_params();
         $sameSite = $this->resolveCookieSameSite();
-        $secure = $this->resolveCookieSecure($sameSite);
+        $cookieName = $this->resolveCookieName();
+
+        if ($cookieName !== null) {
+            session_name($cookieName);
+        }
+
+        $usesHostPrefix = str_starts_with((string) session_name(), '__Host-');
+        $secure = $usesHostPrefix ? true : $this->resolveCookieSecure($sameSite);
         $httpOnly = $this->resolveCookieHttpOnly();
+        $path = $usesHostPrefix ? '/' : $params['path'];
+        $domain = $usesHostPrefix ? '' : $params['domain'];
 
         session_set_cookie_params([
             'lifetime' => $params['lifetime'],
-            'path' => $params['path'],
-            'domain' => $params['domain'],
+            'path' => $path,
+            'domain' => $domain,
             'secure' => $secure,
             'httponly' => $httpOnly,
             'samesite' => $sameSite,
@@ -323,6 +332,23 @@ class Session implements SessionInterface
         }
 
         return $this->envBool((string) $value, true);
+    }
+
+    private function resolveCookieName(): ?string
+    {
+        $value = getenv('SESSION_COOKIE_NAME');
+
+        if ($value === false) {
+            return null;
+        }
+
+        $name = trim((string) $value);
+
+        if ($name === '') {
+            return null;
+        }
+
+        return $name;
     }
 
     /**

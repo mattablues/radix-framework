@@ -59,7 +59,7 @@ namespace Radix\Tests\Config {
                     'ORM_MODEL_NAMESPACE',
                     'DB_DRIVER', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USERNAME', 'DB_PASSWORD', 'DB_CHARSET',
                     'SESSION_DRIVER', 'SESSION_FILE_PATH', 'SESSION_TABLE', 'SESSION_LIFETIME',
-                    'SESSION_COOKIE_SECURE', 'SESSION_COOKIE_HTTPONLY', 'SESSION_COOKIE_SAMESITE',
+                    'SESSION_COOKIE_NAME', 'SESSION_COOKIE_SECURE', 'SESSION_COOKIE_HTTPONLY', 'SESSION_COOKIE_SAMESITE',
                     'SECURE_TOKEN_HMAC', 'SECURE_ENCRYPTION_KEY',
                     'CACHE_ROOT', 'VIEWS_CACHE_PATH', 'APP_CACHE_PATH', 'HEALTH_CACHE_PATH', 'RATELIMIT_CACHE_PATH',
                     'MAIL_HOST', 'MAIL_PORT', 'MAIL_EMAIL', 'MAIL_FROM', 'MAIL_DEBUG', 'MAIL_CHARSET', 'MAIL_SECURE',
@@ -121,6 +121,7 @@ namespace Radix\Tests\Config {
                 . "SESSION_FILE_PATH=cache/sessions\n"
                 . "SESSION_TABLE=sessions\n"
                 . "SESSION_LIFETIME=1440\n"
+                . "SESSION_COOKIE_NAME=radix_session\n"
                 . "SESSION_COOKIE_SECURE=auto\n"
                 . "SESSION_COOKIE_HTTPONLY=true\n"
                 . "SESSION_COOKIE_SAMESITE=Lax\n"
@@ -967,6 +968,7 @@ namespace Radix\Tests\Config {
                 ormNamespace: 'Dummy\\Models\\',
                 healthAllowlist: '127.0.0.1'
             );
+            $env = str_replace("SESSION_COOKIE_SECURE=auto\n", "SESSION_COOKIE_SECURE=true\n", $env);
 
             $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_appenv_prod_' . uniqid('', true);
             @mkdir($basePath, 0o755, true);
@@ -2232,6 +2234,148 @@ namespace Radix\Tests\Config {
                 );
             }
         }
+
+        public function testValidateWhenSessionCookieNameIsEmptyHasPresenceBullet(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("SESSION_COOKIE_NAME=radix_session\n", "SESSION_COOKIE_NAME=\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_name_empty_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertMatchesRegularExpression(
+                    "/\n - SESSION_COOKIE_NAME is required(\n|$)/",
+                    $e->getMessage(),
+                    'SESSION_COOKIE_NAME ska ha en egen presence-bullet när den är tom.'
+                );
+            }
+        }
+
+        public function testValidateFailsWhenSessionCookieNameIsInvalid(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("SESSION_COOKIE_NAME=radix_session\n", "SESSION_COOKIE_NAME=bad cookie name\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_name_bad_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString(
+                    'SESSION_COOKIE_NAME must be a valid cookie name',
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateFailsWhenSessionCookieSecureAutoIsUsedInProduction(): void
+        {
+            $env = $this->baseEnv(
+                appEnv: 'production',
+                ormNamespace: 'Dummy\\Models\\',
+                healthAllowlist: '127.0.0.1'
+            );
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_auto_prod_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString(
+                    'SESSION_COOKIE_SECURE=auto is only allowed outside production',
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateAcceptsSessionCookieSecureAutoOutsideProduction(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_auto_dev_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            (new EnvValidator())->validate($basePath);
+
+            $this->assertSame('auto', getenv('SESSION_COOKIE_SECURE'));
+        }
+
+        public function testValidateFailsWhenHostPrefixedSessionCookieIsNotSecure(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("SESSION_COOKIE_NAME=radix_session\n", "SESSION_COOKIE_NAME=__Host-radix_session\n", $env);
+            $env = str_replace("SESSION_COOKIE_SECURE=auto\n", "SESSION_COOKIE_SECURE=false\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_host_prefix_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString(
+                    'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_NAME uses the __Host- prefix',
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateFailsWhenSecurePrefixedSessionCookieIsNotSecure(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("SESSION_COOKIE_NAME=radix_session\n", "SESSION_COOKIE_NAME=__Secure-radix_session\n", $env);
+            $env = str_replace("SESSION_COOKIE_SECURE=auto\n", "SESSION_COOKIE_SECURE=0\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_secure_prefix_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            try {
+                (new EnvValidator())->validate($basePath);
+                $this->fail('Expected exception not thrown.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString(
+                    'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_NAME uses the __Secure- prefix',
+                    $e->getMessage()
+                );
+            }
+        }
+
+        public function testValidateAcceptsHostPrefixedSessionCookieWhenSecureIsTrue(): void
+        {
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env = str_replace("SESSION_COOKIE_NAME=radix_session\n", "SESSION_COOKIE_NAME=__Host-radix_session\n", $env);
+            $env = str_replace("SESSION_COOKIE_SECURE=auto\n", "SESSION_COOKIE_SECURE=true\n", $env);
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_session_cookie_host_prefix_ok_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            (new EnvValidator())->validate($basePath);
+
+            $this->assertSame('__Host-radix_session', getenv('SESSION_COOKIE_NAME'));
+        }
+
 
         public function testValidateWhenGeoLocatorEnabledIsEmptyHasPresenceBullet(): void
         {
