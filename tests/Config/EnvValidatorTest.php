@@ -85,6 +85,7 @@ final class EnvValidatorTest extends TestCase
         $this->setEnv('SESSION_FILE_PATH', 'cache/sessions');
         $this->setEnv('SESSION_TABLE', 'sessions');
         $this->setEnv('SESSION_LIFETIME', '1440');
+        $this->setEnv('SESSION_COOKIE_NAME', 'radix_session');
         $this->setEnv('SESSION_COOKIE_SECURE', 'auto');
         $this->setEnv('SESSION_COOKIE_HTTPONLY', 'true');
         $this->setEnv('SESSION_COOKIE_SAMESITE', 'Lax');

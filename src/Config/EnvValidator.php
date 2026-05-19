@@ -67,12 +67,12 @@ final class EnvValidator
         // --- Presence (Session) ---
         $this->require('SESSION_DRIVER');
         $this->require('SESSION_LIFETIME');
+        $this->require('SESSION_COOKIE_NAME');
         $this->require('SESSION_COOKIE_SECURE');
         $this->require('SESSION_COOKIE_HTTPONLY');
         $this->require('SESSION_COOKIE_SAMESITE');
         $this->requireIfEquals('SESSION_DRIVER', 'file', 'SESSION_FILE_PATH');
         $this->requireIfEquals('SESSION_DRIVER', 'database', 'SESSION_TABLE');
-
 
         // --- Presence (Keys) ---
         $this->require('SECURE_TOKEN_HMAC');
@@ -126,6 +126,7 @@ final class EnvValidator
         $this->url('GEOLOCATOR_BASE_URL');
         $this->url('CORS_ALLOW_ORIGIN');
         $this->email('MAIL_EMAIL');
+        $this->cookieName('SESSION_COOKIE_NAME');
 
         // Timezone (bättre fel tidigt än konstiga datum senare)
         $this->timezone('APP_TIMEZONE');
@@ -193,9 +194,22 @@ final class EnvValidator
     {
         $sameSite = strtolower($this->get('SESSION_COOKIE_SAMESITE'));
         $secure = strtolower($this->get('SESSION_COOKIE_SECURE'));
+        $cookieName = $this->get('SESSION_COOKIE_NAME');
 
         if ($sameSite === 'none' && !in_array($secure, ['1', 'true'], true)) {
             $this->errors[] = 'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_SAMESITE=None';
+        }
+
+        if ($this->isProduction() && $secure === 'auto') {
+            $this->errors[] = 'SESSION_COOKIE_SECURE=auto is only allowed outside production';
+        }
+
+        if (str_starts_with($cookieName, '__Host-') && !in_array($secure, ['1', 'true'], true)) {
+            $this->errors[] = 'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_NAME uses the __Host- prefix';
+        }
+
+        if (str_starts_with($cookieName, '__Secure-') && !in_array($secure, ['1', 'true'], true)) {
+            $this->errors[] = 'SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_NAME uses the __Secure- prefix';
         }
     }
 
@@ -265,6 +279,24 @@ final class EnvValidator
         }
         if ($v === '' || filter_var($v, FILTER_VALIDATE_EMAIL) === false) {
             $this->errors[] = "$key must be a valid email";
+        }
+    }
+
+    private function cookieName(string $key, bool $allowEmpty = false): void
+    {
+        $v = $this->get($key);
+
+        if ($v === '' && $allowEmpty) {
+            return;
+        }
+
+        if ($v === '') {
+            $this->errors[] = "$key must be a valid cookie name";
+            return;
+        }
+
+        if (preg_match('/^[A-Za-z0-9!#$%&\'*+\-.^_`|~]+$/', $v) !== 1) {
+            $this->errors[] = "$key must be a valid cookie name";
         }
     }
 

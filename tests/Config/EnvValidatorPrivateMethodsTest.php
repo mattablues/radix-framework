@@ -908,4 +908,170 @@ final class EnvValidatorPrivateMethodsTest extends TestCase
             'Tomt prefix ska vara ogiltigt.'
         );
     }
+
+    public function testCookieNameDefaultDoesNotAllowEmpty(): void
+    {
+        // Dödar mutant där default allowEmpty ändras från false till true.
+        putenv('SESSION_COOKIE_NAME=');
+        unset($_ENV['SESSION_COOKIE_NAME'], $_SERVER['SESSION_COOKIE_NAME']);
+
+        $v = new EnvValidator();
+
+        $rm = $this->rm('cookieName');
+        $rm->invoke($v, 'SESSION_COOKIE_NAME');
+
+        $errors = $this->errorsOf($v);
+
+        $this->assertNotEmpty(
+            $errors,
+            'cookieName() ska ge fel för tomt värde när allowEmpty inte anges.'
+        );
+    }
+
+    public function testCookieNameAllowEmptyTrueSkipsOnlyWhenValueIsEmpty(): void
+    {
+        // Dödar mutanter som ändrar:
+        // if ($v === '' && $allowEmpty)
+        // till varianter som returnerar vid fel tillfälle.
+
+        $rm = $this->rm('cookieName');
+
+        // 1) allowEmpty=true + tomt värde => ska accepteras.
+        $v1 = new EnvValidator();
+
+        putenv('SESSION_COOKIE_NAME=');
+        unset($_ENV['SESSION_COOKIE_NAME'], $_SERVER['SESSION_COOKIE_NAME']);
+
+        $rm->invoke($v1, 'SESSION_COOKIE_NAME', true);
+
+        $errors1 = $this->errorsOf($v1);
+
+        $this->assertSame(
+            [],
+            $errors1,
+            'cookieName() ska acceptera tomt värde när allowEmpty=true.'
+        );
+
+        // 2) allowEmpty=true + icke-tomt ogiltigt värde => ska fortfarande valideras.
+        $v2 = new EnvValidator();
+
+        putenv('SESSION_COOKIE_NAME=bad cookie name');
+        $_ENV['SESSION_COOKIE_NAME'] = 'bad cookie name';
+        $_SERVER['SESSION_COOKIE_NAME'] = 'bad cookie name';
+
+        $rm->invoke($v2, 'SESSION_COOKIE_NAME', true);
+
+        $errors2 = $this->errorsOf($v2);
+
+        $this->assertNotEmpty(
+            $errors2,
+            'cookieName() ska validera icke-tomma värden även när allowEmpty=true.'
+        );
+
+        $this->assertSame(
+            'SESSION_COOKIE_NAME must be a valid cookie name',
+            $errors2[0]
+        );
+    }
+
+    public function testCookieNameAllowEmptyFalseStillValidatesEmptyAsError(): void
+    {
+        // Dödar mutant:
+        // if ($v === '' && $allowEmpty)
+        // -> if ($v === '' && !$allowEmpty)
+        putenv('SESSION_COOKIE_NAME=');
+        unset($_ENV['SESSION_COOKIE_NAME'], $_SERVER['SESSION_COOKIE_NAME']);
+
+        $v = new EnvValidator();
+
+        $rm = $this->rm('cookieName');
+        $rm->invoke($v, 'SESSION_COOKIE_NAME', false);
+
+        $errors = $this->errorsOf($v);
+
+        $this->assertNotEmpty(
+            $errors,
+            'cookieName() ska ge fel för tomt värde när allowEmpty=false.'
+        );
+
+        $this->assertSame(
+            'SESSION_COOKIE_NAME must be a valid cookie name',
+            $errors[0]
+        );
+    }
+
+    public function testCookieNameStopsAfterEmptyValueSoItDoesNotAddDuplicateErrors(): void
+    {
+        // Dödar ReturnRemoval-mutanten efter:
+        // if ($v === '') { ... return; }
+        putenv('SESSION_COOKIE_NAME=');
+        unset($_ENV['SESSION_COOKIE_NAME'], $_SERVER['SESSION_COOKIE_NAME']);
+
+        $v = new EnvValidator();
+
+        $rm = $this->rm('cookieName');
+        $rm->invoke($v, 'SESSION_COOKIE_NAME', false);
+
+        $errors = $this->errorsOf($v);
+
+        $this->assertCount(
+            1,
+            $errors,
+            'cookieName() ska bara lägga ett fel för tomt värde och sedan returnera.'
+        );
+
+        $this->assertSame(
+            'SESSION_COOKIE_NAME must be a valid cookie name',
+            $errors[0]
+        );
+    }
+
+    public function testCookieNameAcceptsValidSessionCookieNames(): void
+    {
+        $rm = $this->rm('cookieName');
+
+        foreach (['radix_session', '__Host-radix_session', '__Secure-radix_session'] as $name) {
+            $v = new EnvValidator();
+
+            putenv('SESSION_COOKIE_NAME=' . $name);
+            $_ENV['SESSION_COOKIE_NAME'] = $name;
+            $_SERVER['SESSION_COOKIE_NAME'] = $name;
+
+            $rm->invoke($v, 'SESSION_COOKIE_NAME', false);
+
+            $this->assertSame(
+                [],
+                $this->errorsOf($v),
+                "{$name} ska vara ett giltigt cookie-namn."
+            );
+        }
+    }
+
+    public function testCookieNameRejectsInvalidCharacters(): void
+    {
+        $rm = $this->rm('cookieName');
+
+        foreach (['bad cookie name', 'bad;cookie', 'bad=cookie', 'bad,cookie'] as $name) {
+            $v = new EnvValidator();
+
+            putenv('SESSION_COOKIE_NAME=' . $name);
+            $_ENV['SESSION_COOKIE_NAME'] = $name;
+            $_SERVER['SESSION_COOKIE_NAME'] = $name;
+
+            $rm->invoke($v, 'SESSION_COOKIE_NAME', false);
+
+            $errors = $this->errorsOf($v);
+
+            $this->assertNotEmpty(
+                $errors,
+                "{$name} ska nekas som cookie-namn."
+            );
+
+            $this->assertSame(
+                'SESSION_COOKIE_NAME must be a valid cookie name',
+                $errors[0]
+            );
+        }
+    }
+
 }
