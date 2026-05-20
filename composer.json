@@ -9,7 +9,9 @@
     "psr/container": "^2.0",
     "dflydev/dot-access-data": "^3.0.2",
     "ext-libxml": "*",
-      "ext-pdo": "*"
+    "ext-pdo": "*",
+    "ext-fileinfo": "*",
+    "ext-gd": "*"
   },
   "autoload": {
     "psr-4": {
