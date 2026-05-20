@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Radix\File;
 
+use finfo;
 use Radix\Support\Validator;
 use RuntimeException;
 
@@ -15,6 +16,16 @@ class Upload
     /** @var array<string,array<int,string>> */
     protected array $errors = [];
     protected string $uploadDirectory;
+
+    /**
+     * @var array<string,string>
+     */
+    private const array MIME_EXTENSIONS = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+    ];
 
     /**
      * @param array<string,mixed> $file
@@ -62,13 +73,15 @@ class Upload
      */
     public function save(string $fileName = ''): string
     {
-        $fileName = $fileName ?: $this->generateFileName();
-        $targetPath = rtrim($this->uploadDirectory, '/') . '/' . $fileName;
+        $this->assertUploadOk();
 
-        $tmpName = $this->file['tmp_name'] ?? null;
-        if (!is_string($tmpName) || $tmpName === '') {
-            throw new RuntimeException('Ogiltigt tmp_name för uppladdad fil.');
-        }
+        $tmpName = $this->getTmpName();
+
+        $fileName = $fileName !== ''
+            ? $this->sanitizeFileName($fileName)
+            : $this->generateFileNameFromMimeType($tmpName);
+
+        $targetPath = rtrim($this->uploadDirectory, '/\\') . '/' . $fileName;
 
         if (!move_uploaded_file($tmpName, $targetPath)) {
             throw new RuntimeException("Misslyckades med att flytta uppladdad fil till $targetPath");
@@ -87,16 +100,18 @@ class Upload
      */
     public function processImage(callable $processCallback, string $outputFileName = ''): string
     {
-        $tmpName = $this->file['tmp_name'] ?? null;
-        if (!is_string($tmpName) || $tmpName === '') {
-            throw new RuntimeException('Ogiltigt tmp_name för uppladdad bildfil.');
-        }
+        $this->assertUploadOk();
+
+        $tmpName = $this->getTmpName();
 
         $image = new Image($tmpName);
         $processCallback($image);
 
-        $outputFileName = $outputFileName ?: $this->generateFileName();
-        $targetPath = rtrim($this->uploadDirectory, '/') . '/' . $outputFileName;
+        $outputFileName = $outputFileName !== ''
+            ? $this->sanitizeFileName($outputFileName)
+            : $this->generateFileNameFromMimeType($tmpName);
+
+        $targetPath = rtrim($this->uploadDirectory, '/\\') . '/' . $outputFileName;
 
         $image->saveImage($targetPath);
 
@@ -110,23 +125,83 @@ class Upload
      */
     protected function generateFileName(): string
     {
-        $rawName = $this->file['name'] ?? '';
+        return bin2hex(random_bytes(16));
+    }
 
-        if (!is_string($rawName) || $rawName === '') {
-            // fallback: inget namn, använd bara uniqid utan extension
-            return uniqid('', true);
+    /**
+     * @throws RuntimeException
+     */
+    protected function generateFileNameFromMimeType(string $tmpName): string
+    {
+        $mimeType = $this->detectMimeType($tmpName);
+        $extension = self::MIME_EXTENSIONS[$mimeType] ?? null;
+
+        if ($extension === null) {
+            throw new RuntimeException("Otillåten filtyp: $mimeType");
         }
 
-        $extension = pathinfo($rawName, PATHINFO_EXTENSION);
-        if (!is_string($extension)) {
-            $extension = '';
+        return $this->generateFileName() . '.' . $extension;
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    protected function detectMimeType(string $tmpName): string
+    {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($tmpName);
+
+        if (!is_string($mimeType) || $mimeType === '') {
+            throw new RuntimeException('Kunde inte identifiera MIME-typ för uppladdad fil.');
         }
 
-        $base = uniqid('', true);
+        return strtolower($mimeType);
+    }
 
-        return $extension !== ''
-            ? $base . '.' . strtolower($extension)
-            : $base;
+    /**
+     * @throws RuntimeException
+     */
+    protected function sanitizeFileName(string $fileName): string
+    {
+        if ($fileName !== basename($fileName)) {
+            throw new RuntimeException('Ogiltigt filnamn.');
+        }
+
+        if (!preg_match('/\A[a-zA-Z0-9._-]+\z/', $fileName)) {
+            throw new RuntimeException('Ogiltigt filnamn.');
+        }
+
+        if ($fileName === '.' || $fileName === '..') {
+            throw new RuntimeException('Ogiltigt filnamn.');
+        }
+
+        return $fileName;
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    protected function assertUploadOk(): void
+    {
+        $error = $this->file['error'] ?? null;
+
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('Filen är inte en giltig uppladdning.');
+        }
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    protected function getTmpName(): string
+    {
+        $tmpName = $this->file['tmp_name'] ?? null;
+
+        if (!is_string($tmpName) || $tmpName === '') {
+            throw new RuntimeException('Ogiltigt tmp_name för uppladdad fil.');
+        }
+
+        return $tmpName;
     }
 
     /**

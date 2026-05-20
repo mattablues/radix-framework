@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Radix\Support;
 
 use DateTime;
+use finfo;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -780,28 +781,47 @@ class Validator
             return true; // Anses validerad om ingen fil skickades
         }
 
-        // Kontrollera att vi har en fil-array med 'type'
-        if (!is_array($value) || !array_key_exists('type', $value)) {
-            return false;
-        }
-
-        $type = $value['type'];
-
-        // Säkerställ att type är en sträng
-        if (!is_string($type) || $type === '') {
-            return false;
-        }
-
         // Kontrollera att parametern finns och inte är tom
-        if ($parameter === null || $parameter === '') {
+        if ($parameter === null || trim($parameter) === '') {
             throw new InvalidArgumentException("Parameter krävs för 'file_type'-regeln.");
         }
 
-        // Tillåtna MIME-typer
-        $allowedTypes = array_map('trim', explode(',', strtolower($parameter)));
+        // Kontrollera att vi har en fil-array med tmp_name
+        if (!is_array($value) || !array_key_exists('tmp_name', $value)) {
+            return false;
+        }
 
-        // Kontrollera att filens MIME-typ är tillåten
-        return in_array(strtolower($type), $allowedTypes, true);
+        $tmpName = $value['tmp_name'];
+
+        if (!is_string($tmpName) || $tmpName === '') {
+            return false;
+        }
+
+        if (!is_file($tmpName)) {
+            return false;
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($tmpName);
+
+        if (!is_string($mimeType) || $mimeType === '') {
+            return false;
+        }
+
+        /** @var list<string> $allowedTypes */
+        $allowedTypes = array_values(array_filter(
+            array_map(
+                static fn(string $type): string => strtolower(trim($type)),
+                explode(',', $parameter)
+            ),
+            static fn(string $type): bool => $type !== ''
+        ));
+
+        if ($allowedTypes === []) {
+            throw new InvalidArgumentException("Parameter krävs för 'file_type'-regeln.");
+        }
+
+        return in_array(strtolower($mimeType), $allowedTypes, true);
     }
 
     protected function validateFileSize(mixed $value, ?string $parameter = null): bool
@@ -811,21 +831,33 @@ class Validator
             return true; // Anses validerad om ingen fil skickades
         }
 
-        // Kontrollera om arrayen är korrekt
-        if (!is_array($value) || empty($value['size'])) {
-            return false;
-        }
-
         // Kontrollera att parametern är en giltig siffra
         if ($parameter === null || !is_numeric($parameter)) {
             throw new InvalidArgumentException("Parameter för 'file_size' måste vara en giltig siffra.");
+        }
+
+        // Kontrollera om arrayen är korrekt
+        if (!is_array($value) || !array_key_exists('size', $value)) {
+            return false;
+        }
+
+        $size = $value['size'];
+
+        if (!is_int($size) && !(is_string($size) && ctype_digit($size))) {
+            return false;
+        }
+
+        $sizeInBytes = (int) $size;
+
+        if ($sizeInBytes < 0) {
+            return false;
         }
 
         // Max tillåtna filstorlek i bytes
         $maxBytes = (int) $parameter * 1024 * 1024;
 
         // Kontrollera om filens storlek ligger inom det tillåtna intervallet
-        return $value['size'] <= $maxBytes;
+        return $sizeInBytes <= $maxBytes;
     }
 
     protected function getValueForDotNotation(string $field): mixed

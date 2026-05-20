@@ -245,7 +245,7 @@ class UploadTest extends TestCase
         $this->assertSame([], UploadMkdirSpy::$calls, 'mkdir() ska inte anropas när katalogen redan finns.');
     }
 
-    public function testGenerateFileNameUsesBaseNameAndLowercasedExtension(): void
+    public function testGenerateFileNameReturnsRandomHexNameWithoutOriginalExtension(): void
     {
         $file = [
             'name' => 'My IMAGE.JPG',
@@ -272,18 +272,9 @@ class UploadTest extends TestCase
 
         $generated = $upload->exposedGenerateFileName();
 
-        // Ska sluta med .jpg (lowercased extension)
-        $this->assertStringEndsWith('.jpg', $generated, 'Filen ska använda lowercased extension.');
-
-        // Hitta sista punkten och separera bas/extension
-        $lastDot = strrpos($generated, '.');
-        $this->assertNotFalse($lastDot, 'Filen ska innehålla en punkt innan extensionen.');
-
-        $base = substr($generated, 0, $lastDot);
-        $ext  = substr($generated, $lastDot + 1);
-
-        $this->assertSame('jpg', $ext, 'Extension ska vara exakt "jpg".');
-        $this->assertNotSame('', $base, 'Basdelen av filnamnet får inte vara tom.');
+        $this->assertMatchesRegularExpression('/\A[a-f0-9]{32}\z/', $generated);
+        $this->assertStringNotContainsString('.', $generated);
+        $this->assertFalse(str_ends_with($generated, '.jpg'));
     }
 
     public function testGenerateFileNameFallsBackWhenNameMissingOrNotString(): void
@@ -438,7 +429,7 @@ class UploadTest extends TestCase
         $mockFile = [
             'name' => 'example2.jpg',
             'type' => 'image/png',
-            'tmp_name' => $this->uploadDirectory . '/test_image2.jpg',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
             'size' => 2048,
             'error' => UPLOAD_ERR_OK,
         ];
@@ -446,7 +437,7 @@ class UploadTest extends TestCase
         $validator = new TestableValidator($mockFile, []);
 
         // Extra mellanslag runt andra MIME-typen
-        $parameter = 'image/jpeg,  image/png  ';
+        $parameter = 'image/png,  image/jpeg  ';
 
         $this->assertTrue(
             $validator->testFileType($mockFile, $parameter),
@@ -454,23 +445,23 @@ class UploadTest extends TestCase
         );
     }
 
-    public function testValidateFileTypeIsCaseInsensitiveForActualMimeType(): void
+    public function testValidateFileTypeIgnoresClientMimeTypeAndUsesActualMimeType(): void
     {
         $mockFile = [
             'name' => 'example3.jpg',
-            'type' => 'IMAGE/JPEG', // versaler i faktisk MIME-typ
-            'tmp_name' => $this->uploadDirectory . '/test_image3.jpg',
+            'type' => 'IMAGE/PNG',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
             'size' => 4096,
             'error' => UPLOAD_ERR_OK,
         ];
 
         $validator = new TestableValidator($mockFile, []);
 
-        $parameter = 'image/jpeg,image/png'; // parametern i gemener
+        $parameter = 'IMAGE/JPEG,IMAGE/PNG';
 
         $this->assertTrue(
             $validator->testFileType($mockFile, $parameter),
-            'MIME-typen ska valideras oavsett versaler/gemener i själva filens MIME-typ.'
+            'MIME-typen ska valideras från faktisk fil och parametern ska vara case-insensitive.'
         );
     }
 
@@ -769,5 +760,128 @@ class UploadTest extends TestCase
             $validator->testFileSize($mockFile, '1'),
             'En fil som är precis över 1 MB ska inte godkännas när gränsen är 1 MB.'
         );
+    }
+
+    public function testSaveRejectsPathTraversalFileName(): void
+    {
+        $this->mockMoveUploadedFile();
+
+        $file = [
+            'name' => 'test_image.jpg',
+            'type' => 'image/jpeg',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
+            'error' => UPLOAD_ERR_OK,
+            'size' => 102400,
+        ];
+
+        $upload = new Upload($file, $this->uploadDirectory);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Ogiltigt filnamn.');
+
+        $upload->save('../evil.php');
+    }
+
+    public function testSaveRejectsFileNameWithDirectorySeparator(): void
+    {
+        $this->mockMoveUploadedFile();
+
+        $file = [
+            'name' => 'test_image.jpg',
+            'type' => 'image/jpeg',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
+            'error' => UPLOAD_ERR_OK,
+            'size' => 102400,
+        ];
+
+        $upload = new Upload($file, $this->uploadDirectory);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Ogiltigt filnamn.');
+
+        $upload->save('nested/evil.jpg');
+    }
+
+    public function testSaveRejectsFileNameWithUnsafeCharacters(): void
+    {
+        $this->mockMoveUploadedFile();
+
+        $file = [
+            'name' => 'test_image.jpg',
+            'type' => 'image/jpeg',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
+            'error' => UPLOAD_ERR_OK,
+            'size' => 102400,
+        ];
+
+        $upload = new Upload($file, $this->uploadDirectory);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Ogiltigt filnamn.');
+
+        $upload->save('bad name.jpg');
+    }
+
+    public function testSaveThrowsWhenUploadErrorIsNotOk(): void
+    {
+        $this->mockMoveUploadedFile();
+
+        $file = [
+            'name' => 'test_image.jpg',
+            'type' => 'image/jpeg',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
+            'error' => UPLOAD_ERR_NO_FILE,
+            'size' => 0,
+        ];
+
+        $upload = new Upload($file, $this->uploadDirectory);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Filen är inte en giltig uppladdning.');
+
+        $upload->save();
+    }
+
+    public function testSaveGeneratesExtensionFromActualMimeType(): void
+    {
+        $this->mockMoveUploadedFile();
+
+        $file = [
+            'name' => 'evil.php',
+            'type' => 'application/x-php',
+            'tmp_name' => $this->uploadDirectory . '/test_image.jpg',
+            'error' => UPLOAD_ERR_OK,
+            'size' => 102400,
+        ];
+
+        $upload = new Upload($file, $this->uploadDirectory);
+
+        $savedPath = $upload->save();
+
+        $this->assertStringEndsWith('.jpg', $savedPath);
+        $this->assertFileExists($savedPath);
+    }
+
+    public function testSaveRejectsUnsupportedActualMimeType(): void
+    {
+        $this->mockMoveUploadedFile();
+
+        $textFile = $this->uploadDirectory . '/not_an_image.txt';
+        file_put_contents($textFile, 'hello');
+
+        $file = [
+            'name' => 'image.jpg',
+            'type' => 'image/jpeg',
+            'tmp_name' => $textFile,
+            'error' => UPLOAD_ERR_OK,
+            'size' => 5,
+        ];
+
+        $upload = new Upload($file, $this->uploadDirectory);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Otillåten filtyp:');
+
+        $upload->save();
     }
 }
