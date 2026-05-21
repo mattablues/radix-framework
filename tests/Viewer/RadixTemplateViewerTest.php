@@ -1457,7 +1457,7 @@ class RadixTemplateViewerTest extends TestCase
         /** @var string $key1 */
         $key1 = $generateCacheKey->invoke($this->viewer, $resolved, $data1);
 
-        // 4) Ändra endast pagination (relevantParts) och beräkna nyckel igen – page = 2
+        // 4) Ändra endast pagination och beräkna nyckel igen – page = 2
         $data2 = [
             'name' => 'User',
             'pagination' => ['page' => 2],
@@ -1471,17 +1471,372 @@ class RadixTemplateViewerTest extends TestCase
             'generateCacheKey ska påverkas av template-data (t.ex. pagination).'
         );
 
-        // 5) Samma data som key2, men ändra bara CSS-mtime (additionalHashes)
+        // 5) Samma data som key2, men ändra bara CSS-mtime.
+        // Eftersom asset-signaturen cache:as per viewer-instans använder vi en ny viewer.
         $t2 = $t1 + 10;
         touch($cssPath, $t2);
-        // JS lämnas oförändrad – det räcker att en av dem ändras
+
+        $freshViewer = new RadixTemplateViewer($this->tempViewsPath);
+        $freshReflection = new ReflectionClass($freshViewer);
+
+        $freshGenerateCacheKey = $freshReflection->getMethod('generateCacheKey');
+        $freshGenerateCacheKey->setAccessible(true);
+
         /** @var string $key3 */
-        $key3 = $generateCacheKey->invoke($this->viewer, $resolved, $data2);
+        $key3 = $freshGenerateCacheKey->invoke($freshViewer, $resolved, $data2);
 
         $this->assertNotSame(
             $key2,
             $key3,
-            'generateCacheKey ska påverkas av CSS/JS-tidsstämplar (additionalHashes).'
+            'generateCacheKey ska påverkas av public asset-signaturen mellan viewer-instanser.'
+        );
+    }
+
+    public function testPublicAssetCacheSignatureIsCachedPerViewerInstance(): void
+    {
+        $reflection = new ReflectionClass($this->viewer);
+
+        $getPublicAssetCacheSignature = $reflection->getMethod('getPublicAssetCacheSignature');
+        $getPublicAssetCacheSignature->setAccessible(true);
+
+        $publicPath = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public';
+        $cssDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'css';
+
+        $this->createDirectoryIfNotExists($cssDir);
+
+        $assetPath = $cssDir . DIRECTORY_SEPARATOR . 'cached.css';
+        file_put_contents($assetPath, 'body {}');
+
+        $firstMixed = $getPublicAssetCacheSignature->invoke($this->viewer);
+        $this->assertIsArray($firstMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $first */
+        $first = $firstMixed;
+
+        $this->assertArrayHasKey('assets/css/cached.css', $first);
+
+        unlink($assetPath);
+
+        $secondMixed = $getPublicAssetCacheSignature->invoke($this->viewer);
+        $this->assertIsArray($secondMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $second */
+        $second = $secondMixed;
+
+        $this->assertSame(
+            $first,
+            $second,
+            'Asset-signaturen ska cache:as per viewer-instans och inte skannas om vid andra anropet.'
+        );
+    }
+
+    public function testPublicAssetCacheSignatureAcceptsUppercaseAssetExtensions(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+        $reflection = new ReflectionClass($viewer);
+
+        $getPublicAssetCacheSignature = $reflection->getMethod('getPublicAssetCacheSignature');
+        $getPublicAssetCacheSignature->setAccessible(true);
+
+        $publicPath = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public';
+        $cssDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'css';
+        $jsDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'js';
+
+        $this->createDirectoryIfNotExists($cssDir);
+        $this->createDirectoryIfNotExists($jsDir);
+
+        file_put_contents($cssDir . DIRECTORY_SEPARATOR . 'upper.CSS', 'body {}');
+        file_put_contents($jsDir . DIRECTORY_SEPARATOR . 'upper.JS', 'console.log("x");');
+
+        $signatureMixed = $getPublicAssetCacheSignature->invoke($viewer);
+        $this->assertIsArray($signatureMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $signature */
+        $signature = $signatureMixed;
+
+        $this->assertArrayHasKey('assets/css/upper.CSS', $signature);
+        $this->assertArrayHasKey('assets/js/upper.JS', $signature);
+    }
+
+    public function testPublicAssetCacheSignatureKeysAreSorted(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+        $reflection = new ReflectionClass($viewer);
+
+        $getPublicAssetCacheSignature = $reflection->getMethod('getPublicAssetCacheSignature');
+        $getPublicAssetCacheSignature->setAccessible(true);
+
+        $publicPath = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public';
+
+        $cssDir = $publicPath . DIRECTORY_SEPARATOR . 'css';
+        $assetsDir = $publicPath . DIRECTORY_SEPARATOR . 'assets';
+
+        $this->createDirectoryIfNotExists($cssDir);
+        $this->createDirectoryIfNotExists($assetsDir);
+
+        file_put_contents($cssDir . DIRECTORY_SEPARATOR . 'z.css', 'z');
+        file_put_contents($assetsDir . DIRECTORY_SEPARATOR . 'a.css', 'a');
+
+        $signatureMixed = $getPublicAssetCacheSignature->invoke($viewer);
+        $this->assertIsArray($signatureMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $signature */
+        $signature = $signatureMixed;
+
+        $keys = array_keys($signature);
+        $sortedKeys = $keys;
+        sort($sortedKeys);
+
+        $this->assertSame(
+            $sortedKeys,
+            $keys,
+            'Asset-signaturens nycklar ska vara sorterade för stabil serialisering/cache-key.'
+        );
+    }
+
+    public function testGenerateCacheKeyDependsOnTemplateAbsolutePath(): void
+    {
+        $viewsA = $this->tempRootPath . 'views_a' . DIRECTORY_SEPARATOR;
+        $viewsB = $this->tempRootPath . 'views_b' . DIRECTORY_SEPARATOR;
+
+        $this->createDirectoryIfNotExists($viewsA);
+        $this->createDirectoryIfNotExists($viewsB);
+
+        $templateName = 'same_name';
+        $resolved = $templateName . '.ratio.php';
+
+        $templateA = $viewsA . $resolved;
+        $templateB = $viewsB . $resolved;
+
+        file_put_contents($templateA, 'Same content');
+        file_put_contents($templateB, 'Same content');
+
+        $mtime = 123456;
+        touch($templateA, $mtime);
+        touch($templateB, $mtime);
+
+        $viewerA = new RadixTemplateViewer($viewsA);
+        $viewerB = new RadixTemplateViewer($viewsB);
+
+        $reflectionA = new ReflectionClass($viewerA);
+        $reflectionB = new ReflectionClass($viewerB);
+
+        $generateCacheKeyA = $reflectionA->getMethod('generateCacheKey');
+        $generateCacheKeyA->setAccessible(true);
+
+        $generateCacheKeyB = $reflectionB->getMethod('generateCacheKey');
+        $generateCacheKeyB->setAccessible(true);
+
+        /** @var string $keyA */
+        $keyA = $generateCacheKeyA->invoke($viewerA, $resolved, []);
+
+        /** @var string $keyB */
+        $keyB = $generateCacheKeyB->invoke($viewerB, $resolved, []);
+
+        $this->assertNotSame(
+            $keyA,
+            $keyB,
+            'Cache-key ska påverkas av template-filens absoluta path, inte bara mtime/hash.'
+        );
+    }
+
+    public function testGenerateCacheKeyChangesWhenSearchDataChanges(): void
+    {
+        $reflection = new ReflectionClass($this->viewer);
+
+        $resolveTemplatePath = $reflection->getMethod('resolveTemplatePath');
+        $resolveTemplatePath->setAccessible(true);
+
+        $generateCacheKey = $reflection->getMethod('generateCacheKey');
+        $generateCacheKey->setAccessible(true);
+
+        $templateLogicalName = 'search_cache_key_test';
+
+        /** @var string $resolved */
+        $resolved = $resolveTemplatePath->invoke($this->viewer, $templateLogicalName);
+
+        $templatePath = $this->tempViewsPath . $resolved;
+        $this->createDirectoryIfNotExists(dirname($templatePath));
+        file_put_contents($templatePath, 'Search');
+
+        /** @var string $keyA */
+        $keyA = $generateCacheKey->invoke($this->viewer, $resolved, [
+            'search' => [
+                'term' => 'alpha',
+                'current_page' => 1,
+            ],
+        ]);
+
+        /** @var string $keyB */
+        $keyB = $generateCacheKey->invoke($this->viewer, $resolved, [
+            'search' => [
+                'term' => 'beta',
+                'current_page' => 1,
+            ],
+        ]);
+
+        $this->assertNotSame(
+            $keyA,
+            $keyB,
+            'Cache-key ska påverkas av search-data.'
+        );
+    }
+
+    public function testGenerateCacheKeyChangesWhenFilterNameChangesEvenWithSameType(): void
+    {
+        $templateLogicalName = 'filter_cache_key_test';
+        $resolved = $templateLogicalName . '.ratio.php';
+
+        $templatePath = $this->tempViewsPath . $resolved;
+        $this->createDirectoryIfNotExists(dirname($templatePath));
+        file_put_contents($templatePath, 'Filter');
+
+        $viewerA = new RadixTemplateViewer($this->tempViewsPath);
+        $viewerB = new RadixTemplateViewer($this->tempViewsPath);
+
+        $viewerA->registerFilter('filter_a', static fn(string $value): string => $value, 'string');
+        $viewerB->registerFilter('filter_b', static fn(string $value): string => $value, 'string');
+
+        $reflectionA = new ReflectionClass($viewerA);
+        $reflectionB = new ReflectionClass($viewerB);
+
+        $generateCacheKeyA = $reflectionA->getMethod('generateCacheKey');
+        $generateCacheKeyA->setAccessible(true);
+
+        $generateCacheKeyB = $reflectionB->getMethod('generateCacheKey');
+        $generateCacheKeyB->setAccessible(true);
+
+        /** @var string $keyA */
+        $keyA = $generateCacheKeyA->invoke($viewerA, $resolved, []);
+
+        /** @var string $keyB */
+        $keyB = $generateCacheKeyB->invoke($viewerB, $resolved, []);
+
+        $this->assertNotSame(
+            $keyA,
+            $keyB,
+            'Cache-key ska påverkas av filternamn, inte bara filtertyp.'
+        );
+    }
+
+    public function testLoadTemplateNormalizesOppositeDirectorySeparatorsBeforeFileExistsCheck(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+        $reflection = new ReflectionClass($viewer);
+        $loadTemplate = $reflection->getMethod('loadTemplate');
+        $loadTemplate->setAccessible(true);
+
+        $rawPath = DIRECTORY_SEPARATOR === '\\'
+            ? 'this/does/not/exist/template.ratio.php'
+            : 'this\\does\\not\\exist\\template.ratio.php';
+
+        try {
+            $loadTemplate->invoke($viewer, $rawPath);
+            $this->fail('loadTemplate() borde kasta RuntimeException för saknad fil.');
+        } catch (RuntimeException $e) {
+            $message = $e->getMessage();
+
+            $this->assertStringContainsString('Template file not found:', $message);
+
+            if (DIRECTORY_SEPARATOR === '\\') {
+                $this->assertStringNotContainsString('/', $message);
+            } else {
+                $this->assertStringNotContainsString('\\', $message);
+            }
+        }
+    }
+
+    public function testGetPublicAssetRootPathReturnsRootWithoutTrailingSeparator(): void
+    {
+        $viewer = new class ($this->tempViewsPath) extends RadixTemplateViewer {
+            public function exposeGetPublicAssetRootPath(): string
+            {
+                return $this->getPublicAssetRootPath();
+            }
+        };
+
+        $root = $viewer->exposeGetPublicAssetRootPath();
+
+        $this->assertNotSame('', $root);
+        $this->assertFalse(
+            str_ends_with($root, '/'),
+            'Public asset root path ska inte sluta med slash.'
+        );
+        $this->assertFalse(
+            str_ends_with($root, '\\'),
+            'Public asset root path ska inte sluta med backslash.'
+        );
+    }
+
+    public function testGetFilterKeySerializesBothFilterNamesAndFilterTypes(): void
+    {
+        $viewer = new RadixTemplateViewer($this->tempViewsPath);
+
+        $viewer->registerFilter(
+            'alpha_filter',
+            static fn(string $value): string => $value,
+            'string'
+        );
+
+        $reflection = new ReflectionClass($viewer);
+        $getFilterKey = $reflection->getMethod('getFilterKey');
+        $getFilterKey->setAccessible(true);
+
+        $actualMixed = $getFilterKey->invoke($viewer);
+        $this->assertIsString($actualMixed);
+
+        /** @var string $actual */
+        $actual = $actualMixed;
+
+        $expected = md5(serialize([
+            'names' => ['alpha_filter'],
+            'types' => ['string'],
+        ]));
+
+        $typesOnly = md5(serialize([
+            'types' => ['string'],
+        ]));
+
+        $this->assertSame(
+            $expected,
+            $actual,
+            'getFilterKey() ska serialisera både filternamn och filtertyper.'
+        );
+
+        $this->assertNotSame(
+            $typesOnly,
+            $actual,
+            'getFilterKey() får inte bara baseras på filtertyper.'
+        );
+    }
+
+    public function testPublicAssetRootPathTrimsTrailingSlashesAndBackslashes(): void
+    {
+        $viewer = new class ($this->tempViewsPath) extends RadixTemplateViewer {
+            public function exposeNormalizeRootPath(string $root): string
+            {
+                return $this->normalizeRootPath($root);
+            }
+        };
+
+        $rootWithTrailingSeparators = rtrim($this->tempRootPath, '/\\') . '/\\';
+
+        $normalized = $viewer->exposeNormalizeRootPath($rootWithTrailingSeparators);
+
+        $this->assertSame(
+            rtrim($this->tempRootPath, '/\\'),
+            $normalized,
+            'normalizeRootPath() måste trimma både trailing slash och backslash.'
+        );
+
+        $this->assertFalse(
+            str_ends_with($normalized, '/'),
+            'Normaliserad root path ska inte sluta med slash.'
+        );
+        $this->assertFalse(
+            str_ends_with($normalized, '\\'),
+            'Normaliserad root path ska inte sluta med backslash.'
         );
     }
 
@@ -2218,7 +2573,108 @@ class RadixTemplateViewerTest extends TestCase
         );
     }
 
-    public function testGenerateCacheKeyCastsAssetMtimesToStringForStableSerialization(): void
+    public function testPublicAssetCacheSignatureIncludesNestedCssAndJsAssets(): void
+    {
+        $reflection = new ReflectionClass($this->viewer);
+
+        $getPublicAssetCacheSignature = $reflection->getMethod('getPublicAssetCacheSignature');
+        $getPublicAssetCacheSignature->setAccessible(true);
+
+        $publicPath = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public';
+
+        $cssDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'css';
+        $jsDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'js';
+
+        $this->createDirectoryIfNotExists($cssDir);
+        $this->createDirectoryIfNotExists($jsDir);
+
+        $cssPath = $cssDir . DIRECTORY_SEPARATOR . 'app.css';
+        $jsPath = $jsDir . DIRECTORY_SEPARATOR . 'app.js';
+
+        file_put_contents($cssPath, 'body { color: red; }');
+        file_put_contents($jsPath, 'console.log("ok");');
+
+        $mtime = 222222;
+        touch($cssPath, $mtime);
+        touch($jsPath, $mtime);
+
+        $signatureMixed = $getPublicAssetCacheSignature->invoke($this->viewer);
+        $this->assertIsArray($signatureMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $signature */
+        $signature = $signatureMixed;
+
+        $this->assertArrayHasKey('assets/css/app.css', $signature);
+        $this->assertArrayHasKey('assets/js/app.js', $signature);
+
+        $this->assertSame((int) filemtime($cssPath), $signature['assets/css/app.css']['mtime']);
+        $this->assertSame((int) filesize($cssPath), $signature['assets/css/app.css']['size']);
+
+        $this->assertSame((int) filemtime($jsPath), $signature['assets/js/app.js']['mtime']);
+        $this->assertSame((int) filesize($jsPath), $signature['assets/js/app.js']['size']);
+    }
+
+    public function testPublicAssetCacheSignatureIgnoresUploadsImagesAndMediaDirectories(): void
+    {
+        $reflection = new ReflectionClass($this->viewer);
+
+        $getPublicAssetCacheSignature = $reflection->getMethod('getPublicAssetCacheSignature');
+        $getPublicAssetCacheSignature->setAccessible(true);
+
+        $publicPath = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public';
+
+        $uploadsCssDir = $publicPath . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'css';
+        $imagesJsDir = $publicPath . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'js';
+        $mediaDir = $publicPath . DIRECTORY_SEPARATOR . 'media';
+
+        $this->createDirectoryIfNotExists($uploadsCssDir);
+        $this->createDirectoryIfNotExists($imagesJsDir);
+        $this->createDirectoryIfNotExists($mediaDir);
+
+        file_put_contents($uploadsCssDir . DIRECTORY_SEPARATOR . 'uploaded.css', 'body { color: red; }');
+        file_put_contents($imagesJsDir . DIRECTORY_SEPARATOR . 'image.js', 'console.log("image");');
+        file_put_contents($mediaDir . DIRECTORY_SEPARATOR . 'video-helper.js', 'console.log("media");');
+
+        $signatureMixed = $getPublicAssetCacheSignature->invoke($this->viewer);
+        $this->assertIsArray($signatureMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $signature */
+        $signature = $signatureMixed;
+
+        $this->assertArrayNotHasKey('uploads/css/uploaded.css', $signature);
+        $this->assertArrayNotHasKey('images/js/image.js', $signature);
+        $this->assertArrayNotHasKey('media/video-helper.js', $signature);
+    }
+
+    public function testPublicAssetCacheSignatureIncludesConfiguredAssetDirectories(): void
+    {
+        $reflection = new ReflectionClass($this->viewer);
+
+        $getPublicAssetCacheSignature = $reflection->getMethod('getPublicAssetCacheSignature');
+        $getPublicAssetCacheSignature->setAccessible(true);
+
+        $publicPath = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public';
+
+        $assetsCssDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'css';
+        $assetsJsDir = $publicPath . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'js';
+
+        $this->createDirectoryIfNotExists($assetsCssDir);
+        $this->createDirectoryIfNotExists($assetsJsDir);
+
+        file_put_contents($assetsCssDir . DIRECTORY_SEPARATOR . 'app.css', 'body {}');
+        file_put_contents($assetsJsDir . DIRECTORY_SEPARATOR . 'app.js', 'console.log("app");');
+
+        $signatureMixed = $getPublicAssetCacheSignature->invoke($this->viewer);
+        $this->assertIsArray($signatureMixed);
+
+        /** @var array<string,array{mtime:int,size:int}> $signature */
+        $signature = $signatureMixed;
+
+        $this->assertArrayHasKey('assets/css/app.css', $signature);
+        $this->assertArrayHasKey('assets/js/app.js', $signature);
+    }
+
+    public function testGenerateCacheKeyChangesWhenNestedPublicAssetChanges(): void
     {
         $reflection = new ReflectionClass($this->viewer);
 
@@ -2228,78 +2684,47 @@ class RadixTemplateViewerTest extends TestCase
         $generateCacheKey = $reflection->getMethod('generateCacheKey');
         $generateCacheKey->setAccessible(true);
 
-        // 1) Skapa en template med stabilt innehåll + mtime
-        $templateLogicalName = 'asset_mtime_string_cast_test';
+        $templateLogicalName = 'nested_public_asset_key_test';
+
         /** @var string $resolved */
         $resolved = $resolveTemplatePath->invoke($this->viewer, $templateLogicalName);
 
-        $templateFullPath = $this->tempViewsPath . $resolved;
-        $this->createDirectoryIfNotExists(dirname($templateFullPath));
+        $templatePath = $this->tempViewsPath . $resolved;
+        $this->createDirectoryIfNotExists(dirname($templatePath));
+        file_put_contents($templatePath, 'Hello');
 
-        file_put_contents($templateFullPath, 'Hello {{ $name }}');
-        $tTemplate = 123456;
-        touch($templateFullPath, $tTemplate);
+        $assetDir = rtrim((string) ROOT_PATH, '/\\')
+            . DIRECTORY_SEPARATOR . 'public'
+            . DIRECTORY_SEPARATOR . 'assets'
+            . DIRECTORY_SEPARATOR . 'css';
 
-        // 2) Skapa CSS/JS under ROOT_PATH/public med stabil mtime
-        $publicCssDir = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'css';
-        $publicJsDir  = rtrim((string) ROOT_PATH, '/\\') . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'js';
-        $this->createDirectoryIfNotExists($publicCssDir);
-        $this->createDirectoryIfNotExists($publicJsDir);
+        $this->createDirectoryIfNotExists($assetDir);
 
-        $cssPath = $publicCssDir . DIRECTORY_SEPARATOR . 'app.css';
-        $jsPath  = $publicJsDir . DIRECTORY_SEPARATOR . 'app.js';
+        $assetPath = $assetDir . DIRECTORY_SEPARATOR . 'app.css';
+        file_put_contents($assetPath, 'body { color: red; }');
 
-        file_put_contents($cssPath, 'body {}');
-        file_put_contents($jsPath, 'console.log("x");');
+        $mtime = time();
+        touch($assetPath, $mtime);
 
-        $tAssets = 222222;
-        touch($cssPath, $tAssets);
-        touch($jsPath, $tAssets);
+        /** @var string $key1 */
+        $key1 = $generateCacheKey->invoke($this->viewer, $resolved, []);
 
-        $data = ['name' => 'User'];
-        $version = '';
+        file_put_contents($assetPath, 'body { color: blue; }');
+        touch($assetPath, $mtime + 10);
 
-        $actualMixed = $generateCacheKey->invoke($this->viewer, $resolved, $data, $version);
-        $this->assertIsString($actualMixed);
+        $freshViewer = new RadixTemplateViewer($this->tempViewsPath);
+        $freshReflection = new ReflectionClass($freshViewer);
 
-        $actual = $actualMixed;
+        $freshGenerateCacheKey = $freshReflection->getMethod('generateCacheKey');
+        $freshGenerateCacheKey->setAccessible(true);
 
-        // 3) Bygg EXAKT samma struktur som i generateCacheKey(), inkl. (string) casts
-        $absoluteTemplateFile = rtrim($this->tempViewsPath, '/\\') . DIRECTORY_SEPARATOR . ltrim($resolved, '/\\');
+        /** @var string $key2 */
+        $key2 = $freshGenerateCacheKey->invoke($freshViewer, $resolved, []);
 
-        $templateSig = [
-            'path' => realpath($absoluteTemplateFile) ?: $absoluteTemplateFile,
-            'mtime' => file_exists($absoluteTemplateFile) ? (int) filemtime($absoluteTemplateFile) : 0,
-            'hash' => file_exists($absoluteTemplateFile)
-                ? md5((string) file_get_contents($absoluteTemplateFile))
-                : 'missing',
-        ];
-
-        $relevantParts = [
-            'template' => $templateSig,
-            'pagination' => [], // vi skickar ingen pagination
-            'search' => [],     // vi skickar ingen search
-            'filters' => md5(serialize([]) . serialize([])), // inga filter registrerade
-            'version' => 'default_version', // eftersom $version är ''
-        ];
-
-        $runId = getenv('RADIX_RUN_ID') ?: '';
-        if ($runId !== '') {
-            $relevantParts['run_id'] = $runId;
-        }
-
-        $additionalHashes = [
-            'css' => file_exists($cssPath) ? (string) filemtime($cssPath) : 'no-css',
-            'js' => file_exists($jsPath) ? (string) filemtime($jsPath) : 'no-js',
-        ];
-
-        $expected = md5(serialize($relevantParts) . serialize($additionalHashes));
-
-        // KRITISKT: dödar CastString-mutanten på css-mtime (int vs string ger annan serialize())
-        $this->assertSame(
-            $expected,
-            $actual,
-            'generateCacheKey() måste serialisera asset-mtimes som string för stabil hash (int vs string ska inte smyga in).'
+        $this->assertNotSame(
+            $key1,
+            $key2,
+            'generateCacheKey ska ändras när en nested public asset ändras mellan viewer-instanser.'
         );
     }
 
