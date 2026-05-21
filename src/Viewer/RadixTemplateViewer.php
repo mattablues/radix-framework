@@ -842,9 +842,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
                     continue;
                 }
 
+
                 $path = $file->getPathname();
                 $relativePath = ltrim(str_replace($publicPath, '', $path), '/\\');
-                $relativePath = str_replace('\\', '/', $relativePath);
+                $relativePath = $this->normalizeAssetRelativePath($relativePath);
 
                 $signature[$relativePath] = [
                     'mtime' => $file->getMTime(),
