@@ -1840,6 +1840,22 @@ class RadixTemplateViewerTest extends TestCase
         );
     }
 
+    public function testNormalizeAssetRelativePathConvertsBackslashesToForwardSlashes(): void
+    {
+        $viewer = new class ($this->tempViewsPath) extends RadixTemplateViewer {
+            public function exposeNormalizeAssetRelativePath(string $relativePath): string
+            {
+                return $this->normalizeAssetRelativePath($relativePath);
+            }
+        };
+
+        $this->assertSame(
+            'assets/css/app.css',
+            $viewer->exposeNormalizeAssetRelativePath('assets\\css\\app.css'),
+            'Asset relative path ska normaliseras till forward slashes för stabil cache-key på alla OS.'
+        );
+    }
+
     public function testGenerateCacheKeyChangesWhenVersionChanges(): void
     {
         $reflection = new ReflectionClass($this->viewer);

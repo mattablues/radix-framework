@@ -860,6 +860,11 @@ class RadixTemplateViewer implements TemplateViewerInterface
         return $this->publicAssetCacheSignature;
     }
 
+    protected function normalizeAssetRelativePath(string $relativePath): string
+    {
+        return str_replace('\\', '/', $relativePath);
+    }
+
     protected function getPublicAssetRootPath(): string
     {
         $root = defined('ROOT_PATH')
