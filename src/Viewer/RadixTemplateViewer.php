@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Radix\Viewer;
 
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 use Throwable;
 
 class RadixTemplateViewer implements TemplateViewerInterface
@@ -19,6 +23,10 @@ class RadixTemplateViewer implements TemplateViewerInterface
      */
     private array $filters = [];
     private ?\Radix\Support\Logger $logger = null;
+    /**
+     * @var array<string,array{mtime:int,size:int}>|null
+     */
+    private ?array $publicAssetCacheSignature = null;
 
     public function __construct(?string $viewsDirectory = null)
     {
@@ -389,8 +397,6 @@ class RadixTemplateViewer implements TemplateViewerInterface
             throw new RuntimeException("Komponent fil saknas: $componentFilePath (komponent: $componentPath)");
         }
 
-        $componentCode = $this->loadTemplate($componentFilePath);
-
         // Bearbeta @props direktiv för att sätta standardvärden
         $componentCode = $this->loadTemplate($componentFilePath);
 
@@ -750,6 +756,9 @@ class RadixTemplateViewer implements TemplateViewerInterface
     /**
      * @param array<string,mixed> $data
      */
+    /**
+         * @param array<string,mixed> $data
+         */
     private function generateCacheKey(string $templatePath, array $data, string $version = ''): string
     {
         // Beräkna absolut filsökväg till templaten (säker för både tests och prod)
@@ -766,6 +775,7 @@ class RadixTemplateViewer implements TemplateViewerInterface
             'pagination' => $this->getPaginationKey($data),
             'search' => $this->getSearchKey($data),
             'filters' => $this->getFilterKey(),
+            'assets' => $this->getPublicAssetCacheSignature(),
             'version' => $version ?: 'default_version',
         ];
 
@@ -775,15 +785,99 @@ class RadixTemplateViewer implements TemplateViewerInterface
             $relevantParts['run_id'] = $runId;
         }
 
-        // Lägg till ändringstider från CSS och JS
-        $cssPath = ROOT_PATH . '/public/css/app.css';
-        $jsPath = ROOT_PATH . '/public/js/app.js';
-        $additionalHashes = [
-            'css' => file_exists($cssPath) ? (string) filemtime($cssPath) : 'no-css',
-            'js' => file_exists($jsPath) ? (string) filemtime($jsPath) : 'no-js',
+        return md5(serialize($relevantParts));
+    }
+
+    /**
+         * @return array<string,array{mtime:int,size:int}>
+         */
+    private function getPublicAssetCacheSignature(): array
+    {
+        if ($this->publicAssetCacheSignature !== null) {
+            return $this->publicAssetCacheSignature;
+        }
+
+        $root = $this->getPublicAssetRootPath();
+        $publicPath = $root . DIRECTORY_SEPARATOR . 'public';
+
+        if (!is_dir($publicPath)) {
+            $this->publicAssetCacheSignature = [];
+            return $this->publicAssetCacheSignature;
+        }
+
+        $signature = [];
+        $allowedExtensions = ['css', 'js', 'mjs'];
+
+        $assetDirectories = [
+            'css',
+            'js',
+            'assets',
+            'build',
+            'dist',
         ];
 
-        return md5(serialize($relevantParts) . serialize($additionalHashes));
+        foreach ($assetDirectories as $assetDirectory) {
+            $scanPath = $publicPath . DIRECTORY_SEPARATOR . $assetDirectory;
+
+            if (!is_dir($scanPath)) {
+                continue;
+            }
+
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($scanPath, FilesystemIterator::SKIP_DOTS)
+            );
+
+            foreach ($iterator as $file) {
+                if (!$file instanceof SplFileInfo) {
+                    continue;
+                }
+
+                if (!$file->isFile()) {
+                    continue;
+                }
+
+                $extension = strtolower($file->getExtension());
+
+                if (!in_array($extension, $allowedExtensions, true)) {
+                    continue;
+                }
+
+
+                $path = $file->getPathname();
+                $relativePath = ltrim(str_replace($publicPath, '', $path), '/\\');
+                $relativePath = $this->normalizeAssetRelativePath($relativePath);
+
+                $signature[$relativePath] = [
+                    'mtime' => $file->getMTime(),
+                    'size' => $file->getSize(),
+                ];
+            }
+        }
+
+        ksort($signature);
+
+        $this->publicAssetCacheSignature = $signature;
+
+        return $this->publicAssetCacheSignature;
+    }
+
+    protected function normalizeAssetRelativePath(string $relativePath): string
+    {
+        return str_replace('\\', '/', $relativePath);
+    }
+
+    protected function getPublicAssetRootPath(): string
+    {
+        $root = defined('ROOT_PATH')
+            ? ROOT_PATH
+            : dirname(__DIR__, 4);
+
+        return $this->normalizeRootPath($root);
+    }
+
+    protected function normalizeRootPath(string $root): string
+    {
+        return rtrim($root, '/\\');
     }
 
     /**
@@ -831,10 +925,13 @@ class RadixTemplateViewer implements TemplateViewerInterface
     {
         // Skapa en representation av filtren (namn och typer)
         $filterNames = array_keys($this->filters);
-        $filterTypes = array_map(fn($filter) => $filter['type'], $this->filters);
+        $filterTypes = array_values(array_map(fn($filter) => $filter['type'], $this->filters));
 
         // Skapa hash för aktiva filter
-        return md5(serialize($filterNames) . serialize($filterTypes));
+        return md5(serialize([
+            'names' => $filterNames,
+            'types' => $filterTypes,
+        ]));
     }
 
     /**

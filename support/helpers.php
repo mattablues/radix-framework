@@ -30,10 +30,32 @@ if (!function_exists('public_path')) {
 
 if (!function_exists('versioned_file')) {
     function versioned_file(
-        string $path,
-        string $default = '/images/graphics/avatar.png',
+        mixed $path,
+        string $default = '',
         bool $checkDirectories = false
     ): string {
+        if (is_object($path) && method_exists($path, '__toString')) {
+            $path = (string) $path;
+        }
+
+        if (!is_string($path)) {
+            return $default;
+        }
+
+        $path = trim(str_replace('\\', '/', $path));
+
+        if ($path === '') {
+            return $default;
+        }
+
+        if (preg_match('#^(?:https?:)?//#i', $path) === 1) {
+            return $path;
+        }
+
+        if (!str_starts_with($path, '/')) {
+            $path = '/' . $path;
+        }
+
         $fullPath = public_path($path);
 
         // Kontrollera om filen eller katalogen existerar beroende på flaggan
