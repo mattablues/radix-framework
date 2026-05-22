@@ -11,7 +11,8 @@
     "ext-libxml": "*",
     "ext-pdo": "*",
     "ext-fileinfo": "*",
-    "ext-gd": "*"
+    "ext-gd": "*",
+    "ext-openssl": "*"
   },
   "autoload": {
     "psr-4": {
