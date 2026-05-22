@@ -135,9 +135,9 @@ if (!function_exists('route')) {
 }
 
 if (!function_exists('redirect')) {
-    function redirect(string $url): \Radix\Http\Response
+    function redirect(string $url, int $statusCode = 302): \Radix\Http\Response
     {
-        return new \Radix\Http\RedirectResponse($url);
+        return new \Radix\Http\RedirectResponse($url, $statusCode);
     }
 }
 
@@ -791,8 +791,13 @@ if (!function_exists('honeypot_field')) {
         $honeypotId = generate_honeypot_id() . ($formContext ? '_' . $formContext : '');
         request()->session()->set('honeypot_id', $honeypotId);
 
-        return '<label for="honeypot_' . secure_output($honeypotId) . '" style="display:none;"></label>'
-               . '<input type="text" name="' . secure_output($honeypotId) . '" id="honeypot_' . secure_output($honeypotId) . '" style="display:none;" value="">';
+        $fieldName = secure_output($honeypotId);
+        $fieldId = 'honeypot_' . $fieldName;
+
+        return '<div class="radix-honeypot" aria-hidden="true">'
+            . '<label for="' . $fieldId . '">Leave this field empty</label>'
+            . '<input type="text" name="' . $fieldName . '" id="' . $fieldId . '" value="" tabindex="-1" autocomplete="off">'
+            . '</div>';
     }
 }
 
@@ -894,38 +899,35 @@ if (!function_exists('paginate_links')) {
         $linksMobile  = $first . $prev . $pagesMobile . $next . $last;
         $linksDesktop = $first . $prev . $pagesDesktop . $next . $last;
 
-        $mobile = '<div class="md:hidden w-full overflow-x-auto pb-2 snap-x" aria-label="Sidnavigering">'
-                . '<div class="flex min-w-fit shrink-0 items-center justify-center gap-1.5 px-2 text-sm">'
+        $mobile = '<nav class="radix-pagination radix-pagination--mobile" aria-label="Sidnavigering">'
+                . '<div class="radix-pagination__inner">'
                 . $linksMobile
-                . '</div></div>';
+                . '</div></nav>';
 
-        $desktop = '<div class="hidden md:flex items-center justify-center gap-1.5" aria-label="Sidnavigering">'
+        $desktop = '<nav class="radix-pagination radix-pagination--desktop" aria-label="Sidnavigering">'
+                 . '<div class="radix-pagination__inner">'
                  . $linksDesktop
-                 . '</div>';
+                 . '</div></nav>';
 
         return $mobile . $desktop;
     }
 
-    // Gemensamma klassnamn för konsekvent höjd/bredd
+    // Gemensamma klassnamn för pagination-länkar.
+    // Frameworket använder neutrala radix-klasser.
+    // Radix App kan sedan styla dessa med Tailwind/CSS.
     function _pager_btn_classes(bool $disabled = false, bool $active = false): string
     {
-        // Öka höjd och padding för ~29-30px totalhöjd (matcha tidigare utseende)
-        $base = 'h-7 min-w-7 px-2 py-1 inline-flex items-center justify-center align-middle border rounded text-sm';
-
-        // Basfärger via variabler
-        $baseColors = 'pager-base pager-hover';
+        $base = 'radix-pagination__link';
 
         if ($active) {
-            // Aktiva färger via variabler
-            return $base . ' pager-active';
-        }
-        if ($disabled) {
-            // Inaktiva färger via variabler
-            return $base . ' pager-disabled';
+            return $base . ' radix-pagination__link--active';
         }
 
-        // Standard (länkbar) via variabler
-        return $base . ' ' . $baseColors;
+        if ($disabled) {
+            return $base . ' radix-pagination__link--disabled';
+        }
+
+        return $base;
     }
 
     // Liten, enhetlig SVG-storlek så den inte blir större än sidlänkarna
@@ -944,6 +946,7 @@ if (!function_exists('paginate_links')) {
             default => '',
         };
     }
+
     /**
      * @param array{
      *     total: int,
@@ -968,14 +971,20 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['first_page']]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             return sprintf(
-                '<a href="%s" class="%s" aria-label="Gå till första sidan" style="line-height:1">%s</a>',
+                '<a href="%s" class="%s radix-pagination__link--first" aria-label="Gå till första sidan">%s</a>',
                 secure_output($url),
-                $cls . ' rounded-l-lg',
+                $cls,
                 $icon
             );
         }
-        return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-l-lg', $icon);
+
+        return sprintf(
+            '<span class="%s radix-pagination__link--first" aria-hidden="true">%s</span>',
+            $cls,
+            $icon
+        );
     }
 
     /**
@@ -1001,15 +1010,22 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['current_page'] - 1]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             return sprintf(
-                '<a href="%s" class="%s" aria-label="Föregående sida" style="line-height:1">%s</a>',
+                '<a href="%s" class="%s radix-pagination__link--previous" aria-label="Föregående sida">%s</a>',
                 secure_output($url),
                 $cls,
                 $icon
             );
         }
-        return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
+
+        return sprintf(
+            '<span class="%s radix-pagination__link--previous" aria-hidden="true">%s</span>',
+            $cls,
+            $icon
+        );
     }
+
     /**
      * @param array{
      *     total: int,
@@ -1030,11 +1046,16 @@ if (!function_exists('paginate_links')) {
         for ($page = $pagination['first_page']; $page <= $pagination['last_page']; $page++) {
             $query = http_build_query($currentQuery + ['page' => $page]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             if ($page === $pagination['current_page']) {
-                $html .= sprintf('<span class="%s" aria-current="page" style="line-height:1">%d</span>', _pager_btn_classes(false, true), $page);
+                $html .= sprintf(
+                    '<span class="%s" aria-current="page">%d</span>',
+                    _pager_btn_classes(false, true),
+                    $page
+                );
             } else {
                 $html .= sprintf(
-                    '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                    '<a href="%s" class="%s">%d</a>',
                     secure_output($url),
                     _pager_btn_classes(),
                     $page
@@ -1069,25 +1090,32 @@ if (!function_exists('paginate_links')) {
         if ($current > $first + $interval) {
             $query = http_build_query($currentQuery + ['page' => $first]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             $html .= sprintf(
-                '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                '<a href="%s" class="%s">%d</a>',
                 secure_output($url),
                 _pager_btn_classes(),
                 $first
             );
+
             if ($current > $first + $interval + 1) {
-                $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
+                $html .= '<span class="radix-pagination__ellipsis">…</span>';
             }
         }
 
         for ($page = max($first, $current - $interval); $page <= min($last, $current + $interval); $page++) {
             $query = http_build_query($currentQuery + ['page' => $page]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             if ($page === $current) {
-                $html .= sprintf('<span class="%s" aria-current="page" style="line-height:1">%d</span>', _pager_btn_classes(false, true), $page);
+                $html .= sprintf(
+                    '<span class="%s" aria-current="page">%d</span>',
+                    _pager_btn_classes(false, true),
+                    $page
+                );
             } else {
                 $html .= sprintf(
-                    '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                    '<a href="%s" class="%s">%d</a>',
                     secure_output($url),
                     _pager_btn_classes(),
                     $page
@@ -1097,12 +1125,14 @@ if (!function_exists('paginate_links')) {
 
         if ($current < $last - $interval) {
             if ($current < $last - $interval - 1) {
-                $html .= '<span class="h-6 min-w-6 px-1.5 py-0.5 inline-flex items-center justify-center align-middle pager-ellipsis" style="line-height:1">…</span>';
+                $html .= '<span class="radix-pagination__ellipsis">…</span>';
             }
+
             $query = http_build_query($currentQuery + ['page' => $last]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             $html .= sprintf(
-                '<a href="%s" class="%s" style="line-height:1">%d</a>',
+                '<a href="%s" class="%s">%d</a>',
                 secure_output($url),
                 _pager_btn_classes(),
                 $last
@@ -1135,14 +1165,20 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['current_page'] + 1]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             return sprintf(
-                '<a href="%s" class="%s" aria-label="Nästa sida" style="line-height:1">%s</a>',
+                '<a href="%s" class="%s radix-pagination__link--next" aria-label="Nästa sida">%s</a>',
                 secure_output($url),
                 $cls,
                 $icon
             );
         }
-        return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls, $icon);
+
+        return sprintf(
+            '<span class="%s radix-pagination__link--next" aria-hidden="true">%s</span>',
+            $cls,
+            $icon
+        );
     }
 
     /**
@@ -1170,14 +1206,20 @@ if (!function_exists('paginate_links')) {
         if (!$disabled) {
             $query = http_build_query($currentQuery + ['page' => $pagination['last_page']]);
             $url = $baseUrl . ($query ? '?' . $query : '');
+
             return sprintf(
-                '<a href="%s" class="%s" aria-label="Gå till sista sidan" style="line-height:1">%s</a>',
+                '<a href="%s" class="%s radix-pagination__link--last" aria-label="Gå till sista sidan">%s</a>',
                 secure_output($url),
-                $cls . ' rounded-r-lg',
+                $cls,
                 $icon
             );
         }
-        return sprintf('<span class="%s" aria-hidden="true" style="line-height:1">%s</span>', $cls . ' rounded-r-lg', $icon);
+
+        return sprintf(
+            '<span class="%s radix-pagination__link--last" aria-hidden="true">%s</span>',
+            $cls,
+            $icon
+        );
     }
 
     function calculate_total_pages(int $total, int $perPage): int
