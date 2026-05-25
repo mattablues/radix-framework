@@ -55,7 +55,7 @@ namespace Radix\Tests\Config {
                     'LOCATOR_COUNTRY', 'LOCATOR_CITY', 'LOCATOR_CITY_URL',
                     'GEOLOCATOR_ENABLED', 'GEOLOCATOR_BASE_URL', 'GEOLOCATOR_TIMEOUT',
                     'CORS_ALLOW_ORIGIN', 'CORS_ALLOW_CREDENTIALS',
-                    'HEALTH_REQUIRE_TOKEN', 'API_TOKEN', 'HEALTH_IP_ALLOWLIST', 'TRUSTED_PROXY',
+                    'HEALTH_REQUIRE_TOKEN', 'API_TOKEN', 'HEALTH_IP_ALLOWLIST', 'TRUSTED_PROXY', 'SECURITY_CORP',
                     'ORM_MODEL_NAMESPACE',
                     'DB_DRIVER', 'DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USERNAME', 'DB_PASSWORD', 'DB_CHARSET',
                     'SESSION_DRIVER', 'SESSION_FILE_PATH', 'SESSION_TABLE', 'SESSION_LIFETIME',
@@ -109,6 +109,7 @@ namespace Radix\Tests\Config {
                 . "API_TOKEN=dummy-token\n"
                 . "HEALTH_IP_ALLOWLIST={$healthAllowlist}\n"
                 . "TRUSTED_PROXY=\n"
+                . "SECURITY_CORP=\n"
                 . "ORM_MODEL_NAMESPACE={$ormNamespace}\n"
                 . "DB_DRIVER=mysql\n"
                 . "DB_HOST=127.0.0.1\n"
@@ -882,6 +883,39 @@ namespace Radix\Tests\Config {
             @mkdir($basePath, 0o755, true);
 
             (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            (new EnvValidator())->validate($basePath);
+        }
+
+        public function testValidateAcceptsSecurityCorpSameOrigin(): void
+        {
+            // Dödar mutant som tar bort "same-origin" ur allowed-listan för SECURITY_CORP.
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env .= "SECURITY_CORP=same-origin\n";
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_security_corp_same_origin_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            (new EnvValidator())->validate($basePath);
+
+            $this->assertSame('same-origin', getenv('SECURITY_CORP'));
+        }
+
+        public function testValidateFailsWhenSecurityCorpIsInvalidEnumValue(): void
+        {
+            // Dödar mutant som tar bort enum('SECURITY_CORP', ...).
+            $env = $this->baseEnv(appEnv: 'development', ormNamespace: '', healthAllowlist: '');
+            $env .= "SECURITY_CORP=bogus\n";
+
+            $basePath = rtrim(sys_get_temp_dir(), "/\\") . DIRECTORY_SEPARATOR . 'radix_envvalidator_security_corp_bad_' . uniqid('', true);
+            @mkdir($basePath, 0o755, true);
+
+            (new Dotenv($this->writeTempEnv($env), $basePath))->load();
+
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Invalid environment configuration:');
 
             (new EnvValidator())->validate($basePath);
         }
