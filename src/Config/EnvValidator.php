@@ -106,6 +106,7 @@ final class EnvValidator
         $this->enum('SESSION_DRIVER', ['file', 'database']);
         $this->enum('SESSION_COOKIE_SECURE', ['auto', '1', '0', 'true', 'false']);
         $this->enum('SESSION_COOKIE_SAMESITE', ['Lax', 'Strict', 'None']);
+        $this->enum('SECURITY_CORP', ['same-origin', 'same-site', 'cross-origin', 'off'], allowEmpty: true);
         $this->enum('MAIL_SECURE', ['none', 'ssl', 'tls'], allowEmpty: true);
 
         // --- Bools (0/1, true/false) ---

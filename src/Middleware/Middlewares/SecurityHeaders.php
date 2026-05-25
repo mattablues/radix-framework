@@ -58,6 +58,19 @@ final class SecurityHeaders implements MiddlewareInterface
         $response->setHeader('X-Content-Type-Options', 'nosniff');
         $response->setHeader('X-Frame-Options', 'DENY');
         $response->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+        // Andra klassiker
+        $response->setHeader('X-Content-Type-Options', 'nosniff');
+        $response->setHeader('X-Frame-Options', 'DENY');
+        $response->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+        $corpConfig = $this->config->get('security.corp', '');
+        $corp = is_string($corpConfig) ? trim($corpConfig) : '';
+
+        if ($corp !== '' && strtolower($corp) !== 'off') {
+            $response->setHeader('Cross-Origin-Resource-Policy', $corp);
+        }
+
         $response->setHeader(
             'Permissions-Policy',
             'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), fullscreen=(self)'
