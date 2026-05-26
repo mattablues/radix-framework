@@ -59,11 +59,6 @@ final class SecurityHeaders implements MiddlewareInterface
         $response->setHeader('X-Frame-Options', 'DENY');
         $response->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // Andra klassiker
-        $response->setHeader('X-Content-Type-Options', 'nosniff');
-        $response->setHeader('X-Frame-Options', 'DENY');
-        $response->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-
         $corpConfig = $this->config->get('security.corp', '');
         $corp = is_string($corpConfig) ? trim($corpConfig) : '';
 
