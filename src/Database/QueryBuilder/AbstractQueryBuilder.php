@@ -83,7 +83,7 @@ abstract class AbstractQueryBuilder
                         throw new LogicException('Relation name in eagerLoadRelations must be a string.');
                     }
 
-                    if (!method_exists($model, $relation)) {
+                    if (!$model->relationExists($relation)) {
                         throw new InvalidArgumentException(
                             sprintf("Relation '%s' is not defined in the model '%s'.", $relation, $this->modelClass)
                         );

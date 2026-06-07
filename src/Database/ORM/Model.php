@@ -293,9 +293,84 @@ abstract class Model implements JsonSerializable
         return $this->relations[$key] ?? null;
     }
 
+    /**
+     * Kontrollera om en relation redan är laddad.
+     *
+     * Viktigt: array_key_exists används för att skilja på:
+     *  - relation saknas
+     *  - relation är laddad men värdet är null
+     */
+    public function relationLoaded(string $key): bool
+    {
+        return array_key_exists($key, $this->relations);
+    }
+
+    /**
+     * Ta bort en laddad relation.
+     */
+    public function unsetRelation(string $key): self
+    {
+        unset($this->relations[$key]);
+
+        return $this;
+    }
+
+    /**
+     * Ta bort alla laddade relationer.
+     */
+    public function withoutRelations(): self
+    {
+        $this->relations = [];
+
+        return $this;
+    }
+
+    /**
+     * Hämta relationens värde.
+     *
+     * Om relationen redan är laddad returneras det cachade värdet.
+     * Om relationen finns men inte är laddad körs relationens get()/first()-logik
+     * och resultatet sparas i $relations.
+     */
+    public function getRelationValue(string $key): mixed
+    {
+        if ($this->relationLoaded($key)) {
+            return $this->relations[$key];
+        }
+
+        if (!$this->relationExists($key)) {
+            return null;
+        }
+
+        $relation = $this->$key();
+
+        if (is_object($relation) && method_exists($relation, 'get')) {
+            $value = $relation->get();
+            $this->setRelation($key, $value);
+
+            return $value;
+        }
+
+        return null;
+    }
+
     public function relationExists(string $relation): bool
     {
-        return method_exists($this, $relation);
+        if (!method_exists($this, $relation)) {
+            return false;
+        }
+
+        $method = new ReflectionMethod($this, $relation);
+
+        if (!$method->isPublic()) {
+            return false;
+        }
+
+        if ($method->getNumberOfRequiredParameters() > 0) {
+            return false;
+        }
+
+        return $method->getDeclaringClass()->getName() !== self::class;
     }
 
     /**
@@ -500,7 +575,14 @@ abstract class Model implements JsonSerializable
             return $this->getAttribute($key);
         }
 
-        // Kontrollera om det är en definierad relationsmetod
+        // Om relationen redan är laddad, returnera relationsdatan.
+        // Detta gör att $model->relation fungerar naturligt efter load()/setRelation().
+        if ($this->relationLoaded($key)) {
+            return $this->relations[$key];
+        }
+
+        // Kontrollera om det är en definierad relationsmetod.
+        // Bakåtkompatibelt: returnerar fortfarande relationsobjektet om relationen inte är laddad.
         if (method_exists($this, $key)) {
             return $this->$key();
         }
@@ -1157,6 +1239,69 @@ abstract class Model implements JsonSerializable
         return $out;
     }
 
+    private function getClosureSingleParameterTypeName(Closure $closure): ?string
+    {
+        $ref = new ReflectionFunction($closure);
+
+        if ($ref->getNumberOfParameters() !== 1) {
+            return null;
+        }
+
+        $type = $ref->getParameters()[0]->getType();
+
+        if ($type instanceof ReflectionNamedType) {
+            return $type->getName();
+        }
+
+        if ($type instanceof ReflectionUnionType) {
+            $names = array_map(
+                static fn($t) => $t instanceof ReflectionNamedType ? $t->getName() : null,
+                $type->getTypes()
+            );
+            $names = array_values(array_filter($names));
+
+            return in_array(QueryBuilder::class, $names, true)
+                ? QueryBuilder::class
+                : ($names[0] ?? null);
+        }
+
+        if ($type instanceof ReflectionIntersectionType) {
+            $names = array_map(
+                static fn($t) => $t instanceof ReflectionNamedType ? $t->getName() : null,
+                $type->getTypes()
+            );
+            $names = array_values(array_filter($names));
+
+            return $names[0] ?? null;
+        }
+
+        return null;
+    }
+
+    private function setParentOnRelationIfSupported(mixed $relation): void
+    {
+        if (is_object($relation) && method_exists($relation, 'setParent')) {
+            $relation->setParent($this);
+        }
+    }
+
+    private function getQueryFromRelationIfAvailable(mixed $relation): ?QueryBuilder
+    {
+        if (is_object($relation) && method_exists($relation, 'getQuery')) {
+            $query = $relation->getQuery();
+
+            return $query instanceof QueryBuilder ? $query : null;
+        }
+
+        if (is_object($relation) && method_exists($relation, 'query')) {
+            $query = $relation->query();
+
+            return $query instanceof QueryBuilder ? $query : null;
+        }
+
+        return null;
+    }
+
     /**
      * Exempel:
      *  $user->load('posts');
@@ -1191,54 +1336,29 @@ abstract class Model implements JsonSerializable
             $relObj = $this->$name();
 
             // Sätt parent om möjligt
-            if (is_object($relObj) && method_exists($relObj, 'setParent')) {
-                $relObj->setParent($this);
-            }
+            $this->setParentOnRelationIfSupported($relObj);
 
             $relatedData = null;
 
             if ($closure instanceof Closure) {
-                $ref = new ReflectionFunction($closure);
-                // Säker typ-hämtning utan ReflectionType::getName()
-                $paramType = null;
-                if ($ref->getNumberOfParameters() === 1) {
-                    $type = $ref->getParameters()[0]->getType();
-                    if ($type instanceof ReflectionNamedType) {
-                        $paramType = $type->getName();
-                    } elseif ($type instanceof ReflectionUnionType) {
-                        $names = array_map(
-                            static fn($t) => $t instanceof ReflectionNamedType ? $t->getName() : null,
-                            $type->getTypes()
-                        );
-                        $names = array_values(array_filter($names));
-                        $paramType = in_array(\Radix\Database\QueryBuilder\QueryBuilder::class, $names, true)
-                            ? \Radix\Database\QueryBuilder\QueryBuilder::class
-                            : ($names[0] ?? null);
-                    } elseif (class_exists('\ReflectionIntersectionType') && $type instanceof ReflectionIntersectionType) {
-                        $names = array_map(
-                            static fn($t) => $t instanceof ReflectionNamedType ? $t->getName() : null,
-                            $type->getTypes()
-                        );
-                        $names = array_values(array_filter($names));
-                        $paramType = $names[0] ?? null;
-                    }
-                }
+                $paramType = $this->getClosureSingleParameterTypeName($closure);
 
                 // Försök extrahera QueryBuilder (om relationen har en)
-                $query = null;
-                if (is_object($relObj) && method_exists($relObj, 'getQuery')) {
-                    $query = $relObj->getQuery();
-                } elseif (is_object($relObj) && method_exists($relObj, 'query')) {
-                    $query = $relObj->query();
-                }
+                $query = $this->getQueryFromRelationIfAvailable($relObj);
 
                 if ($paramType === QueryBuilder::class) {
                     if ($query instanceof QueryBuilder) {
-                        // Ge closuren relationens QueryBuilder
+                        // Ge closuren relationens QueryBuilder.
+                        // När användaren uttryckligen type-hintar QueryBuilder ska resultatet hämtas via samma builder,
+                        // så att constraints faktiskt påverkar frågan.
                         $closure($query);
-                        // Låt relationen hämta enligt sin get()
-                        if (is_object($relObj) && method_exists($relObj, 'get')) {
-                            $relatedData = $relObj->get();
+
+                        if (
+                            is_object($relObj)
+                            && method_exists($relObj, 'isOne')
+                            && $relObj->isOne() === true
+                        ) {
+                            $relatedData = $query->first();
                         } else {
                             $relatedData = $query->get();
                         }
@@ -1247,8 +1367,16 @@ abstract class Model implements JsonSerializable
                         $relatedTable = null;
                         $relatedModelClass = null;
 
-                        // HasMany/HasOne: har 'modelClass'
-                        if (is_object($relObj) && property_exists($relObj, 'modelClass')) {
+                        if (is_object($relObj) && method_exists($relObj, 'getRelatedModelClass')) {
+                            $relatedModelClass = $relObj->getRelatedModelClass();
+                        }
+
+                        // HasMany/HasOne: fallback via private property 'modelClass'
+                        if (
+                            $relatedModelClass === null
+                            && is_object($relObj)
+                            && property_exists($relObj, 'modelClass')
+                        ) {
                             $rc = new ReflectionClass($relObj);
                             if ($rc->hasProperty('modelClass')) {
                                 $p = $rc->getProperty('modelClass');
@@ -1256,8 +1384,22 @@ abstract class Model implements JsonSerializable
                                 $relatedModelClass = $p->getValue($relObj);
                             }
                         }
-                        // BelongsTo: har 'relatedTable'
-                        if ($relatedModelClass === null && is_object($relObj) && property_exists($relObj, 'relatedTable')) {
+
+                        if (
+                            $relatedModelClass === null
+                            && is_object($relObj)
+                            && method_exists($relObj, 'getRelatedTable')
+                        ) {
+                            $relatedTable = $relObj->getRelatedTable();
+                        }
+
+                        // BelongsTo: fallback via private property 'relatedTable'
+                        if (
+                            $relatedModelClass === null
+                            && $relatedTable === null
+                            && is_object($relObj)
+                            && property_exists($relObj, 'relatedTable')
+                        ) {
                             $rc = new ReflectionClass($relObj);
                             if ($rc->hasProperty('relatedTable')) {
                                 $p = $rc->getProperty('relatedTable');
@@ -1288,7 +1430,23 @@ abstract class Model implements JsonSerializable
 
                         // Applicera foreign key-filter om möjligt (för HasMany/HasOne)
                         try {
-                            if (is_object($relObj)) {
+                            if (
+                                is_object($relObj)
+                                && method_exists($relObj, 'getForeignKey')
+                                && method_exists($relObj, 'getLocalKeyName')
+                            ) {
+                                $foreignKey = $relObj->getForeignKey();
+                                $localKeyName = $relObj->getLocalKeyName();
+
+                                if (!is_string($foreignKey) || !is_string($localKeyName)) {
+                                    throw new LogicException('Relation foreignKey/localKeyName must be strings.');
+                                }
+
+                                $localValue = $this->getAttribute($localKeyName);
+                                if ($localValue !== null) {
+                                    $qb->where($foreignKey, '=', $localValue);
+                                }
+                            } elseif (is_object($relObj)) {
                                 $rc = new ReflectionClass($relObj);
                                 if ($rc->hasProperty('foreignKey') && $rc->hasProperty('localKeyName')) {
                                     $pfk = $rc->getProperty('foreignKey');
@@ -1318,7 +1476,7 @@ abstract class Model implements JsonSerializable
                     }
                 } elseif (
                     $paramType === null
-                    || (is_string($paramType) && str_starts_with($paramType, 'Radix\\Database\\ORM\\Relationships\\'))
+                    || str_starts_with($paramType, 'Radix\\Database\\ORM\\Relationships\\')
                 ) {
                     // Skicka relationsobjektet (withDefault m.m.)
                     $closure($relObj);
@@ -1388,7 +1546,7 @@ abstract class Model implements JsonSerializable
                 $name = $key;
             }
 
-            if (!array_key_exists($name, $this->relations)) {
+            if (!$this->relationLoaded($name)) {
                 $toLoad[$key] = $constraint;
             }
         }
@@ -1399,110 +1557,6 @@ abstract class Model implements JsonSerializable
 
         return $this;
     }
-
-    //    public function loadMissing(array|string $relations): self
-    //    {
-    //        $relations = is_array($relations) ? $relations : [$relations];
-    //
-    //        foreach ($relations as $key => $constraint) {
-    //            if (is_int($key)) {
-    //                if (!is_string($constraint)) {
-    //                    // enligt signaturen ska värdet här vara string; hoppa annars
-    //                    continue;
-    //                }
-    //                $name = $constraint;
-    //            } else {
-    //                $name = $key;
-    //            }
-    //
-    //            if (array_key_exists($name, $this->relations)) {
-    //                continue; // redan laddad
-    //            }
-    //        }
-    //
-    //        // Kör load() med full uppsättning, men filtrera bort redan laddade
-    //        $toLoad = [];
-    //        foreach ($relations as $key => $constraint) {
-    //            if (is_int($key)) {
-    //                if (!is_string($constraint)) {
-    //                    continue;
-    //                }
-    //                $name = $constraint;
-    //            } else {
-    //                $name = $key;
-    //            }
-    //
-    //            if (!array_key_exists($name, $this->relations)) {
-    //                $toLoad[$key] = $constraint;
-    //            }
-    //        }
-    //
-    //        if (!empty($toLoad)) {
-    //            $this->load($toLoad);
-    //        }
-    //
-    //        return $this;
-    //    }
-
-    //    /**
-    //     * @return array<string, mixed>
-    //     */
-    //    public function toArray(): array
-    //    {
-    //        $array = [];
-    //
-    //        foreach ($this->attributes as $key => $value) {
-    //            $array[$key] = $this->getAttribute($key);
-    //        }
-    //
-    //        foreach ($this->relations as $relationKey => $relationValue) {
-    //            if ($relationValue instanceof Collection) {
-    //                $array[$relationKey] = $relationValue->map(
-    //                    fn($item) => $item instanceof self ? $item->toArray() : $item
-    //                )->values()->toArray();
-    //            } elseif (is_array($relationValue)) {
-    //                $array[$relationKey] = array_map(
-    //                    fn($item) => $item instanceof self ? $item->toArray() : $item,
-    //                    $relationValue
-    //                );
-    //            } elseif ($relationValue instanceof self) {
-    //                $array[$relationKey] = $relationValue->toArray();
-    //            } else {
-    //                $array[$relationKey] = $relationValue;
-    //            }
-    //        }
-    //
-    //        if (!empty($this->autoloadRelations)) {
-    //            foreach ($this->autoloadRelations as $relation) {
-    //                if (!isset($array[$relation]) && $this->relationExists($relation)) {
-    //                    $relObj = $this->$relation();
-    //
-    //                    if (is_object($relObj) && method_exists($relObj, 'get')) {
-    //                        $relatedData = $relObj->get();
-    //                    } else {
-    //                        $relatedData = null;
-    //                    }
-    //
-    //                    if ($relatedData instanceof Collection) {
-    //                        $array[$relation] = $relatedData->map(
-    //                            fn($item) => $item instanceof self ? $item->toArray() : $item
-    //                        )->values()->toArray();
-    //                    } elseif (is_array($relatedData)) {
-    //                        $array[$relation] = array_map(
-    //                            fn($item) => $item instanceof self ? $item->toArray() : $item,
-    //                            $relatedData
-    //                        );
-    //                    } elseif ($relatedData instanceof self) {
-    //                        $array[$relation] = $relatedData->toArray();
-    //                    } else {
-    //                        $array[$relation] = $relatedData;
-    //                    }
-    //                }
-    //            }
-    //        }
-    //
-    //        return $array;
-    //    }
 
     /**
      * @return array<string, mixed>

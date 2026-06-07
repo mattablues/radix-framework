@@ -55,7 +55,10 @@ trait EagerLoad
                 throw new LogicException('Model class must be set and extend ' . Model::class . ' before calling with().');
             }
 
-            if (!method_exists($modelClass, $relation)) {
+            /** @var class-string<Model> $modelClass */
+            $model = new $modelClass();
+
+            if (!$model->relationExists($relation)) {
                 throw new InvalidArgumentException(
                     sprintf("Relation '%s' is not defined on model '%s'.", $relation, $modelClass)
                 );

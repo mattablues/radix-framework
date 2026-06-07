@@ -66,6 +66,51 @@ class HasMany
         return $this->foreignKey;
     }
 
+    public function getLocalKeyName(): string
+    {
+        return $this->localKeyName;
+    }
+
+    public function isMany(): bool
+    {
+        return true;
+    }
+
+    public function isOne(): bool
+    {
+        return false;
+    }
+
+    public function query(): \Radix\Database\QueryBuilder\QueryBuilder
+    {
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $this->modelClass;
+
+        $modelInstance = new $modelClass();
+        /** @var Model $modelInstance */
+        $table = $modelInstance->getTable();
+
+        $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
+            ->setConnection($this->connection)
+            ->setModelClass($modelClass)
+            ->from($table);
+
+        if ($this->parent !== null) {
+            $localValue = $this->parent->getAttribute($this->localKeyName);
+
+            if ($localValue !== null) {
+                $qb->where($this->foreignKey, '=', $localValue);
+            } else {
+                $qb->whereRaw('1 = 0');
+            }
+        } else {
+            // Backcompat: om parent saknas används localKeyName som värde, samma princip som get().
+            $qb->where($this->foreignKey, '=', $this->localKeyName);
+        }
+
+        return $qb;
+    }
+
     /**
      * @return array<int, Model>
      */
