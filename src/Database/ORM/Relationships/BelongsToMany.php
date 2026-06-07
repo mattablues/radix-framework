@@ -84,6 +84,16 @@ class BelongsToMany
         return $this->parentKeyName;
     }
 
+    public function isMany(): bool
+    {
+        return true;
+    }
+
+    public function isOne(): bool
+    {
+        return false;
+    }
+
     // Ny: bygg en QueryBuilder för relaterade med JOIN pivot och standard WHERE på parent
     public function query(): \Radix\Database\QueryBuilder\QueryBuilder
     {
@@ -98,8 +108,14 @@ class BelongsToMany
         $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
             ->setConnection($this->connection)
             ->setModelClass($this->relatedModelClass)
-            ->from("$relatedTable AS related")
-            ->join($this->pivotTable . ' AS pivot', 'related.id', '=', "pivot.$this->relatedPivotKey");
+            ->from($relatedTable . ' AS related')
+            ->joinRaw(
+                sprintf(
+                    'INNER JOIN `%s` AS pivot ON related.`id` = pivot.`%s`',
+                    $this->pivotTable,
+                    $this->relatedPivotKey
+                )
+            );
 
         // WHERE pivot.foreignPivotKey = parent.id
         if ($this->parent !== null) {
@@ -108,7 +124,7 @@ class BelongsToMany
                 $qb->where("pivot.$this->foreignPivotKey", '=', $parentValue);
             } else {
                 // tomt resultat om parent saknar id
-                $qb->where('1', '=', 0);
+                $qb->whereRaw('1 = 0');
             }
         } else {
             // Backcompat: anta parentKeyName är ett värde

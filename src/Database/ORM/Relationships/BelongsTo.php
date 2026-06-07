@@ -85,6 +85,37 @@ class BelongsTo
         return $this->ownerKey;
     }
 
+    public function isMany(): bool
+    {
+        return false;
+    }
+
+    public function isOne(): bool
+    {
+        return true;
+    }
+
+    public function query(): \Radix\Database\QueryBuilder\QueryBuilder
+    {
+        $foreignKeyValue = $this->parentModel->getAttribute($this->foreignKey);
+
+        [$relatedClass, $relatedTable] = $this->resolveRelatedClassAndTable();
+
+        $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
+            ->setConnection($this->connection)
+            ->setModelClass($relatedClass)
+            ->from($relatedTable)
+            ->limit(1);
+
+        if ($foreignKeyValue !== null) {
+            $qb->where($this->ownerKey, '=', $foreignKeyValue);
+        } else {
+            $qb->whereRaw('1 = 0');
+        }
+
+        return $qb;
+    }
+
     /**
      * @param array<string, mixed>|callable|null $attributes
      */

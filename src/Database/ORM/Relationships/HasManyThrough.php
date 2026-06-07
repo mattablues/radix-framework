@@ -97,6 +97,65 @@ class HasManyThrough
         return $this->secondLocal;
     }
 
+    public function isMany(): bool
+    {
+        return true;
+    }
+
+    public function isOne(): bool
+    {
+        return false;
+    }
+
+    public function query(): \Radix\Database\QueryBuilder\QueryBuilder
+    {
+        if ($this->parent === null) {
+            throw new LogicException('HasManyThrough parent saknas.');
+        }
+
+        /** @var Model $parent */
+        $parent = $this->parent;
+
+        $relatedClass = $this->resolveModelClass($this->related);
+        $throughClass = $this->resolveModelClass($this->through);
+
+        $this->ensureModelClassLoaded($relatedClass);
+        $this->ensureModelClassLoaded($throughClass);
+
+        /** @var class-string<Model> $relatedClass */
+        /** @var class-string<Model> $throughClass */
+        $relatedModel = new $relatedClass();
+        $throughModel = new $throughClass();
+
+        /** @var Model $relatedModel */
+        /** @var Model $throughModel */
+        $relatedTable = $relatedModel->getTable();
+        $throughTable = $throughModel->getTable();
+
+        $parentValue = $parent->getAttribute($this->localKey);
+
+        $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
+            ->setConnection($this->connection)
+            ->setModelClass($relatedClass)
+            ->from($relatedTable . ' AS r')
+            ->joinRaw(
+                sprintf(
+                    'INNER JOIN `%s` AS t ON t.`%s` = r.`%s`',
+                    $throughTable,
+                    $this->secondLocal,
+                    $this->secondKey
+                )
+            );
+
+        if ($parentValue !== null) {
+            $qb->where('t.' . $this->firstKey, '=', $parentValue);
+        } else {
+            $qb->whereRaw('1 = 0');
+        }
+
+        return $qb;
+    }
+
     public function setParent(Model $parent): self
     {
         $this->parent = $parent;

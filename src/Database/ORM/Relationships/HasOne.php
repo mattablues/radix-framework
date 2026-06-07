@@ -66,6 +66,52 @@ class HasOne
         return $this->foreignKey;
     }
 
+    public function getLocalKeyName(): string
+    {
+        return $this->localKeyName;
+    }
+
+    public function isMany(): bool
+    {
+        return false;
+    }
+
+    public function isOne(): bool
+    {
+        return true;
+    }
+
+    public function query(): \Radix\Database\QueryBuilder\QueryBuilder
+    {
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $this->modelClass;
+
+        $modelInstance = new $modelClass();
+        /** @var Model $modelInstance */
+        $table = $modelInstance->getTable();
+
+        $qb = (new \Radix\Database\QueryBuilder\QueryBuilder())
+            ->setConnection($this->connection)
+            ->setModelClass($modelClass)
+            ->from($table)
+            ->limit(1);
+
+        if ($this->parent !== null) {
+            $localValue = $this->parent->getAttribute($this->localKeyName);
+
+            if ($localValue !== null) {
+                $qb->where($this->foreignKey, '=', $localValue);
+            } else {
+                $qb->whereRaw('1 = 0');
+            }
+        } else {
+            // Backcompat: om parent saknas används localKeyName som värde, samma princip som get().
+            $qb->where($this->foreignKey, '=', $this->localKeyName);
+        }
+
+        return $qb;
+    }
+
     /**
      * @param array<string, mixed>|callable|null $attributes
      */
@@ -140,9 +186,6 @@ class HasOne
     /**
      * @param array<string, mixed> $data
      */
-    /**
-     * @param array<string, mixed> $data
-     */
     private function createModelInstance(array $data, string $classOrTable): Model
     {
         // Använd redan-resolvad klass, inte resolve/autoload igen.
@@ -156,9 +199,6 @@ class HasOne
         return $model;
     }
 
-    /**
-     * Hjälpmetod för att lösa det fullständiga modellklassnamnet.
-     */
     /**
      * Hjälpmetod för att lösa modellklass från klassnamn eller tabellnamn.
      * OBS: Ingen autoload här – bara mapping.

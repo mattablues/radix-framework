@@ -6,6 +6,7 @@ namespace Radix\Tests\Database\Query;
 
 use Closure;
 use ErrorException;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Radix\Database\Connection;
 use Radix\Database\ORM\Model;
@@ -270,5 +271,45 @@ final class AbstractQueryBuilderMutationTest extends TestCase
         $builder->get();
 
         $this->assertSame(1, $called, 'Constraint-closure ska köras exakt en gång per eager-load.');
+    }
+
+    public function testEagerLoadRejectsBaseModelMethodAsRelation(): void
+    {
+        $conn = $this->createMock(\Radix\Database\Connection::class);
+        $conn->method('fetchAll')->willReturn([
+            ['id' => 1],
+        ]);
+
+        $builder = new class extends \Radix\Database\QueryBuilder\AbstractQueryBuilder {
+            /** @var array<int,string> */
+            protected array $eagerLoadRelations = ['save'];
+
+            public function toSql(): string
+            {
+                return 'SELECT * FROM users';
+            }
+
+            /**
+             * @param class-string<\Radix\Database\ORM\Model> $modelClass
+             */
+            public function setModelClassForTest(string $modelClass): void
+            {
+                $this->modelClass = $modelClass;
+            }
+        };
+
+        $model = new class extends \Radix\Database\ORM\Model {
+            protected string $table = 'users';
+            /** @var array<int,string> */
+            protected array $fillable = ['id'];
+        };
+
+        $builder->setConnection($conn);
+        $builder->setModelClassForTest(get_class($model));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Relation 'save' is not defined");
+
+        $builder->get();
     }
 }
